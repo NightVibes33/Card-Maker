@@ -821,7 +821,7 @@ function customLayerSelectionStyle(layer, layerImage) {
     Number(layer?.x ?? 0.5) * OUT_W,
     Number(layer?.y ?? 0.5) * OUT_H,
     clamp(Number(layer?.scale ?? 1), 0.1, 6),
-    Number(layer?.rotation || 0),
+    Number(layer?.rotation ?? 0),
     customLayerBounds(layer, layerImage)
   );
 }
@@ -2745,7 +2745,7 @@ export default function Page() {
         height: ih,
         rotation: renderDesign.rotate
       };
-      const exposureFactor = artworkOriginal ? 1 : Math.pow(2, Number(renderDesign.exposure || 0));
+      const exposureFactor = artworkOriginal ? 1 : Math.pow(2, Number(renderDesign.exposure ?? 0));
       const brightness = artworkOriginal ? 1 : clamp(renderDesign.brightness * exposureFactor, 0.2, 3);
       const saturation = artworkOriginal ? 1 : clamp(renderDesign.saturation, 0, 3);
       const sharpBoost = artworkOriginal ? 0 : Math.max(0, Number(renderDesign.sharpness || 0));
@@ -3015,8 +3015,8 @@ export default function Page() {
       const lx = clamp(Number(layer.x ?? 0.5), -0.5, 1.5) * OUT_W;
       const ly = clamp(Number(layer.y ?? 0.5), -0.5, 1.5) * OUT_H;
       ctx.translate(lx, ly);
-      ctx.rotate((Number(layer.rotation || 0) * Math.PI) / 180);
-      const scale = clamp(Number(layer.scale || 1), 0.1, 6);
+      ctx.rotate((Number(layer.rotation ?? 0) * Math.PI) / 180);
+      const scale = clamp(Number(layer.scale ?? 1), 0.1, 6);
       ctx.scale(layer.type === 'image' && layer.flipX ? -scale : scale, scale);
 
       if (layer.type === 'text') {
@@ -3034,12 +3034,12 @@ export default function Page() {
             line,
             0,
             firstBaseline + index * lineAdvance,
-            Number(layer.letterSpacing || 0)
+            Number(layer.letterSpacing ?? 0)
           );
         });
       } else if (layer.type === 'shape') {
-        const w = clamp(Number(layer.width || 260), 20, 1200);
-        const h = clamp(Number(layer.height || 120), 20, 800);
+        const w = clamp(Number(layer.width ?? 280), 20, 1200);
+        const h = clamp(Number(layer.height ?? 120), 20, 800);
         ctx.fillStyle = layer.color || '#ffffff';
         if (layer.shape === 'ellipse') {
           ctx.beginPath();
@@ -3063,18 +3063,18 @@ export default function Page() {
           const sw = crop ? clamp(crop.w, 0.01, 1) * layerImage.width : layerImage.width;
           const sh = crop ? clamp(crop.h, 0.01, 1) * layerImage.height : layerImage.height;
           const ratio = sw / Math.max(1, sh);
-          const w = clamp(Number(layer.width || 640), 20, 1800);
+          const w = clamp(Number(layer.width ?? 640), 20, 1800);
           const h = w / Math.max(0.1, ratio);
           const exposureFactor = layerOriginal ? 1 : Math.pow(2, Number(settings.exposure || 0));
           const brightness = layerOriginal ? 1 : clamp(Number(settings.brightness || 1) * exposureFactor, 0.2, 3);
           const saturation = layerOriginal ? 1 : clamp(Number(settings.saturation ?? 1), 0, 3);
-          const sharpBoost = layerOriginal ? 0 : Math.max(0, Number(settings.sharpness || 0));
+          const sharpBoost = layerOriginal ? 0 : Math.max(0, Number(settings.sharpness ?? 0));
           const contrast = layerOriginal
             ? 1
             : clamp(Number(settings.contrast || 1) + sharpBoost * 0.22, 0.3, 2.5);
           const blur = layerOriginal
             ? 0
-            : Math.max(0, Number(settings.blur || 0) + Math.max(0, -Number(settings.sharpness || 0)) * 0.09);
+            : Math.max(0, Number(settings.blur ?? 0) + Math.max(0, -Number(settings.sharpness ?? 0)) * 0.09);
 
           ctx.save();
           ctx.beginPath();
@@ -3134,7 +3134,7 @@ export default function Page() {
               ctx.restore();
             }
 
-            if (Number(settings.overlay || 0) > 0) {
+            if (Number(settings.overlay ?? 0) > 0) {
               const overlay = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
               overlay.addColorStop(0, 'rgba(0,0,0,' + Number(settings.overlay) * 0.55 + ')');
               overlay.addColorStop(0.55, 'rgba(0,0,0,0)');
@@ -3143,7 +3143,7 @@ export default function Page() {
               ctx.fillRect(-w / 2, -h / 2, w, h);
             }
 
-            if (Number(settings.vignette || 0) > 0) {
+            if (Number(settings.vignette ?? 0) > 0) {
               const vignette = ctx.createRadialGradient(0, 0, Math.min(w, h) * 0.14, 0, 0, Math.max(w, h) * 0.66);
               vignette.addColorStop(0, 'rgba(0,0,0,0)');
               vignette.addColorStop(1, 'rgba(0,0,0,' + Number(settings.vignette) + ')');
@@ -3151,7 +3151,7 @@ export default function Page() {
               ctx.fillRect(-w / 2, -h / 2, w, h);
             }
 
-            if (Number(settings.gloss || 0) > 0) {
+            if (Number(settings.gloss ?? 0) > 0) {
               const gloss = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
               gloss.addColorStop(0, 'rgba(255,255,255,' + Number(settings.gloss) * 0.42 + ')');
               gloss.addColorStop(0.22, 'rgba(255,255,255,' + Number(settings.gloss) * 0.08 + ')');
@@ -3160,11 +3160,11 @@ export default function Page() {
               ctx.fillRect(-w / 2, -h / 2, w, h);
             }
 
-            if (Number(settings.grain || 0) > 0) {
+            if (Number(settings.grain ?? 0) > 0) {
               fillGrain(ctx, -w / 2, -h / 2, w, h, settings.grain);
             }
 
-            if (Number(settings.fade || 0) > 0) {
+            if (Number(settings.fade ?? 0) > 0) {
               ctx.save();
               ctx.globalCompositeOperation = 'screen';
               ctx.globalAlpha *= clamp(Number(settings.fade), 0, 1) * 0.34;
@@ -4961,7 +4961,7 @@ export default function Page() {
                 ? {
                     ...layer,
                     scale: clamp(Number(layer.scale ?? 1) * factor, 0.1, 6),
-                    rotation: clamp(Number(layer.rotation || 0) + angleDelta, -180, 180)
+                    rotation: clamp(Number(layer.rotation ?? 0) + angleDelta, -180, 180)
                   }
                 : layer
             )
@@ -5706,13 +5706,13 @@ export default function Page() {
                               <span>{selectedLayer.flipX ? 'Unflip Image' : 'Flip Image Horizontally'}</span>
                             </button>
                           </div>
-                          <SliderRow label="Image Width" value={selectedLayer.width || 640} min={20} max={1800} step={1} disabled={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
+                          <SliderRow label="Image Width" value={selectedLayer.width ?? 640} min={20} max={1800} step={1} disabled={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
                         </>
                       ) : null}
                       <SliderRow label="Layer horizontal position" value={selectedLayer.x ?? 0.5} min={0} max={1} step={0.005} disabled={Boolean(selectedLayer.locked)} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateLayer(selectedLayer.id, { x: value })} />
                       <SliderRow label="Layer vertical position" value={selectedLayer.y ?? 0.5} min={0} max={1} step={0.005} disabled={Boolean(selectedLayer.locked)} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateLayer(selectedLayer.id, { y: value })} />
-                      <SliderRow label="Layer scale" value={selectedLayer.scale || 1} min={0.1} max={6} step={0.01} disabled={Boolean(selectedLayer.locked)} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
-                      <SliderRow label="Layer rotation" value={selectedLayer.rotation || 0} min={-180} max={180} step={1} suffix="°" disabled={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} />
+                      <SliderRow label="Layer scale" value={selectedLayer.scale ?? 1} min={0.1} max={6} step={0.01} disabled={Boolean(selectedLayer.locked)} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
+                      <SliderRow label="Layer rotation" value={selectedLayer.rotation ?? 0} min={-180} max={180} step={1} suffix="°" disabled={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} />
                       <button type="button" className="settingsResetButton" disabled={Boolean(selectedLayer.locked)} onClick={() => updateLayer(selectedLayer.id, { x: 0.5, y: 0.5, scale: 1, rotation: 0, flipX: false })}>Reset Layer Position</button>
                     </>
                   ) : null}
@@ -5988,7 +5988,7 @@ export default function Page() {
                         </div>
                         <SliderRow label="Font Size" value={selectedLayer.fontSize || 58} min={10} max={240} step={1} onChange={(value) => updateLayer(selectedLayer.id, { fontSize: value })} />
                         <SliderRow label="Weight" value={selectedLayer.weight || 700} min={100} max={900} step={100} onChange={(value) => updateLayer(selectedLayer.id, { weight: value })} />
-                        <SliderRow label="Letter Spacing" value={selectedLayer.letterSpacing || 0} min={-4} max={30} step={1} onChange={(value) => updateLayer(selectedLayer.id, { letterSpacing: value })} />
+                        <SliderRow label="Letter Spacing" value={selectedLayer.letterSpacing ?? 0} min={-4} max={30} step={1} onChange={(value) => updateLayer(selectedLayer.id, { letterSpacing: value })} />
                         <SliderRow label="Line Height" value={selectedLayer.lineHeight ?? 1.18} min={0.8} max={2} step={0.01} formatValue={(value) => value.toFixed(2) + '×'} onChange={(value) => updateLayer(selectedLayer.id, { lineHeight: value })} />
                         <label className="colorRow"><span>Color</span><input type="color" value={selectedLayer.color || '#ffffff'} onChange={(event) => updateLayer(selectedLayer.id, { color: event.target.value })} /></label>
                         <SwitchRow label="Text Shadow" value={Boolean(selectedLayer.shadow)} onChange={(value) => updateLayer(selectedLayer.id, { shadow: value })} />
@@ -6000,14 +6000,14 @@ export default function Page() {
                           <button type="button" aria-pressed={selectedLayer.shape !== 'ellipse'} className={selectedLayer.shape !== 'ellipse' ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { shape: 'rectangle' })}>Rectangle</button>
                           <button type="button" aria-pressed={selectedLayer.shape === 'ellipse'} className={selectedLayer.shape === 'ellipse' ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { shape: 'ellipse' })}>Ellipse</button>
                         </div>
-                        <SliderRow label="Width" value={selectedLayer.width || 280} min={20} max={1200} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
-                        <SliderRow label="Height" value={selectedLayer.height || 120} min={20} max={800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { height: value })} />
+                        <SliderRow label="Width" value={selectedLayer.width ?? 280} min={20} max={1200} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
+                        <SliderRow label="Height" value={selectedLayer.height ?? 120} min={20} max={800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { height: value })} />
                         {selectedLayer.shape !== 'ellipse' ? (
                           <SliderRow
                             label="Corner Radius"
                             value={selectedLayer.radius ?? 28}
                             min={0}
-                            max={Math.max(0, Math.floor(Math.min(Number(selectedLayer.width || 280), Number(selectedLayer.height || 120)) / 2))}
+                            max={Math.max(0, Math.floor(Math.min(Number(selectedLayer.width ?? 280), Number(selectedLayer.height ?? 120)) / 2))}
                             step={1}
                             onChange={(value) => updateLayer(selectedLayer.id, { radius: value })}
                           />
@@ -6016,7 +6016,7 @@ export default function Page() {
                       </>
                     ) : null}
                     {selectedLayer.type === 'image' ? (
-                      <SliderRow label="Image Width" value={selectedLayer.width || 640} min={20} max={1800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
+                      <SliderRow label="Image Width" value={selectedLayer.width ?? 640} min={20} max={1800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
                     ) : null}
                     {selectedLayer.type === 'chip' ? (
                       <div className="tonePicker" role="radiogroup" aria-label="Custom chip finish">
@@ -6033,34 +6033,34 @@ export default function Page() {
                     ) : null}
                     <SliderRow label="Layer X" value={selectedLayer.x ?? 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id, { x: value })} />
                     <SliderRow label="Layer Y" value={selectedLayer.y ?? 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id, { y: value })} />
-                    <SliderRow label="Layer Scale" value={selectedLayer.scale || 1} min={0.1} max={6} step={0.01} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
-                    <SliderRow label="Layer Rotation" value={selectedLayer.rotation || 0} min={-180} max={180} step={1} suffix="°" onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} />
+                    <SliderRow label="Layer Scale" value={selectedLayer.scale ?? 1} min={0.1} max={6} step={0.01} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
+                    <SliderRow label="Layer Rotation" value={selectedLayer.rotation ?? 0} min={-180} max={180} step={1} suffix="°" onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} />
                     <SliderRow label="Opacity" value={selectedLayer.opacity ?? 1} min={0} max={1} step={0.01} onChange={(value) => updateLayer(selectedLayer.id, { opacity: value })} />
                     {expertMode ? (
                       <div className="layerExpertValues">
                         <NumericField label="Exact Layer X" value={selectedLayer.x ?? 0.5} min={0} max={1} onChange={(value) => updateLayer(selectedLayer.id, { x: value })} />
                         <NumericField label="Exact Layer Y" value={selectedLayer.y ?? 0.5} min={0} max={1} onChange={(value) => updateLayer(selectedLayer.id, { y: value })} />
-                        <NumericField label="Exact Layer Scale" value={selectedLayer.scale || 1} min={0.1} max={6} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
-                        <NumericField label="Exact Layer Rotation" value={selectedLayer.rotation || 0} min={-180} max={180} step={0.1} onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} suffix="°" />
+                        <NumericField label="Exact Layer Scale" value={selectedLayer.scale ?? 1} min={0.1} max={6} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
+                        <NumericField label="Exact Layer Rotation" value={selectedLayer.rotation ?? 0} min={-180} max={180} step={0.1} onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} suffix="°" />
                         <NumericField label="Exact Layer Opacity" value={selectedLayer.opacity ?? 1} min={0} max={1} onChange={(value) => updateLayer(selectedLayer.id, { opacity: value })} />
                         {selectedLayer.type === 'text' ? (
                           <>
                             <NumericField label="Exact Font Size" value={selectedLayer.fontSize || 58} min={10} max={240} step={1} onChange={(value) => updateLayer(selectedLayer.id, { fontSize: value })} />
                             <NumericField label="Exact Font Weight" value={selectedLayer.weight || 700} min={100} max={900} step={100} onChange={(value) => updateLayer(selectedLayer.id, { weight: value })} />
-                            <NumericField label="Exact Letter Spacing" value={selectedLayer.letterSpacing || 0} min={-4} max={30} step={0.1} onChange={(value) => updateLayer(selectedLayer.id, { letterSpacing: value })} />
+                            <NumericField label="Exact Letter Spacing" value={selectedLayer.letterSpacing ?? 0} min={-4} max={30} step={0.1} onChange={(value) => updateLayer(selectedLayer.id, { letterSpacing: value })} />
                             <NumericField label="Exact Line Height" value={selectedLayer.lineHeight ?? 1.18} min={0.8} max={2} step={0.01} onChange={(value) => updateLayer(selectedLayer.id, { lineHeight: value })} suffix="×" />
                           </>
                         ) : null}
                         {selectedLayer.type === 'shape' ? (
                           <>
-                            <NumericField label="Exact Shape Width" value={selectedLayer.width || 280} min={20} max={1200} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
-                            <NumericField label="Exact Shape Height" value={selectedLayer.height || 120} min={20} max={800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { height: value })} />
+                            <NumericField label="Exact Shape Width" value={selectedLayer.width ?? 280} min={20} max={1200} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
+                            <NumericField label="Exact Shape Height" value={selectedLayer.height ?? 120} min={20} max={800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { height: value })} />
                             {selectedLayer.shape !== 'ellipse' ? (
                               <NumericField
                                 label="Exact Corner Radius"
                                 value={selectedLayer.radius ?? 28}
                                 min={0}
-                                max={Math.max(0, Math.min(Number(selectedLayer.width || 280), Number(selectedLayer.height || 120)) / 2)}
+                                max={Math.max(0, Math.min(Number(selectedLayer.width ?? 280), Number(selectedLayer.height ?? 120)) / 2)}
                                 step={1}
                                 onChange={(value) => updateLayer(selectedLayer.id, { radius: value })}
                               />
@@ -6068,7 +6068,7 @@ export default function Page() {
                           </>
                         ) : null}
                         {selectedLayer.type === 'image' ? (
-                          <NumericField label="Exact Image Width" value={selectedLayer.width || 640} min={20} max={1800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
+                          <NumericField label="Exact Image Width" value={selectedLayer.width ?? 640} min={20} max={1800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
                         ) : null}
                       </div>
                     ) : null}
