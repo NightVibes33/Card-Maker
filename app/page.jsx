@@ -5659,44 +5659,62 @@ export default function Page() {
       const dy = (event.clientY - lastPoint.current.y) / Math.max(1, rect.height);
       const moved = Math.abs(dx) + Math.abs(dy) > 0.00001;
 
-      if (target === 'chip') {
-        if (moved) recordGestureHistory();
-        patch((current) => {
-          const snapX = snapValue(clamp(current.chipX + dx, 0, 0.82), [0.04, 0.105, 1 / 3, 0.5, 2 / 3, 0.78]);
-          const snapY = snapValue(clamp(current.chipY + dy, 0, 0.8), [0.04, 1 / 3, 0.35, 0.5, 2 / 3, 0.76]);
-          setActiveGuides({
-            x: snapX.snapped ? snapX.value : null,
-            y: snapY.snapped ? snapY.value : null
-          });
-          return { chipX: snapX.value, chipY: snapY.value };
-        }, false);
-      } else if (target === 'contactless') {
-        if (moved) recordGestureHistory();
-        patch((current) => {
-          const snapX = snapValue(clamp(current.contactlessX + dx, 0.03, 0.97), [0.05, 0.285, 1 / 3, 0.5, 2 / 3, 0.95]);
-          const snapY = snapValue(clamp(current.contactlessY + dy, 0.03, 0.97), [0.05, 1 / 3, 0.43, 0.5, 2 / 3, 0.95]);
-          setActiveGuides({
-            x: snapX.snapped ? snapX.value : null,
-            y: snapY.snapped ? snapY.value : null
-          });
-          return { contactlessX: snapX.value, contactlessY: snapY.value };
-        }, false);
-      } else if (target !== 'artwork') {
-        const layer = (designRef.current.customLayers || []).find((entry) => entry.id === target);
-        if (layer && !layer.locked) {
-          if (moved) recordGestureHistory();
-          patch((current) => {
-            const layers = current.customLayers || [];
-            const index = layers.findIndex((entry) => entry.id === target);
-            if (index < 0) return {};
+      if (moved) {
+        const currentDesign = designRef.current;
 
-            const entry = layers[index];
+        if (target === 'chip') {
+          const snapX = snapValue(
+            clamp(currentDesign.chipX + dx, 0, 0.82),
+            [0.04, 0.105, 1 / 3, 0.5, 2 / 3, 0.78]
+          );
+          const snapY = snapValue(
+            clamp(currentDesign.chipY + dy, 0, 0.8),
+            [0.04, 1 / 3, 0.35, 0.5, 2 / 3, 0.76]
+          );
+          setActiveGuides({
+            x: snapX.snapped ? snapX.value : null,
+            y: snapY.snapped ? snapY.value : null
+          });
+
+          if (
+            !Object.is(currentDesign.chipX, snapX.value) ||
+            !Object.is(currentDesign.chipY, snapY.value)
+          ) {
+            recordGestureHistory();
+            patch({ chipX: snapX.value, chipY: snapY.value }, false);
+          }
+        } else if (target === 'contactless') {
+          const snapX = snapValue(
+            clamp(currentDesign.contactlessX + dx, 0.03, 0.97),
+            [0.05, 0.285, 1 / 3, 0.5, 2 / 3, 0.95]
+          );
+          const snapY = snapValue(
+            clamp(currentDesign.contactlessY + dy, 0.03, 0.97),
+            [0.05, 1 / 3, 0.43, 0.5, 2 / 3, 0.95]
+          );
+          setActiveGuides({
+            x: snapX.snapped ? snapX.value : null,
+            y: snapY.snapped ? snapY.value : null
+          });
+
+          if (
+            !Object.is(currentDesign.contactlessX, snapX.value) ||
+            !Object.is(currentDesign.contactlessY, snapY.value)
+          ) {
+            recordGestureHistory();
+            patch({ contactlessX: snapX.value, contactlessY: snapY.value }, false);
+          }
+        } else if (target !== 'artwork') {
+          const layer = (currentDesign.customLayers || []).find((entry) => entry.id === target);
+          if (layer && !layer.locked) {
+            const currentX = Number(layer.x ?? 0.5);
+            const currentY = Number(layer.y ?? 0.5);
             const snapX = snapValue(
-              clamp(Number(entry.x ?? 0.5) + dx, 0, 1),
+              clamp(currentX + dx, 0, 1),
               [0.05, 1 / 3, 0.5, 2 / 3, 0.95]
             );
             const snapY = snapValue(
-              clamp(Number(entry.y ?? 0.5) + dy, 0, 1),
+              clamp(currentY + dy, 0, 1),
               [0.05, 1 / 3, 0.5, 2 / 3, 0.95]
             );
             setActiveGuides({
@@ -5704,24 +5722,41 @@ export default function Page() {
               y: snapY.snapped ? snapY.value : null
             });
 
-            const nextLayers = layers.slice();
-            nextLayers[index] = { ...entry, x: snapX.value, y: snapY.value };
-            return { customLayers: nextLayers };
-          }, false);
-        }
-      } else if (designRef.current.background) {
-        if (moved) recordGestureHistory();
-        patch((current) => {
-          const rawX = clamp(current.x + dx, -1.5, 1.5);
-          const rawY = clamp(current.y + dy, -1.5, 1.5);
+            if (!Object.is(currentX, snapX.value) || !Object.is(currentY, snapY.value)) {
+              recordGestureHistory();
+              patch((current) => {
+                const layers = current.customLayers || [];
+                const index = layers.findIndex((entry) => entry.id === target);
+                if (index < 0) return {};
+
+                const entry = layers[index];
+                const entryX = Number(entry.x ?? 0.5);
+                const entryY = Number(entry.y ?? 0.5);
+                if (Object.is(entryX, snapX.value) && Object.is(entryY, snapY.value)) {
+                  return {};
+                }
+
+                const nextLayers = layers.slice();
+                nextLayers[index] = { ...entry, x: snapX.value, y: snapY.value };
+                return { customLayers: nextLayers };
+              }, false);
+            }
+          }
+        } else if (currentDesign.background) {
+          const rawX = clamp(currentDesign.x + dx, -1.5, 1.5);
+          const rawY = clamp(currentDesign.y + dy, -1.5, 1.5);
           const snapX = snapValue(rawX, [-0.45, -1 / 6, 0, 1 / 6, 0.45]);
           const snapY = snapValue(rawY, [-0.45, -1 / 6, 0, 1 / 6, 0.45]);
           setActiveGuides({
             x: snapX.snapped ? clamp(0.5 + snapX.value, 0.05, 0.95) : null,
             y: snapY.snapped ? clamp(0.5 + snapY.value, 0.05, 0.95) : null
           });
-          return { x: snapX.value, y: snapY.value };
-        }, false);
+
+          if (!Object.is(currentDesign.x, snapX.value) || !Object.is(currentDesign.y, snapY.value)) {
+            recordGestureHistory();
+            patch({ x: snapX.value, y: snapY.value }, false);
+          }
+        }
       }
 
       lastPoint.current = { x: event.clientX, y: event.clientY };
@@ -5734,48 +5769,83 @@ export default function Page() {
         ? 0
         : normalizeAngleDelta(((angle - lastAngle.current) * 180) / Math.PI);
       const transformed = Math.abs(factor - 1) > 0.0005 || Math.abs(angleDelta) > 0.02;
+      const currentDesign = designRef.current;
       const gestureLayer = target !== 'artwork' && target !== 'chip' && target !== 'contactless'
-        ? (designRef.current.customLayers || []).find((layer) => layer.id === target)
+        ? (currentDesign.customLayers || []).find((layer) => layer.id === target)
         : null;
       const transformBlocked = Boolean(
         target === 'card-text' ||
         gestureLayer?.locked ||
-        (target === 'artwork' && !designRef.current.background)
+        (target === 'artwork' && !currentDesign.background)
       );
-      if (transformed && !transformBlocked) recordGestureHistory();
 
-      if (target === 'chip') {
-        patch((current) => ({
-          chipScale: clamp(current.chipScale * factor, 0.5, 2),
-          chipRotation: clamp(current.chipRotation + angleDelta, -45, 45)
-        }), false);
-      } else if (target === 'contactless') {
-        patch((current) => ({
-          contactlessScale: clamp(current.contactlessScale * factor, 0.4, 2.2),
-          contactlessRotation: normalizeFreeRotation(Number(current.contactlessRotation || 0) + angleDelta)
-        }), false);
-      } else if (target !== 'artwork') {
-        if (!transformBlocked) {
-          patch((current) => {
-            const layers = current.customLayers || [];
-            const index = layers.findIndex((layer) => layer.id === target);
-            if (index < 0) return {};
+      if (transformed && !transformBlocked) {
+        if (target === 'chip') {
+          const nextScale = clamp(currentDesign.chipScale * factor, 0.5, 2);
+          const nextRotation = clamp(currentDesign.chipRotation + angleDelta, -45, 45);
+          if (
+            !Object.is(currentDesign.chipScale, nextScale) ||
+            !Object.is(currentDesign.chipRotation, nextRotation)
+          ) {
+            recordGestureHistory();
+            patch({ chipScale: nextScale, chipRotation: nextRotation }, false);
+          }
+        } else if (target === 'contactless') {
+          const nextScale = clamp(currentDesign.contactlessScale * factor, 0.4, 2.2);
+          const nextRotation = normalizeFreeRotation(
+            Number(currentDesign.contactlessRotation || 0) + angleDelta
+          );
+          if (
+            !Object.is(currentDesign.contactlessScale, nextScale) ||
+            !Object.is(Number(currentDesign.contactlessRotation || 0), nextRotation)
+          ) {
+            recordGestureHistory();
+            patch({ contactlessScale: nextScale, contactlessRotation: nextRotation }, false);
+          }
+        } else if (target !== 'artwork' && gestureLayer) {
+          const currentScale = Number(gestureLayer.scale ?? 1);
+          const currentRotation = Number(gestureLayer.rotation ?? 0);
+          const nextScale = clamp(currentScale * factor, 0.1, 6);
+          const nextRotation = normalizeFreeRotation(currentRotation + angleDelta);
 
-            const layer = layers[index];
-            const nextLayers = layers.slice();
-            nextLayers[index] = {
-              ...layer,
-              scale: clamp(Number(layer.scale ?? 1) * factor, 0.1, 6),
-              rotation: normalizeFreeRotation(Number(layer.rotation ?? 0) + angleDelta)
-            };
-            return { customLayers: nextLayers };
-          }, false);
+          if (!Object.is(currentScale, nextScale) || !Object.is(currentRotation, nextRotation)) {
+            recordGestureHistory();
+            patch((current) => {
+              const layers = current.customLayers || [];
+              const index = layers.findIndex((layer) => layer.id === target);
+              if (index < 0) return {};
+
+              const layer = layers[index];
+              const layerScale = Number(layer.scale ?? 1);
+              const layerRotation = Number(layer.rotation ?? 0);
+              if (
+                Object.is(layerScale, nextScale) &&
+                Object.is(layerRotation, nextRotation)
+              ) {
+                return {};
+              }
+
+              const nextLayers = layers.slice();
+              nextLayers[index] = {
+                ...layer,
+                scale: nextScale,
+                rotation: nextRotation
+              };
+              return { customLayers: nextLayers };
+            }, false);
+          }
+        } else if (target === 'artwork') {
+          const currentRotation = Number(currentDesign.rotate || 0);
+          const nextZoom = clamp(currentDesign.zoom * factor, 0.5, 5);
+          const nextRotation = normalizeFreeRotation(currentRotation + angleDelta);
+          if (
+            !Object.is(currentDesign.zoom, nextZoom) ||
+            !Object.is(currentRotation, nextRotation)
+          ) {
+            recordGestureHistory();
+            patch({ zoom: nextZoom, rotate: nextRotation }, false);
+          }
         }
-      } else if (!transformBlocked) {
-        patch((current) => ({
-          zoom: clamp(current.zoom * factor, 0.5, 5),
-          rotate: normalizeFreeRotation(current.rotate + angleDelta)
-        }), false);
       }
 
       lastDistance.current = distance;
