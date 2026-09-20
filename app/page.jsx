@@ -261,9 +261,13 @@ function normalizeLayerOrder(design) {
   return ordered;
 }
 
-function finiteClamp(value, fallback, min, max) {
+function finiteNumber(value, fallback = 0) {
   const number = Number(value);
-  return clamp(Number.isFinite(number) ? number : fallback, min, max);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function finiteClamp(value, fallback, min, max) {
+  return clamp(finiteNumber(value, fallback), min, max);
 }
 
 function normalizeHexColor(value, fallback = '#ffffff') {
@@ -2204,7 +2208,7 @@ function importListItem(asset = {}) {
     id: safeDisplayText(asset.id, '', 160),
     name: safeDisplayText(asset.name, 'Imported image', 160),
     type: safeDisplayText(asset.type, 'image/*', 80),
-    createdAt: Number(asset.createdAt || Date.now())
+    createdAt: finiteNumber(asset.createdAt, Date.now())
   };
 }
 
@@ -2580,8 +2584,8 @@ export default function Page() {
                 /^data:image\/(?:jpeg|png|webp);base64,/i.test(entry.preview)
                   ? entry.preview
                   : '',
-              createdAt: Number(entry.createdAt || 0),
-              updatedAt: Number(entry.updatedAt || entry.createdAt || 0)
+              createdAt: finiteNumber(entry.createdAt, 0),
+              updatedAt: finiteNumber(entry.updatedAt, finiteNumber(entry.createdAt, 0))
             }))
             .filter((entry) => entry.id)
             .sort((a, b) => b.updatedAt - a.updatedAt)
@@ -2600,9 +2604,9 @@ export default function Page() {
               name: safeDisplayText(entry.name, 'Export', 160),
               designName: safeDisplayText(entry.designName, 'Untitled Card', 160),
               action: safeDisplayText(entry.action, 'export', 80),
-              width: Math.max(0, Number(entry.width || 0)),
-              height: Math.max(0, Number(entry.height || 0)),
-              createdAt: Number(entry.createdAt || 0)
+              width: Math.max(0, finiteNumber(entry.width, 0)),
+              height: Math.max(0, finiteNumber(entry.height, 0)),
+              createdAt: finiteNumber(entry.createdAt, 0)
             }))
             .filter((entry) => entry.id)
             .sort((a, b) => b.createdAt - a.createdAt)
