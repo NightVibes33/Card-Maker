@@ -1640,3 +1640,369 @@ button:disabled{opacity:.38}
   max-height:none;
   object-fit:fill;
 }
+
+
+/* Studio editor refresh — one stable sticky dock, no stacked sticky preview. */
+.studioPreview{
+  position:relative;
+  z-index:1;
+  top:auto;
+  padding:4px 16px 8px;
+  background:transparent;
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+}
+.studioPreview .studioFloatingBar{
+  position:relative;
+  z-index:2;
+  flex-wrap:nowrap;
+  justify-content:flex-start;
+  gap:6px;
+  margin:0 0 10px;
+  padding:0;
+  border-radius:0;
+  background:transparent;
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+  box-shadow:none;
+}
+.studioPreview .studioToolbarNewButton{
+  min-width:66px;
+  min-height:42px;
+  justify-content:center;
+  border-radius:13px;
+  padding:0 11px;
+  background:var(--blue);
+  box-shadow:0 5px 14px color-mix(in srgb,var(--blue) 24%,transparent);
+  font-size:13px;
+}
+.studioPreview .historyButtons{
+  display:flex;
+  flex:0 0 auto;
+  gap:2px;
+  padding:2px;
+  border-radius:13px;
+  background:var(--secondary-bg);
+  box-shadow:inset 0 0 0 .5px var(--separator);
+}
+.studioPreview .historyButtons button{
+  min-width:38px;
+  width:38px;
+  min-height:38px;
+  height:38px;
+  border-radius:11px;
+  display:grid;
+  place-items:center;
+  color:var(--blue);
+}
+.studioPreview .historyButtons button:disabled{
+  color:var(--tertiary-label);
+  opacity:1;
+}
+.studioPreview .savePill{
+  flex:0 0 auto;
+  min-height:30px;
+  margin-left:auto;
+  padding:0 8px;
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  border-radius:999px;
+  background:color-mix(in srgb,var(--secondary-bg) 88%,transparent);
+  box-shadow:inset 0 0 0 .5px var(--separator);
+  font-size:10.5px;
+}
+.studioPreview .savePill.isSaved:before{
+  content:"";
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 12%,transparent);
+}
+.studioPreview .doneSelectionButton{
+  flex:0 0 auto;
+  min-width:44px;
+  min-height:38px;
+  border-radius:12px;
+  padding:0 9px;
+}
+.studioPreview .beforeAfterButton{
+  flex:0 0 auto;
+  min-width:auto;
+  min-height:38px;
+  height:38px;
+  padding:0 9px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  border-radius:12px;
+  background:var(--secondary-bg);
+  color:var(--blue);
+  box-shadow:inset 0 0 0 .5px var(--separator);
+  font-size:10.5px;
+  font-weight:700;
+  white-space:nowrap;
+}
+.studioPreview .beforeAfterButton svg{flex:0 0 auto}
+.studioPreview .cardFrame{
+  border-radius:18px;
+  box-shadow:0 8px 24px rgba(0,0,0,.22),0 0 0 .5px rgba(255,255,255,.16);
+}
+.studioPreview .previewCaption{
+  min-height:24px;
+  padding:7px 4px 0;
+  font-size:11.5px;
+}
+.studioPreview .previewCaption span:first-child{
+  max-width:62%;
+  font-weight:650;
+}
+
+.studioScreen{
+  padding-top:0;
+}
+.studioModeRow{
+  position:sticky;
+  z-index:42;
+  top:var(--safe-top);
+  margin:4px -16px 0;
+  padding:8px 16px 9px;
+  border-bottom:.5px solid color-mix(in srgb,var(--separator) 80%,transparent);
+  background:color-mix(in srgb,var(--system-bg) 88%,transparent);
+  -webkit-backdrop-filter:saturate(180%) blur(28px);
+  backdrop-filter:saturate(180%) blur(28px);
+  box-shadow:0 10px 24px rgba(0,0,0,.08);
+}
+.studioToolBar{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:4px;
+  padding:3px;
+  border-radius:15px;
+  background:color-mix(in srgb,var(--secondary-bg) 74%,var(--tertiary-bg));
+  box-shadow:inset 0 0 0 .5px var(--separator);
+}
+.studioToolBar button{
+  min-width:0;
+  min-height:52px;
+  border-radius:12px;
+  padding:5px 2px 4px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  color:var(--secondary-label);
+  font-size:10.5px;
+  font-weight:650;
+  transition:background-color .16s ease,color .16s ease,transform .16s ease;
+}
+.studioToolBar button svg{
+  flex:0 0 auto;
+  stroke-width:1.9;
+}
+.studioToolBar button.active{
+  background:color-mix(in srgb,var(--blue) 14%,var(--secondary-bg));
+  color:var(--blue);
+  box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--blue) 28%,var(--separator));
+}
+.studioToolBar button:active{transform:scale(.97)}
+.studioModeActions{
+  min-height:38px;
+  margin-top:7px;
+  padding:0 2px;
+}
+.studioModeLabel{
+  color:var(--secondary-label);
+  font-size:11px;
+  font-weight:650;
+  letter-spacing:.1px;
+}
+.previewModeToggle{
+  gap:2px;
+  padding:2px;
+  border-radius:12px;
+  background:color-mix(in srgb,var(--secondary-bg) 72%,var(--tertiary-bg));
+  box-shadow:inset 0 0 0 .5px var(--separator);
+}
+.previewModeToggle button{
+  min-height:34px;
+  border-radius:10px;
+  padding:0 12px;
+  font-size:11px;
+}
+.previewModeToggle button.active{
+  background:var(--secondary-bg);
+  color:var(--label);
+  box-shadow:0 1px 4px rgba(0,0,0,.12);
+}
+
+#panel-studio .settingsSection{
+  margin:16px 0 20px;
+}
+#panel-studio .sectionLabel{
+  margin:0 0 8px;
+  padding:0 4px;
+  color:var(--secondary-label);
+  font-size:11px;
+  line-height:1.2;
+  font-weight:750;
+  letter-spacing:.55px;
+  text-transform:uppercase;
+}
+#panel-studio .insetGroup{
+  border-radius:18px;
+  background:color-mix(in srgb,var(--group-bg) 96%,var(--tertiary-bg));
+  box-shadow:
+    inset 0 0 0 .5px var(--separator),
+    0 8px 24px rgba(0,0,0,.05);
+}
+#panel-studio .editingTargetBar{
+  min-height:54px;
+  margin:0;
+  padding:9px 14px;
+  border-radius:0;
+  border-bottom:.5px solid var(--separator);
+  background:color-mix(in srgb,var(--blue) 6%,transparent);
+  box-shadow:none;
+}
+#panel-studio .editingTargetBar strong{
+  font-size:15px;
+  font-weight:700;
+}
+#panel-studio .editingTargetBar small{
+  margin-top:3px;
+  font-size:11px;
+}
+#panel-studio .editingTargetBar button{
+  min-height:36px;
+  border-radius:11px;
+  font-size:11px;
+}
+#panel-studio .sliderRow{
+  min-height:70px;
+  padding:10px 14px 8px;
+  border-bottom:.5px solid var(--separator);
+}
+#panel-studio .sliderRow:last-child{border-bottom:0}
+#panel-studio .rowHeader{
+  margin-bottom:5px;
+  font-size:15px;
+}
+#panel-studio .rowValue{
+  min-width:46px;
+  padding:4px 7px;
+  border-radius:8px;
+  background:var(--tertiary-bg);
+  color:var(--secondary-label);
+  font-size:12px;
+  line-height:1;
+  text-align:center;
+}
+#panel-studio .sliderRow input{
+  min-height:36px;
+}
+#panel-studio .numericRow{
+  min-height:52px;
+  padding:6px 14px;
+}
+#panel-studio .numericRow input{
+  min-height:38px;
+  border-radius:10px;
+  background:var(--tertiary-bg);
+}
+#panel-studio .groupRow{
+  min-height:54px;
+  padding-left:14px;
+  padding-right:12px;
+}
+#panel-studio .segmentedControl{
+  min-height:42px;
+  border-radius:12px;
+}
+#panel-studio .segmentedControl button{
+  min-height:38px;
+  border-radius:10px;
+}
+#panel-studio .sectionFooter{
+  padding:7px 4px 0;
+  font-size:11px;
+  line-height:1.35;
+}
+#panel-studio .presetScroller{
+  margin-left:-16px;
+  margin-right:-16px;
+}
+#panel-studio .layerAddRow{
+  gap:6px;
+  padding:8px;
+}
+#panel-studio .layerAddRow button,
+#panel-studio .layerActionGrid button{
+  border-radius:11px;
+  background:var(--tertiary-bg);
+}
+#panel-studio .settingsResetButton{
+  min-height:44px;
+  font-weight:650;
+}
+#panel-studio button,
+#panel-studio input,
+#panel-studio select,
+#panel-studio textarea{
+  scroll-margin-top:calc(var(--safe-top) + 126px);
+}
+
+@media (max-width:420px){
+  .studioPreview .studioFloatingBar{
+    flex-wrap:nowrap;
+    gap:5px;
+  }
+  .studioPreview .studioToolbarNewButton{
+    min-width:62px;
+    padding:0 9px;
+  }
+  .studioPreview .historyButtons button{
+    width:36px;
+    min-width:36px;
+  }
+  .studioPreview .savePill{
+    padding:0 7px;
+  }
+  .studioPreview .beforeAfterButton{
+    flex:0 1 auto;
+    min-width:0;
+    padding:0 8px;
+  }
+  .studioPreview .beforeAfterButton span{
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+}
+@media (max-width:360px){
+  .studioModeRow{
+    position:sticky;
+    top:var(--safe-top);
+  }
+  .studioToolBar button{
+    min-height:50px;
+    padding-left:0;
+    padding-right:0;
+    font-size:9.5px;
+  }
+  .studioPreview .savePill{
+    display:none;
+  }
+}
+@media (max-height:620px){
+  .studioPreview{
+    position:relative;
+    top:auto;
+  }
+  .studioModeRow{
+    position:sticky;
+    top:var(--safe-top);
+  }
+}
