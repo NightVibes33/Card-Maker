@@ -4071,6 +4071,23 @@ export default function Page() {
       addDesignRefs(designRef.current);
       for (const snapshot of undoRef.current) addDesignRefs(snapshot);
       for (const snapshot of redoRef.current) addDesignRefs(snapshot);
+
+      let storedDraft;
+      try {
+        storedDraft = await dbGet('kv', 'draft');
+      } catch {
+        setMessage('Could not verify the autosaved draft, so no imported images were removed.');
+        return;
+      }
+      addDesignRefs(storedDraft?.design);
+
+      try {
+        const fallbackDraft = localStorage.getItem('aircard-sticker-fvp-v3');
+        if (fallbackDraft) {
+          const parsedFallback = JSON.parse(fallbackDraft);
+          addDesignRefs(parsedFallback);
+        }
+      } catch {}
   
       let storedProjects;
       try {
