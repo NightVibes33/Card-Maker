@@ -1053,6 +1053,17 @@ function Group({ title, footer, children }) {
 function proxyImageWidth(src = '', width = 1600) {
   let source = String(src || '');
 
+  // Older builds could persist the proxy as an absolute URL. Normalize that
+  // back to the local route before deciding whether a source is third-party.
+  if (/^https:\/\//i.test(source)) {
+    try {
+      const absolute = new URL(source);
+      if (absolute.pathname === '/api/image' && absolute.searchParams.has('url')) {
+        source = '/api/image?' + absolute.searchParams.toString();
+      }
+    } catch {}
+  }
+
   // Older favorites/recent items may store the original HTTPS artwork URL.
   // Route those through the same-origin proxy so canvas export stays untainted
   // and the server still enforces the current image-host allowlist.
