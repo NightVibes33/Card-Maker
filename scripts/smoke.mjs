@@ -169,17 +169,20 @@ async function checkBlitzCatalog() {
     throw new Error('Blitz catalog source mismatch: ' + first.source);
   }
 
+  if (first.upstream?.mode !== 'indexed-snapshot') {
+    throw new Error('Blitz catalog did not use indexed snapshot mode: ' + JSON.stringify(first.upstream));
+  }
+
   const invalid = first.results.find((item) =>
     item.source !== 'Blitz Covers' ||
     item.mediaType !== 'premade-card-skin' ||
     item.collection !== 'credit-card-cover' ||
-    item.assetMode !== 'direct-card-art' ||
+    item.assetMode !== 'resolved-product-art' ||
     !/blitzcovers\.com\/products\//i.test(item.sourceUrl || '') ||
-    !item.image?.startsWith('/api/image?') ||
+    !item.image?.startsWith('/api/blitz-image?') ||
     !Array.isArray(item.candidateImages) ||
     item.candidateImages.length < 1 ||
-    !Array.isArray(item.directAssetUrls) ||
-    item.directAssetUrls.length < 1 ||
+    !item.candidateImages.every((src) => src.startsWith('/api/blitz-image?')) ||
     /customization|custom card|priority|packaging|voucher/i.test(item.title || '')
   );
   if (invalid) {
@@ -215,7 +218,7 @@ async function checkBlitzCatalog() {
     totalPages,
     'app pages | final page',
     last.results.length,
-    'products |',
+    'products | resolved image',
     type
   );
 }
