@@ -52,6 +52,7 @@ const pageChecks = [
   [/setSelectedElement\('artwork'\);[\s\S]{0,220}setStudioTool\('crop'\)/, 'Library artwork selection targets the background before crop editing'],
   [/for \(const snapshot of undoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves undo history assets'],
   [/for \(const snapshot of redoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves redo history assets'],
+  [/storedImports = await dbGetImportMetadata\(\)/, 'import cleanup verifies authoritative IndexedDB metadata'],
   [/for \(const layer of currentDesign\.customLayers \|\| \[\]\)/, 'project saving scans custom layers for remote artwork'],
   [/some remote art is not cached offline/, 'project saving reports incomplete offline artwork caching'],
   [/const referencedPresetAssetIds = new Set\(\)/, 'preset import tracks only referenced embedded assets'],
