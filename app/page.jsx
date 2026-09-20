@@ -2019,7 +2019,10 @@ export default function Page() {
           ctx.fill();
         }
       } else if (layer.type === 'image') {
-        const layerImage = layerImages[layer.id];
+        const layerImage =
+          loadedImageLayerSourceKey === imageLayerSourceKey
+            ? layerImages[layer.id]
+            : null;
         if (layerImage) {
           const layerOriginal = originalTarget === 'all' || originalTarget === layer.id;
           const settings = { ...IMAGE_LAYER_DEFAULTS, ...(layer.adjustments || {}) };
@@ -2166,7 +2169,15 @@ export default function Page() {
     }
 
     ctx.restore();
-  }, [design, gradient, image, layerImages, loadedBackgroundKey]);
+  }, [
+    design,
+    gradient,
+    image,
+    imageLayerSourceKey,
+    layerImages,
+    loadedBackgroundKey,
+    loadedImageLayerSourceKey
+  ]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -3019,7 +3030,10 @@ export default function Page() {
       const layer = customLayerMap.get(stackId);
       if (!layer || layer.hidden || Number(layer.opacity ?? 1) <= 0.01) continue;
       if (layer.type === 'text' && String(layer.text ?? '').length === 0) continue;
-      const bounds = customLayerBounds(layer, layerImages[layer.id]);
+      const bounds = customLayerBounds(
+        layer,
+        loadedImageLayerSourceKey === imageLayerSourceKey ? layerImages[layer.id] : null
+      );
       if (
         pointInRotatedBounds(
           px,
@@ -3485,7 +3499,10 @@ export default function Page() {
           <div
             className="selectionOutline layerSelection"
             aria-hidden="true"
-            style={customLayerSelectionStyle(selectedLayer, layerImages[selectedLayer.id])}
+            style={customLayerSelectionStyle(
+              selectedLayer,
+              loadedImageLayerSourceKey === imageLayerSourceKey ? layerImages[selectedLayer.id] : null
+            )}
           />
         ) : null}
       </div>
