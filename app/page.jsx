@@ -1495,7 +1495,7 @@ export default function Page() {
       ctx.translate(lx, ly);
       ctx.rotate((Number(layer.rotation || 0) * Math.PI) / 180);
       const scale = clamp(Number(layer.scale || 1), 0.1, 6);
-      ctx.scale(scale, scale);
+      ctx.scale(layer.type === 'image' && layer.flipX ? -scale : scale, scale);
 
       if (layer.type === 'text') {
         const size = clamp(Number(layer.fontSize || 54), 10, 240);
@@ -1931,6 +1931,7 @@ export default function Page() {
           rotation: 0,
           opacity: 1,
           width: 640,
+          flipX: false,
           crop: null,
           originalCrop: null,
           adjustments: { ...IMAGE_LAYER_DEFAULTS },
@@ -2927,105 +2928,136 @@ export default function Page() {
             </div>
 
             {studioTool === 'crop' ? (
-              <>
-                <Group title="CROP">
-                  <div className="groupRow segmentedRow">
-                    <div className="segmentedControl compact" role="tablist" aria-label="Artwork fit">
-                      <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
-                      <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
+              <Group title={'CROP · ' + activeImageLabel}>
+                <div className="editingTargetBar">
+                  <span>
+                    <strong>Editing {activeImageLabel}</strong>
+                    <small>{selectedImageLayer ? 'Imported image layer' : 'Card artwork'}</small>
+                  </span>
+                  {selectedImageLayer ? (
+                    <button type="button" onClick={() => setSelectedElement('artwork')}>Back to Artwork</button>
+                  ) : null}
+                </div>
+
+                {selectedImageLayer ? (
+                  <>
+                    <div className="cropControlBlock">
+                      <SliderRow
+                        label="Layer Crop Left"
+                        value={selectedImageLayer.crop?.x || 0}
+                        min={0}
+                        max={0.48}
+                        step={0.005}
+                        formatValue={(value) => Math.round(value * 100) + '%'}
+                        onChange={(value) => updateLayerCropEdge(selectedImageLayer.id, 'left', value)}
+                      />
+                      <SliderRow
+                        label="Layer Crop Right"
+                        value={selectedImageLayer.crop ? Math.max(0, 1 - selectedImageLayer.crop.x - selectedImageLayer.crop.w) : 0}
+                        min={0}
+                        max={0.48}
+                        step={0.005}
+                        formatValue={(value) => Math.round(value * 100) + '%'}
+                        onChange={(value) => updateLayerCropEdge(selectedImageLayer.id, 'right', value)}
+                      />
+                      <SliderRow
+                        label="Layer Crop Top"
+                        value={selectedImageLayer.crop?.y || 0}
+                        min={0}
+                        max={0.48}
+                        step={0.005}
+                        formatValue={(value) => Math.round(value * 100) + '%'}
+                        onChange={(value) => updateLayerCropEdge(selectedImageLayer.id, 'top', value)}
+                      />
+                      <SliderRow
+                        label="Layer Crop Bottom"
+                        value={selectedImageLayer.crop ? Math.max(0, 1 - selectedImageLayer.crop.y - selectedImageLayer.crop.h) : 0}
+                        min={0}
+                        max={0.48}
+                        step={0.005}
+                        formatValue={(value) => Math.round(value * 100) + '%'}
+                        onChange={(value) => updateLayerCropEdge(selectedImageLayer.id, 'bottom', value)}
+                      />
                     </div>
-                    <button type="button" className="iconTextButton" disabled={!design.background} onClick={() => patch({ flipX: !design.flipX })}>
-                      <span>{design.flipX ? 'Unflip' : 'Flip'}</span>
+                    <button
+                      type="button"
+                      className="settingsResetButton"
+                      onClick={() => updateLayer(selectedImageLayer.id, { crop: selectedImageLayer.originalCrop || null })}
+                    >
+                      Reset Layer Crop
                     </button>
-                  </div>
-                  <button type="button" className="actionRow" onClick={() => uploadRef.current?.click()}>
-                    <span><strong>Replace Artwork</strong><small>Photos or Files</small></span>
-                    <IOSIcon name="photo" size={19} />
-                  </button>
-                  <div className="cropControlBlock">
-                    <SliderRow
-                      label="Crop Left"
-                      value={design.sourceCrop?.x || 0}
-                      min={0}
-                      max={0.48}
-                      step={0.005}
+                  </>
+                ) : (
+                  <>
+                    <div className="groupRow segmentedRow">
+                      <div className="segmentedControl compact" role="tablist" aria-label="Artwork fit">
+                        <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
+                        <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
+                      </div>
+                      <button type="button" className="iconTextButton" disabled={!design.background} onClick={() => patch({ flipX: !design.flipX })}>
+                        <span>{design.flipX ? 'Unflip' : 'Flip'}</span>
+                      </button>
+                    </div>
+                    <button type="button" className="actionRow" onClick={() => uploadRef.current?.click()}>
+                      <span><strong>Replace Artwork</strong><small>Photos or Files</small></span>
+                      <IOSIcon name="photo" size={19} />
+                    </button>
+                    <div className="cropControlBlock">
+                      <SliderRow label="Crop Left" value={design.sourceCrop?.x || 0} min={0} max={0.48} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('left', value)} />
+                      <SliderRow label="Crop Right" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.x - design.sourceCrop.w) : 0} min={0} max={0.48} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('right', value)} />
+                      <SliderRow label="Crop Top" value={design.sourceCrop?.y || 0} min={0} max={0.48} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('top', value)} />
+                      <SliderRow label="Crop Bottom" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.y - design.sourceCrop.h) : 0} min={0} max={0.48} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('bottom', value)} />
+                    </div>
+                    <button
+                      type="button"
+                      className="settingsResetButton"
                       disabled={!design.background}
-                      formatValue={(value) => Math.round(value * 100) + '%'}
-                      onChange={(value) => updateCropEdge('left', value)}
-                    />
-                    <SliderRow
-                      label="Crop Right"
-                      value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.x - design.sourceCrop.w) : 0}
-                      min={0}
-                      max={0.48}
-                      step={0.005}
-                      disabled={!design.background}
-                      formatValue={(value) => Math.round(value * 100) + '%'}
-                      onChange={(value) => updateCropEdge('right', value)}
-                    />
-                    <SliderRow
-                      label="Crop Top"
-                      value={design.sourceCrop?.y || 0}
-                      min={0}
-                      max={0.48}
-                      step={0.005}
-                      disabled={!design.background}
-                      formatValue={(value) => Math.round(value * 100) + '%'}
-                      onChange={(value) => updateCropEdge('top', value)}
-                    />
-                    <SliderRow
-                      label="Crop Bottom"
-                      value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.y - design.sourceCrop.h) : 0}
-                      min={0}
-                      max={0.48}
-                      step={0.005}
-                      disabled={!design.background}
-                      formatValue={(value) => Math.round(value * 100) + '%'}
-                      onChange={(value) => updateCropEdge('bottom', value)}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    className="settingsResetButton"
-                    disabled={!design.background}
-                    onClick={() => patch({
-                      sourceCrop: design.originalSourceCrop || null,
-                      fit: 'cover',
-                      zoom: design.originalSourceCrop ? 1 : 1.06,
-                      x: 0,
-                      y: 0,
-                      rotate: 0,
-                      flipX: false
-                    })}
-                  >
-                    Reset Crop
-                  </button>
-                </Group>
-              </>
+                      onClick={() => patch({
+                        sourceCrop: design.originalSourceCrop || null,
+                        fit: 'cover',
+                        zoom: design.originalSourceCrop ? 1 : 1.06,
+                        x: 0,
+                        y: 0,
+                        rotate: 0,
+                        flipX: false
+                      })}
+                    >
+                      Reset Crop
+                    </button>
+                  </>
+                )}
+              </Group>
             ) : null}
 
             {studioTool === 'position' ? (
               <>
-                <Group title="POSITION" footer="Tap artwork, chip, contactless, or a custom layer on the card to select it. Drag to move. Two fingers scale and rotate.">
-                  <div className="groupRow segmentedRow">
-                    <div className="segmentedControl compact" role="tablist" aria-label="Artwork fit in Position">
-                      <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
-                      <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
-                    </div>
-                    <button type="button" className="iconTextButton" disabled={!design.background} onClick={() => patch({ flipX: !design.flipX })}>
-                      <span>{design.flipX ? 'Unflip' : 'Flip Horizontal'}</span>
-                    </button>
+                <Group title={'POSITION · ' + (selectedLayer ? (selectedLayer.name || selectedLayer.type) : selectedElement === 'chip' ? 'EMV Chip' : selectedElement === 'contactless' ? 'Contactless' : 'Artwork')} footer="Tap an object on the card to select it. Drag to move. Two fingers scale and rotate.">
+                  <div className="editingTargetBar">
+                    <span>
+                      <strong>{selectedLayer ? (selectedLayer.name || selectedLayer.type) : selectedElement === 'chip' ? 'EMV Chip' : selectedElement === 'contactless' ? 'Contactless' : 'Artwork'}</strong>
+                      <small>Current transform target</small>
+                    </span>
+                    {selectedElement !== 'artwork' ? (
+                      <button type="button" onClick={() => setSelectedElement('artwork')}>Back to Artwork</button>
+                    ) : null}
                   </div>
-                  <button type="button" className={'selectionRow ' + (selectedElement === 'artwork' ? 'selected' : '')} onClick={() => setSelectedElement('artwork')}>Artwork</button>
-                  {design.chip ? <button type="button" className={'selectionRow ' + (selectedElement === 'chip' ? 'selected' : '')} onClick={() => setSelectedElement('chip')}>EMV Chip</button> : null}
-                  {design.contactless ? <button type="button" className={'selectionRow ' + (selectedElement === 'contactless' ? 'selected' : '')} onClick={() => setSelectedElement('contactless')}>Contactless</button> : null}
 
                   {selectedElement === 'artwork' ? (
                     <>
+                      <div className="groupRow segmentedRow">
+                        <div className="segmentedControl compact" role="tablist" aria-label="Artwork fit in Position">
+                          <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
+                          <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
+                        </div>
+                        <button type="button" className="iconTextButton" disabled={!design.background} onClick={() => patch({ flipX: !design.flipX })}>
+                          <span>{design.flipX ? 'Unflip' : 'Flip Horizontal'}</span>
+                        </button>
+                      </div>
                       <SliderRow label="Artwork zoom" value={design.zoom} min={0.5} max={5} step={0.01} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ zoom: value })} />
                       <SliderRow label="Artwork horizontal position" value={design.x} min={-1.5} max={1.5} step={0.01} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ x: value })} />
                       <SliderRow label="Artwork vertical position" value={design.y} min={-1.5} max={1.5} step={0.01} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ y: value })} />
                       <SliderRow label="Artwork rotation" value={design.rotate} min={-180} max={180} step={1} suffix="°" disabled={!design.background} onChange={(value) => patch({ rotate: value })} />
+                      <button type="button" className="settingsResetButton" disabled={!design.background} onClick={() => patch({ fit: 'cover', zoom: 1, x: 0, y: 0, rotate: 0, flipX: false })}>Reset Position</button>
                     </>
                   ) : null}
 
@@ -3041,15 +3073,32 @@ export default function Page() {
                   {selectedElement === 'contactless' && design.contactless ? (
                     <>
                       <SliderRow label="Contactless size" value={design.contactlessScale} min={0.4} max={2.2} step={0.01} onChange={(value) => patch({ contactlessScale: value })} />
-                      <SliderRow label="Contactless horizontal position" value={design.contactlessX} min={0.03} max={0.97} step={0.005} onChange={(value) => patch({ contactlessX: value })} />
-                      <SliderRow label="Contactless vertical position" value={design.contactlessY} min={0.03} max={0.97} step={0.005} onChange={(value) => patch({ contactlessY: value })} />
+                      <SliderRow label="Contactless horizontal position" value={design.contactlessX} min={0.03} max={0.97} step={0.005} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ contactlessX: value })} />
+                      <SliderRow label="Contactless vertical position" value={design.contactlessY} min={0.03} max={0.97} step={0.005} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ contactlessY: value })} />
+                    </>
+                  ) : null}
+
+                  {selectedLayer ? (
+                    <>
+                      {selectedLayer.type === 'image' ? (
+                        <>
+                          <div className="groupRow">
+                            <button type="button" className="iconTextButton" onClick={() => updateLayer(selectedLayer.id, { flipX: !selectedLayer.flipX })}>
+                              <span>{selectedLayer.flipX ? 'Unflip Image' : 'Flip Image Horizontally'}</span>
+                            </button>
+                          </div>
+                          <SliderRow label="Image Width" value={selectedLayer.width || 640} min={20} max={1800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
+                        </>
+                      ) : null}
+                      <SliderRow label="Layer horizontal position" value={selectedLayer.x ?? 0.5} min={0} max={1} step={0.005} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateLayer(selectedLayer.id, { x: value })} />
+                      <SliderRow label="Layer vertical position" value={selectedLayer.y ?? 0.5} min={0} max={1} step={0.005} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateLayer(selectedLayer.id, { y: value })} />
+                      <SliderRow label="Layer scale" value={selectedLayer.scale || 1} min={0.1} max={6} step={0.01} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
+                      <SliderRow label="Layer rotation" value={selectedLayer.rotation || 0} min={-180} max={180} step={1} suffix="°" onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} />
+                      <button type="button" className="settingsResetButton" onClick={() => updateLayer(selectedLayer.id, { x: 0.5, y: 0.5, scale: 1, rotation: 0, flipX: false })}>Reset Layer Position</button>
                     </>
                   ) : null}
 
                   <SwitchRow label="Alignment Guides" detail="Bleed, rounded crop boundary, safe text, snap lines, chip/contactless zones" value={guidesEnabled} onChange={setGuidesEnabled} />
-                  <button type="button" className="settingsResetButton" disabled={!design.background} onClick={() => patch({ fit: 'cover', zoom: 1, x: 0, y: 0, rotate: 0, flipX: false })}>
-                    Reset Position
-                  </button>
                 </Group>
 
                 {expertMode ? (
@@ -3058,12 +3107,10 @@ export default function Page() {
                     <NumericField label="Artwork X" value={design.x} min={-1.5} max={1.5} onChange={(value) => patch({ x: value })} />
                     <NumericField label="Artwork Y" value={design.y} min={-1.5} max={1.5} onChange={(value) => patch({ y: value })} />
                     <NumericField label="Artwork Rotation" value={design.rotate} min={-180} max={180} step={0.1} onChange={(value) => patch({ rotate: value })} suffix="°" />
-
                     <NumericField label="Crop Left" value={design.sourceCrop?.x || 0} min={0} max={0.48} onChange={(value) => updateCropEdge('left', value)} />
                     <NumericField label="Crop Right" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.x - design.sourceCrop.w) : 0} min={0} max={0.48} onChange={(value) => updateCropEdge('right', value)} />
                     <NumericField label="Crop Top" value={design.sourceCrop?.y || 0} min={0} max={0.48} onChange={(value) => updateCropEdge('top', value)} />
                     <NumericField label="Crop Bottom" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.y - design.sourceCrop.h) : 0} min={0} max={0.48} onChange={(value) => updateCropEdge('bottom', value)} />
-
                     <NumericField label="Exposure" value={design.exposure} min={-1} max={1} onChange={(value) => patch({ exposure: value })} />
                     <NumericField label="Brightness" value={design.brightness} min={0.4} max={1.7} onChange={(value) => patch({ brightness: value })} />
                     <NumericField label="Contrast" value={design.contrast} min={0.45} max={1.8} onChange={(value) => patch({ contrast: value })} />
@@ -3074,14 +3121,12 @@ export default function Page() {
                     <NumericField label="Tint" value={design.tint} min={-1} max={1} onChange={(value) => patch({ tint: value })} />
                     <NumericField label="Sharpness" value={design.sharpness} min={-1} max={1} onChange={(value) => patch({ sharpness: value })} />
                     <NumericField label="Blur" value={design.blur} min={0} max={1} onChange={(value) => patch({ blur: value })} />
-
                     <NumericField label="Vignette" value={design.vignette} min={0} max={0.8} onChange={(value) => patch({ vignette: value })} />
                     <NumericField label="Grain" value={design.grain} min={0} max={0.22} onChange={(value) => patch({ grain: value })} />
                     <NumericField label="Gloss" value={design.gloss} min={0} max={0.8} onChange={(value) => patch({ gloss: value })} />
                     <NumericField label="Dark Overlay" value={design.overlay} min={0} max={0.75} onChange={(value) => patch({ overlay: value })} />
                     <NumericField label="Fade" value={design.fade} min={0} max={1} onChange={(value) => patch({ fade: value })} />
                     <NumericField label="Effect Tint Strength" value={design.effectTintStrength} min={0} max={1} onChange={(value) => patch({ effectTintStrength: value })} />
-
                     <NumericField label="Chip Scale" value={design.chipScale} min={0.5} max={2} onChange={(value) => patch({ chipScale: value })} />
                     <NumericField label="Chip X" value={design.chipX} min={0} max={0.82} onChange={(value) => patch({ chipX: value })} />
                     <NumericField label="Chip Y" value={design.chipY} min={0} max={0.8} onChange={(value) => patch({ chipY: value })} />
