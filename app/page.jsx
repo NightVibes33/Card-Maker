@@ -84,6 +84,7 @@ const DEFAULTS = {
   contactlessX: 0.285,
   contactlessY: 0.43,
   contactlessScale: 1,
+  contactlessRotation: 0,
   number: false,
   numberText: '••••  ••••  ••••  4242',
   holder: false,
@@ -291,7 +292,7 @@ function customLayerBounds(layer, layerImage) {
 
   const size = clamp(Number(layer.fontSize ?? 58), 10, 240);
   const tracking = Number(layer.letterSpacing ?? 0);
-  const chars = Array.from(String(layer.text || 'Text'));
+  const chars = Array.from(String(layer.text ?? 'Text'));
   const estimatedWidth = Math.max(
     size * 0.5,
     chars.reduce(
@@ -346,8 +347,24 @@ function customLayerSelectionStyle(layer, layerImage) {
 }
 
 function roundRect(ctx, x, y, w, h, r) {
+  const radius = clamp(Number(r || 0), 0, Math.min(Math.abs(w), Math.abs(h)) / 2);
   ctx.beginPath();
-  ctx.roundRect(x, y, w, h, r);
+
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, w, h, radius);
+    ctx.closePath();
+    return;
+  }
+
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  ctx.lineTo(x + radius, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
   ctx.closePath();
 }
 
@@ -533,6 +550,7 @@ function drawContactless(ctx, d) {
   const scale = d.contactlessScale;
   ctx.save();
   ctx.translate(x, y);
+  ctx.rotate((Number(d.contactlessRotation || 0) * Math.PI) / 180);
   ctx.strokeStyle = d.textColor;
   ctx.lineWidth = 10 * scale;
   ctx.lineCap = 'round';
@@ -571,7 +589,6 @@ function SliderRow({ label, value, min, max, step, onChange, suffix = '', disabl
         step={step}
         disabled={disabled}
         onInput={emit}
-        onChange={emit}
       />
     </label>
   );
@@ -1575,7 +1592,7 @@ export default function Page() {
       if (design.badge) {
         ctx.textAlign = 'right';
         ctx.font = '800 66px -apple-system, BlinkMacSystemFont, sans-serif';
-        ctx.fillText(design.badgeText || 'CARD', OUT_W - 105, 130);
+        ctx.fillText(design.badgeText ?? 'CARD', OUT_W - 105, 130);
       }
       if (design.number) {
         ctx.textAlign = 'left';
@@ -1638,7 +1655,7 @@ export default function Page() {
         ctx.textAlign = layer.align || 'center';
         ctx.shadowColor = layer.shadow ? 'rgba(0,0,0,.5)' : 'transparent';
         ctx.shadowBlur = layer.shadow ? 12 : 0;
-        drawTrackedText(ctx, layer.text || 'Text', 0, 0, Number(layer.letterSpacing || 0));
+        drawTrackedText(ctx, layer.text ?? 'Text', 0, 0, Number(layer.letterSpacing || 0));
       } else if (layer.type === 'shape') {
         const w = clamp(Number(layer.width || 260), 20, 1200);
         const h = clamp(Number(layer.height || 120), 20, 800);
@@ -2672,7 +2689,8 @@ export default function Page() {
         }), false);
       } else if (target === 'contactless') {
         patch((current) => ({
-          contactlessScale: clamp(current.contactlessScale * factor, 0.4, 2.2)
+          contactlessScale: clamp(current.contactlessScale * factor, 0.4, 2.2),
+          contactlessRotation: clamp(Number(current.contactlessRotation || 0) + angleDelta, -180, 180)
         }), false);
       } else if (target !== 'artwork') {
         patch((current) => ({
@@ -2931,7 +2949,7 @@ export default function Page() {
               top: (design.contactlessY * 100) + '%',
               width: ((184 * Number(design.contactlessScale || 1) / OUT_W) * 100) + '%',
               height: ((184 * Number(design.contactlessScale || 1) / OUT_H) * 100) + '%',
-              transform: 'translate(-50%, -50%)'
+              transform: 'translate(-50%, -50%) rotate(' + Number(design.contactlessRotation || 0) + 'deg)'
             }}
           />
         ) : null}
@@ -3253,6 +3271,7 @@ export default function Page() {
                       <SliderRow label="Contactless size" value={design.contactlessScale} min={0.4} max={2.2} step={0.01} onChange={(value) => patch({ contactlessScale: value })} />
                       <SliderRow label="Contactless horizontal position" value={design.contactlessX} min={0.03} max={0.97} step={0.005} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ contactlessX: value })} />
                       <SliderRow label="Contactless vertical position" value={design.contactlessY} min={0.03} max={0.97} step={0.005} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ contactlessY: value })} />
+                      <SliderRow label="Contactless rotation" value={design.contactlessRotation || 0} min={-180} max={180} step={1} suffix="°" onChange={(value) => patch({ contactlessRotation: value })} />
                     </>
                   ) : null}
 
@@ -3312,6 +3331,7 @@ export default function Page() {
                     <NumericField label="Contactless Scale" value={design.contactlessScale} min={0.4} max={2.2} onChange={(value) => patch({ contactlessScale: value })} />
                     <NumericField label="Contactless X" value={design.contactlessX} min={0.03} max={0.97} onChange={(value) => patch({ contactlessX: value })} />
                     <NumericField label="Contactless Y" value={design.contactlessY} min={0.03} max={0.97} onChange={(value) => patch({ contactlessY: value })} />
+                    <NumericField label="Contactless Rotation" value={design.contactlessRotation || 0} min={-180} max={180} step={0.1} onChange={(value) => patch({ contactlessRotation: value })} suffix="°" />
                   </Group>
                 ) : null}
               </>
@@ -3503,7 +3523,7 @@ export default function Page() {
                     </button>
                     {selectedLayer.type === 'text' ? (
                       <>
-                        <input className="iosTextField" aria-label="Layer text" value={selectedLayer.text || ''} onChange={(event) => updateLayer(selectedLayer.id, { text: event.target.value })} />
+                        <input className="iosTextField" aria-label="Layer text" value={selectedLayer.text ?? ''} onChange={(event) => updateLayer(selectedLayer.id, { text: event.target.value })} />
                         <label className="selectRow">
                           <span>Font</span>
                           <select aria-label="Text layer font" value={selectedLayer.fontFamily || 'system'} onChange={(event) => updateLayer(selectedLayer.id, { fontFamily: event.target.value })}>
