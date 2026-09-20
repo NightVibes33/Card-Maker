@@ -2582,7 +2582,12 @@ export default function Page() {
 
     const already = favoriteIds.has(item.id);
     if (already) {
-      await dbDelete('favorites', item.id).catch(() => {});
+      try {
+        await dbDelete('favorites', item.id);
+      } catch {
+        setMessage('Could not remove this favorite from local storage.');
+        return;
+      }
       setFavoriteIds((current) => {
         const next = new Set(current);
         next.delete(item.id);
@@ -2594,11 +2599,16 @@ export default function Page() {
     }
 
     const stored = { ...item };
-    await dbPut('favorites', {
-      id: item.id,
-      item: stored,
-      updatedAt: Date.now()
-    }).catch(() => {});
+    try {
+      await dbPut('favorites', {
+        id: item.id,
+        item: stored,
+        updatedAt: Date.now()
+      });
+    } catch {
+      setMessage('Could not save this favorite. Device storage may be full.');
+      return;
+    }
 
     cacheArtwork(item.image);
     if (item.thumbnail) cacheArtwork(item.thumbnail);
