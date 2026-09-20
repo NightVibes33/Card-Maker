@@ -5525,7 +5525,12 @@ export default function Page() {
         if (error?.name === 'AbortError') {
           setMessage('Image sharing canceled');
         } else {
-          setMessage('Could not open the native image sheet.');
+          const downloaded = await download(width, height, name, file);
+          if (downloaded) {
+            setMessage('Native image sharing failed, so the PNG download was started instead.');
+          } else {
+            setMessage('Could not share or download the PNG on this device.');
+          }
         }
       }
     } finally {
