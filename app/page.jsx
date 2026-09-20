@@ -2424,6 +2424,7 @@ export default function Page() {
     <main className="studio">
       <header className="largeTitleBar">
         <h1>Card Studio</h1>
+        <button type="button" className="navTextButton" onClick={reset}>New</button>
       </header>
 
       {!online ? (
