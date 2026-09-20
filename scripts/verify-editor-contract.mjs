@@ -21,6 +21,8 @@ const pageChecks = [
   [/function normalizeDesignState\(/, 'restored designs are normalized'],
   [/if \(!hydrated\) return undefined;/, 'autosave waits for hydration'],
   [/function pointInRotatedBounds\(/, 'rotated geometry hit testing exists'],
+  [/function pointInRotatedEllipse\(/, 'ellipse layers use true ellipse hit testing'],
+  [/const CONTACTLESS_BOUNDS = \{/, 'contactless selection uses rendered symbol bounds'],
   [/function customLayerSelectionStyle\(/, 'selection outlines use object geometry'],
   [/loadedImageLayerSourceKey === imageLayerSourceKey/, 'image layers are source-key gated'],
   [/loadedBackgroundKey === renderDesign\.background/, 'background rendering is source-key gated'],
