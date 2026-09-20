@@ -1344,3 +1344,19 @@ button:disabled{opacity:.38}
 @media (prefers-reduced-motion:reduce){
   .physicalCard,.physicalCard:after,.physicalChipReflection{animation:none!important}
 }
+
+.cropBoundary{
+  inset:.6%;
+  border:1px solid rgba(255,255,255,.68);
+  border-radius:18px;
+  box-shadow:0 0 0 .5px rgba(0,0,0,.2);
+}
+.numericInputWrap{
+  display:flex;
+  align-items:center;
+  gap:5px;
+}
+.numericInputWrap small{
+  color:var(--secondary-label);
+  font-size:11px;
+}
