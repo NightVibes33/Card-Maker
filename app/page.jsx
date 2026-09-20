@@ -1610,12 +1610,32 @@ function plausibleImageDimensions(width, height) {
 }
 
 function svgNumericLength(tag, name) {
-  const pattern =
-    "\\b" +
-    name +
-    "\\s*=\\s*[\\\"']\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(?:px)?\\s*[\\\"']";
-  const match = tag.match(new RegExp(pattern, 'i'));
-  return match ? Number(match[1]) : 0;
+  const attributePattern =
+    "\\b" + name + "\\s*=\\s*[\\\"']\\s*([^\\\"']+)\\s*[\\\"']";
+  const attribute = tag.match(new RegExp(attributePattern, 'i'));
+  if (!attribute) return 0;
+
+  const value = String(attribute[1] || '').trim();
+  const match = value.match(
+    /^([-+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][-+]?\\d+)?)\\s*(px|pt|pc|in|cm|mm|q)?$/i
+  );
+  if (!match) return Number.NaN;
+
+  const number = Number(match[1]);
+  if (!Number.isFinite(number)) return Number.NaN;
+
+  const unit = String(match[2] || 'px').toLowerCase();
+  const factor = {
+    px: 1,
+    pt: 96 / 72,
+    pc: 16,
+    in: 96,
+    cm: 96 / 2.54,
+    mm: 96 / 25.4,
+    q: 96 / 101.6
+  }[unit];
+
+  return Number.isFinite(factor) ? number * factor : Number.NaN;
 }
 
 async function probeLocalImageDimensions(blob) {
@@ -1630,6 +1650,8 @@ async function probeLocalImageDimensions(blob) {
     const root = markup.match(/<\s*svg\b[^>]*>/i)?.[0] || '';
     let width = svgNumericLength(root, 'width');
     let height = svgNumericLength(root, 'height');
+
+    if (Number.isNaN(width) || Number.isNaN(height)) return null;
 
     if (!width || !height) {
       const viewBox = root.match(/\bviewBox\s*=\s*["']\s*[-+0-9.eE]+\s+[-+0-9.eE]+\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s*["']/i);
@@ -1878,6 +1900,16 @@ async function prepareLocalImageBlob(blob, limits = {}) {
   const probedDimensions = await probeLocalImageDimensions(blob);
   assertSafeSourceDimensions(probedDimensions);
 
+  const sourceType = String(blob.type || '').toLowerCase();
+  const sourceName = String(blob.name || '');
+  const svgSource =
+    sourceType === 'image/svg+xml' ||
+    /\.svg$/i.test(sourceName);
+
+  if (svgSource && !probedDimensions) {
+    throw new Error('SVG dimensions could not be verified safely.');
+  }
+
   if (!probedDimensions && Number(blob?.size || 0) > MAX_UNPROBED_IMAGE_BYTES) {
     throw new Error('Image dimensions could not be verified safely');
   }
@@ -1895,8 +1927,6 @@ async function prepareLocalImageBlob(blob, limits = {}) {
   const pixelScale = Math.sqrt(maxPixels / Math.max(1, width * height));
   const dimensionScale = maxDimension / Math.max(width, height);
   const scale = Math.min(1, pixelScale, dimensionScale);
-  const sourceType = String(blob.type || '').toLowerCase();
-  const sourceName = String(blob.name || '');
   const animatedOrVectorSource =
     Boolean(probedDimensions?.animated) ||
     /^image\/(?:gif|apng|svg\+xml)$/.test(sourceType) ||
