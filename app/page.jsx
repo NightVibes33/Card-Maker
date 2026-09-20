@@ -459,6 +459,13 @@ function hexToRgb(hex = '#000000') {
 let textMeasureCanvas = null;
 let graphemeSegmenter = null;
 
+const CONTACTLESS_BOUNDS = {
+  left: 14,
+  top: -58,
+  right: 84,
+  bottom: 58
+};
+
 function splitGraphemes(value) {
   const text = String(value ?? '');
   if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
@@ -544,7 +551,7 @@ function customLayerBounds(layer, layerImage) {
   }
 
   if (layer.type === 'chip') return { left: -127.5, top: -94, right: 127.5, bottom: 94 };
-  if (layer.type === 'contactless') return { left: -92, top: -92, right: 92, bottom: 92 };
+  if (layer.type === 'contactless') return CONTACTLESS_BOUNDS;
 
   const size = clamp(Number(layer.fontSize ?? 58), 10, 240);
   const tracking = Number(layer.letterSpacing ?? 0);
@@ -608,28 +615,36 @@ function pointInRotatedBounds(px, py, cx, cy, rotation, scale, bounds, padding =
   );
 }
 
-function customLayerSelectionStyle(layer, layerImage) {
-  const bounds = customLayerBounds(layer, layerImage);
-  const scale = clamp(Number(layer?.scale ?? 1), 0.1, 6);
-  const rotation = Number(layer?.rotation || 0);
-  const radians = (rotation * Math.PI) / 180;
+function selectionStyleForBounds(originX, originY, scale, rotation, bounds) {
+  const safeScale = Math.max(0.0001, Number(scale || 1));
+  const angle = Number(rotation || 0);
+  const radians = (angle * Math.PI) / 180;
   const cos = Math.cos(radians);
   const sin = Math.sin(radians);
-  const centerLocalX = ((bounds.left + bounds.right) / 2) * scale;
-  const centerLocalY = ((bounds.top + bounds.bottom) / 2) * scale;
-  const originX = Number(layer?.x ?? 0.5) * OUT_W;
-  const originY = Number(layer?.y ?? 0.5) * OUT_H;
+  const centerLocalX = ((bounds.left + bounds.right) / 2) * safeScale;
+  const centerLocalY = ((bounds.top + bounds.bottom) / 2) * safeScale;
   const centerX = originX + centerLocalX * cos - centerLocalY * sin;
   const centerY = originY + centerLocalX * sin + centerLocalY * cos;
-  const width = Math.max(18, (bounds.right - bounds.left) * scale);
-  const height = Math.max(18, (bounds.bottom - bounds.top) * scale);
+  const width = Math.max(18, (bounds.right - bounds.left) * safeScale);
+  const height = Math.max(18, (bounds.bottom - bounds.top) * safeScale);
+
   return {
     left: (centerX / OUT_W) * 100 + '%',
     top: (centerY / OUT_H) * 100 + '%',
     width: (width / OUT_W) * 100 + '%',
     height: (height / OUT_H) * 100 + '%',
-    transform: 'translate(-50%, -50%) rotate(' + rotation + 'deg)'
+    transform: 'translate(-50%, -50%) rotate(' + angle + 'deg)'
   };
+}
+
+function customLayerSelectionStyle(layer, layerImage) {
+  return selectionStyleForBounds(
+    Number(layer?.x ?? 0.5) * OUT_W,
+    Number(layer?.y ?? 0.5) * OUT_H,
+    clamp(Number(layer?.scale ?? 1), 0.1, 6),
+    Number(layer?.rotation || 0),
+    customLayerBounds(layer, layerImage)
+  );
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -3697,8 +3712,18 @@ export default function Page() {
 
     for (const stackId of stack) {
       if (stackId === 'builtin-contactless' && currentDesign.contactless) {
-        const radius = 96 * Number(currentDesign.contactlessScale || 1);
-        if (Math.hypot(px - currentDesign.contactlessX * OUT_W, py - currentDesign.contactlessY * OUT_H) <= radius) {
+        if (
+          pointInRotatedBounds(
+            px,
+            py,
+            currentDesign.contactlessX * OUT_W,
+            currentDesign.contactlessY * OUT_H,
+            currentDesign.contactlessRotation,
+            Number(currentDesign.contactlessScale || 1),
+            CONTACTLESS_BOUNDS,
+            14
+          )
+        ) {
           return 'contactless';
         }
         continue;
@@ -4224,13 +4249,13 @@ export default function Page() {
           <div
             className="selectionOutline contactlessSelection"
             aria-hidden="true"
-            style={{
-              left: (design.contactlessX * 100) + '%',
-              top: (design.contactlessY * 100) + '%',
-              width: ((184 * Number(design.contactlessScale || 1) / OUT_W) * 100) + '%',
-              height: ((184 * Number(design.contactlessScale || 1) / OUT_H) * 100) + '%',
-              transform: 'translate(-50%, -50%) rotate(' + Number(design.contactlessRotation || 0) + 'deg)'
-            }}
+            style={selectionStyleForBounds(
+              design.contactlessX * OUT_W,
+              design.contactlessY * OUT_H,
+              Number(design.contactlessScale || 1),
+              Number(design.contactlessRotation || 0),
+              CONTACTLESS_BOUNDS
+            )}
           />
         ) : null}
 
