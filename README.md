@@ -1,23 +1,37 @@
-# AirCard Sticker Studio
+# AirCard Card Skin Studio
 
-A production iPhone-first card skin designer for [AirCard-iOS](https://github.com/Mak5er/AirCard-iOS).
+iPhone-first card skin editor for AirCard-iOS.
 
-## FVP features
-- Exact AirCard exports: 1536×969 (`cardBackgroundCombined@3x.png`) and 1024×646 (`@2x`).
-- Real high-resolution canvas compositor; preview scaling does not reduce export resolution.
-- iPhone touch gestures: drag to pan and two-finger pinch to zoom.
-- Built-in EMV chip renderer with four finishes plus size/position controls.
-- Live anime artwork search via Jikan / MyAnimeList-linked images.
-- Live TV/cartoon artwork search via TVmaze with in-app attribution.
-- 18 built-in genre templates, image upload, fit/fill controls, brightness, saturation, blur, vignette, grain and gloss.
-- Decorative number, holder, expiry and badge overlays with light/dark modes.
-- iOS Share Sheet export and normal PNG download.
-- Session settings persistence and an allow-listed image proxy so exports are not canvas-tainted by CORS.
+## What is real in this build
 
-## Run
-```bash
+- 1536×969 cardBackgroundCombined@3x.png export.
+- 1024×646 cardBackgroundCombined@2x.png export.
+- Real full-resolution Canvas rendering, not a screenshot of the preview.
+- Draggable/pinch-zoom artwork on iPhone.
+- EMV chip renderer with gold, silver, black, and rose finishes.
+- Contactless symbol with position and scale controls.
+- Brightness, saturation, contrast, blur, vignette, gloss, grain, pan, zoom, and rotation.
+- Optional decorative card number, holder, expiry, and badge layers.
+- iOS Share Sheet support.
+- One-tap live show templates for popular anime, cartoons, and TV series.
+- Anime search: Jikan with AniList fallback.
+- TV/cartoon search: TVmaze.
+- Same-origin image proxy so searched artwork can be composited and exported from Canvas.
+- GitHub CI boots the built Next.js app and verifies anime, TV, and cartoon search plus image-proxy loading.
+
+## Local
+
 npm install
 npm run dev
-```
 
-No environment variables are required. Deploy directly as a Next.js project on Vercel.
+## Production validation
+
+npm run build
+npm start -- -p 3000
+node scripts/smoke.mjs
+
+No environment variables are required for the current public search providers.
+
+## Deploy
+
+Import NightVibes33/Card-Maker into Vercel as a Next.js project.

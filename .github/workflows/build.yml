@@ -10,9 +10,9 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  build-and-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,5 +20,22 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Build Next.js production app
+      - name: Build production app
         run: npm run build
+      - name: Start production server
+        run: |
+          npm start -- -p 3000 > /tmp/card-maker.log 2>&1 &
+          echo $! > /tmp/card-maker.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:3000/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/card-maker.log
+          exit 1
+      - name: Smoke test real search and images
+        run: node scripts/smoke.mjs
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/card-maker.log || true
