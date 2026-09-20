@@ -124,6 +124,33 @@ function isRetriableDbError(error) {
     .includes(String(error?.name || ''));
 }
 
+function hydrateImportRecord(value) {
+  if (!value || typeof value !== 'object') return value || null;
+  if (value.blob instanceof Blob) return value;
+
+  const bytes = value.blobBytes;
+  if (!(bytes instanceof ArrayBuffer)) return value;
+
+  return {
+    ...value,
+    blob: new Blob([bytes], {
+      type: String(value.blobType || value.type || 'application/octet-stream')
+    })
+  };
+}
+
+async function serializeImportRecord(value) {
+  if (!value || typeof value !== 'object' || !(value.blob instanceof Blob)) return value;
+  const bytes = await value.blob.arrayBuffer();
+  return {
+    ...value,
+    blob: undefined,
+    blobBytes: bytes,
+    blobType: value.blob.type || value.type || 'application/octet-stream',
+    blobSize: value.blob.size
+  };
+}
+
 async function withDbRetry(operation) {
   let lastError = null;
 
@@ -148,15 +175,19 @@ async function withDbRetry(operation) {
 }
 
 export async function dbPut(store, value) {
+  const storedValue = store === 'imports'
+    ? await serializeImportRecord(value)
+    : value;
+
   return withDbRetry((db) => new Promise((resolve, reject) => {
     let tx;
     try {
       const stores = store === 'imports' ? ['imports', 'importMeta'] : [store];
       tx = db.transaction(stores, 'readwrite');
-      tx.objectStore(store).put(value);
+      tx.objectStore(store).put(storedValue);
 
-      if (store === 'imports' && value?.id) {
-        tx.objectStore('importMeta').put(importMetadata(value));
+      if (store === 'imports' && storedValue?.id) {
+        tx.objectStore('importMeta').put(importMetadata(storedValue));
       }
     } catch (error) {
       reject(error);
@@ -242,7 +273,7 @@ export async function dbPutIfBelowLimit(store, value, maxCount) {
 }
 
 export async function dbGet(store, id) {
-  return withDbRetry((db) => new Promise((resolve, reject) => {
+  const value = await withDbRetry((db) => new Promise((resolve, reject) => {
     let request;
     try {
       const tx = db.transaction(store, 'readonly');
@@ -254,10 +285,12 @@ export async function dbGet(store, id) {
     request.onsuccess = () => resolve(request.result || null);
     request.onerror = () => reject(request.error || new Error('IndexedDB read failed'));
   }));
+
+  return store === 'imports' ? hydrateImportRecord(value) : value;
 }
 
 export async function dbGetAll(store) {
-  return withDbRetry((db) => new Promise((resolve, reject) => {
+  const values = await withDbRetry((db) => new Promise((resolve, reject) => {
     let request;
     try {
       const tx = db.transaction(store, 'readonly');
@@ -269,6 +302,8 @@ export async function dbGetAll(store) {
     request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
     request.onerror = () => reject(request.error || new Error('IndexedDB list failed'));
   }));
+
+  return store === 'imports' ? values.map(hydrateImportRecord) : values;
 }
 
 export async function dbDelete(store, id) {
