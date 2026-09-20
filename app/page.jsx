@@ -139,6 +139,23 @@ const DEFAULTS = {
   layerOrder: ['builtin-chip', 'builtin-contactless', 'builtin-text']
 };
 
+function createDefaultProjectDesign({
+  background = DEFAULTS.background,
+  backgroundLabel = DEFAULTS.backgroundLabel,
+  sourceCrop = DEFAULTS.sourceCrop,
+  originalSourceCrop = sourceCrop
+} = {}) {
+  return {
+    ...DEFAULTS,
+    background,
+    backgroundLabel,
+    sourceCrop,
+    originalSourceCrop,
+    customLayers: [],
+    layerOrder: [...DEFAULTS.layerOrder]
+  };
+}
+
 const TAB_ITEMS = [
   ['discover', 'Discover'],
   ['studio', 'Studio'],
@@ -4136,6 +4153,7 @@ export default function Page() {
 
     replaceDesign(next, false);
     setSelectedElement('artwork');
+    setPreviewMode('flat');
     setShowOriginal(false);
     setShowExportPreview(false);
     setActiveGuides({ x: null, y: null });
@@ -4169,19 +4187,12 @@ export default function Page() {
       return false;
     }
 
-    startFreshWorkingProject({
-      ...DEFAULTS,
+    startFreshWorkingProject(createDefaultProjectDesign({
       background: workingImage,
       backgroundLabel: item.title,
       sourceCrop: item.sourceCrop || null,
-      originalSourceCrop: item.sourceCrop || null,
-      zoom: item.sourceCrop ? 1 : 1.06,
-      x: 0,
-      y: 0,
-      rotate: 0,
-      flipX: false,
-      fit: 'cover'
-    }, {
+      originalSourceCrop: item.sourceCrop || null
+    }), {
       studioTool: 'position',
       statusMessage: 'New project created from ' + item.title
     });
@@ -4199,19 +4210,12 @@ export default function Page() {
     }
 
     const importedBackground = 'idb://imports/' + asset.id;
-    startFreshWorkingProject({
-      ...DEFAULTS,
+    startFreshWorkingProject(createDefaultProjectDesign({
       background: importedBackground,
       backgroundLabel: safeDisplayText(asset.name, 'Imported image', 160),
       sourceCrop: null,
-      originalSourceCrop: null,
-      zoom: 1,
-      x: 0,
-      y: 0,
-      rotate: 0,
-      flipX: false,
-      fit: 'cover'
-    }, {
+      originalSourceCrop: null
+    }), {
       studioTool: 'crop',
       statusMessage: (asset.name || 'Imported image') + ' opened as a new card'
     });
@@ -5495,7 +5499,7 @@ export default function Page() {
       return;
     }
 
-    startFreshWorkingProject(DEFAULTS, {
+    startFreshWorkingProject(createDefaultProjectDesign(), {
       studioTool: 'position',
       statusMessage: 'New card ready · unsaved work cleared'
     });
