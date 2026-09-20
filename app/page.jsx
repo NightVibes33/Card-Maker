@@ -3399,6 +3399,9 @@ export default function Page() {
   }
 
   async function removeProject(project) {
+    const projectName = project?.name || 'this design';
+    if (!window.confirm('Delete "' + projectName + '" permanently?')) return;
+
     try {
       await dbDelete('projects', project.id);
     } catch {
@@ -3434,15 +3437,16 @@ export default function Page() {
     } catch {}
     for (const project of storedProjects) addDesignRefs(project?.design);
 
-    addDesignRefs(designRef.current);
-    for (const snapshot of undoRef.current) addDesignRefs(snapshot);
-    for (const snapshot of redoRef.current) addDesignRefs(snapshot);
-
     const unused = imports.filter((asset) => asset?.id && !referenced.has(asset.id));
     if (!unused.length) {
       setMessage('No unused imported images to clean up');
       return;
     }
+
+    if (!window.confirm(
+      'Permanently remove ' + unused.length + ' unused imported image' +
+      (unused.length === 1 ? '' : 's') + '?'
+    )) return;
 
     const failed = [];
     await Promise.all(unused.map(async (asset) => {
