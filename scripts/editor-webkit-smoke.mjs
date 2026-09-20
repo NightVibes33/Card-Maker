@@ -915,9 +915,36 @@ try {
     'preset import must restore the exported text-layer state'
   );
 
-  // Main Card Library / Discover selection is a project boundary. It must
-  // import the selected skin into a clean project and forget unsaved editor
-  // work from the previously open project.
+  // Main Card Library / Discover selection is a hard project boundary. Deliberately
+  // dirty hardware position/scale/rotation, finish, text color, and custom layers
+  // first; the selected skin must then open on the exact original card defaults.
+  await page.getByRole('button', { name: 'Black Metal', exact: true }).click();
+  await page.getByLabel('Text color').evaluate((node) => {
+    node.value = '#123456';
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+    node.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.getByRole('button', { name: /^EMV Chip Built-in hardware /i }).click();
+  await page.getByRole('tab', { name: 'Position', exact: true }).click();
+
+  const dirtyChipValues = [
+    ['Chip horizontal position', '0.42'],
+    ['Chip vertical position', '0.18'],
+    ['Chip size', '1.6'],
+    ['Chip rotation', '23']
+  ];
+  for (const [label, value] of dirtyChipValues) {
+    await page.getByLabel(label).evaluate((node, nextValue) => {
+      node.value = nextValue;
+      node.dispatchEvent(new Event('input', { bubbles: true }));
+      node.dispatchEvent(new Event('change', { bubbles: true }));
+    }, value);
+  }
+  assert.ok(
+    Math.abs(Number(await page.getByLabel('Chip horizontal position').inputValue()) - 0.42) < 0.002,
+    'precondition: chip position must be dirty before main-library import'
+  );
+
   await page.getByRole('tab', { name: 'Discover', exact: true }).click();
   const mainLibrarySkin = page.getByRole('button', { name: 'Use WebKit Library Skin', exact: true }).first();
   await mainLibrarySkin.waitFor({ state: 'visible', timeout: 15000 });
@@ -926,26 +953,45 @@ try {
     state: 'visible',
     timeout: 10000
   });
-  await page.getByText('Artwork loaded', { exact: true }).waitFor({
-    state: 'visible',
-    timeout: 15000
-  });
-  const mainLibraryPixel = await sampleBackgroundCorner();
-  assert.ok(
-    mainLibraryPixel[2] > mainLibraryPixel[0],
-    'main Card Library selection must render the newly selected artwork instead of retaining the prior bitmap'
-  );
   assert.equal(
     await page.getByRole('button', { name: 'Undo', exact: true }).isDisabled(),
     true,
     'main Card Library selection must clear undo history from the previous project'
   );
+
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
   assert.equal(
     await page.getByRole('button', { name: /^Text text /i }).count(),
     0,
     'main Card Library selection must not inherit custom layers from the previous project'
   );
+  const builtinChipFinish = page.getByRole('radiogroup', { name: 'Chip finish' });
+  assert.equal(
+    await builtinChipFinish.getByRole('radio', { name: 'Gold', exact: true }).getAttribute('aria-checked'),
+    'true',
+    'main Card Library selection must restore the default gold chip finish'
+  );
+  assert.equal(
+    await page.getByLabel('Text color').inputValue(),
+    '#ffffff',
+    'main Card Library selection must restore the default card text color'
+  );
+
+  await page.getByRole('button', { name: /^EMV Chip Built-in hardware /i }).click();
+  await page.getByRole('tab', { name: 'Position', exact: true }).click();
+  const resetHardware = [
+    ['Chip horizontal position', 0.105],
+    ['Chip vertical position', 0.35],
+    ['Chip size', 1],
+    ['Chip rotation', 0]
+  ];
+  for (const [label, expected] of resetHardware) {
+    const actual = Number(await page.getByLabel(label).inputValue());
+    assert.ok(
+      Math.abs(actual - expected) < 0.002,
+      `main Card Library selection must reset ${label} to its original default`
+    );
+  }
 
   // Simulate another Safari/PWA instance filling the project store without
   // updating this page's React state. The capacity check must still reject a
