@@ -1464,18 +1464,22 @@ export default function Page() {
     loadedImageLayerSourceKey
   ]);
 
-  const replaceDesign = useCallback((nextDesign) => {
-    const normalized = normalizeDesignState(nextDesign);
-    designRef.current = normalized;
-    setDesign(normalized);
-    return normalized;
+  const replaceDesign = useCallback((nextDesign, shouldNormalize = true) => {
+    const resolved = shouldNormalize ? normalizeDesignState(nextDesign) : nextDesign;
+    designRef.current = resolved;
+    setDesign(resolved);
+    return resolved;
   }, []);
 
   const patch = useCallback((next, recordHistory = true, historyKey = '') => {
     const current = designRef.current;
     const delta = typeof next === 'function' ? next(current) : next;
+    const deltaKeys = Object.keys(delta || {});
+    if (!deltaKeys.length) return current;
+
     const updated = { ...current, ...delta };
-    if (JSON.stringify(updated) === JSON.stringify(current)) return current;
+    const changed = deltaKeys.some((key) => !Object.is(current[key], updated[key]));
+    if (!changed) return current;
 
     if (recordHistory) {
       const now = Date.now();
@@ -1500,8 +1504,8 @@ export default function Page() {
       historyGroupRef.current = { key: automaticKey, at: now };
     }
 
-    replaceDesign(updated);
-    return updated;
+    const resolved = replaceDesign(updated, recordHistory);
+    return resolved;
   }, [replaceDesign]);
 
   const undo = useCallback(() => {
