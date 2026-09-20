@@ -263,7 +263,7 @@ async function checkBlitzCatalog() {
 async function checkBrowseTaxonomy() {
   const response = await fetch(base + '/');
   if (!response.ok) throw new Error('Home page returned ' + response.status);
-  const html = await response.text();
+  const html = (await response.text()).replace(/&amp;/g, '&');
 
   for (const label of ['CUCU', 'Blitz', 'All Card Skins', 'Best Sellers', 'New Arrivals', 'Cute & Kawaii']) {
     if (!html.includes(label)) throw new Error('Browse UI missing real source/category label: ' + label);
