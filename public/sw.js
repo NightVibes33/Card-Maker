@@ -4,6 +4,31 @@ const CATALOG_CACHE = 'card-studio-catalog-v3';
 const STATIC_CACHE = 'card-studio-static-v3';
 
 const SHELL = ['/manifest.webmanifest'];
+const CACHE_LIMITS = {
+  [SHELL_CACHE]: 16,
+  [ART_CACHE]: 180,
+  [CATALOG_CACHE]: 80,
+  [STATIC_CACHE]: 120
+};
+
+async function trimCache(cacheName) {
+  const limit = CACHE_LIMITS[cacheName];
+  if (!limit) return;
+
+  const cache = await caches.open(cacheName);
+  const keys = await cache.keys();
+  const overflow = keys.length - limit;
+  if (overflow <= 0) return;
+
+  await Promise.all(keys.slice(0, overflow).map((request) => cache.delete(request)));
+}
+
+async function cacheResponse(cacheName, request, response) {
+  if (!response?.ok) return;
+  const cache = await caches.open(cacheName);
+  await cache.put(request, response.clone());
+  await trimCache(cacheName);
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -31,7 +56,7 @@ async function cacheFirst(request, cacheName) {
   if (hit) return hit;
 
   const response = await fetch(request);
-  if (response.ok) cache.put(request, response.clone()).catch(() => {});
+  if (response.ok) cacheResponse(cacheName, request, response).catch(() => {});
   return response;
 }
 
@@ -41,7 +66,7 @@ async function staleWhileRevalidate(request, cacheName) {
 
   const network = fetch(request)
     .then((response) => {
-      if (response.ok) cache.put(request, response.clone()).catch(() => {});
+      if (response.ok) cacheResponse(cacheName, request, response).catch(() => {});
       return response;
     })
     .catch(() => null);
@@ -59,7 +84,7 @@ async function networkFirst(request, cacheName) {
 
   try {
     const response = await fetch(request, { cache: 'no-store' });
-    if (response.ok) cache.put(request, response.clone()).catch(() => {});
+    if (response.ok) cacheResponse(cacheName, request, response).catch(() => {});
     return response;
   } catch {
     const hit = await cache.match(request);
