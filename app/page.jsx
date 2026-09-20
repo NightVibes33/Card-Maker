@@ -1171,7 +1171,7 @@ export default function Page() {
   const lastAngle = useRef(null);
   const undoRef = useRef([]);
   const redoRef = useRef([]);
-  const applyingHistory = useRef(false);
+  const designRef = useRef(DEFAULTS);
   const historyGroupRef = useRef({ key: '', at: 0 });
   const gestureTarget = useRef('artwork');
   const gestureStartDesign = useRef(null);
@@ -1207,68 +1207,67 @@ export default function Page() {
     loadedImageLayerSourceKey
   ]);
 
+  const replaceDesign = useCallback((nextDesign) => {
+    designRef.current = nextDesign;
+    setDesign(nextDesign);
+  }, []);
+
   const patch = useCallback((next, recordHistory = true, historyKey = '') => {
-    setDesign((current) => {
-      const delta = typeof next === 'function' ? next(current) : next;
-      const updated = { ...current, ...delta };
-      if (JSON.stringify(updated) === JSON.stringify(current)) return current;
+    const current = designRef.current;
+    const delta = typeof next === 'function' ? next(current) : next;
+    const updated = { ...current, ...delta };
+    if (JSON.stringify(updated) === JSON.stringify(current)) return current;
 
-      if (recordHistory && !applyingHistory.current) {
-        const now = Date.now();
-        const automaticKey = historyKey || (
-          typeof next === 'function'
-            ? ''
-            : Object.keys(delta || {}).sort().join('|')
-        );
-        const previousGroup = historyGroupRef.current;
-        const coalesced = Boolean(
-          automaticKey &&
-          previousGroup.key === automaticKey &&
-          now - previousGroup.at < 700
-        );
+    if (recordHistory) {
+      const now = Date.now();
+      const automaticKey = historyKey || (
+        typeof next === 'function'
+          ? ''
+          : Object.keys(delta || {}).sort().join('|')
+      );
+      const previousGroup = historyGroupRef.current;
+      const coalesced = Boolean(
+        automaticKey &&
+        previousGroup.key === automaticKey &&
+        now - previousGroup.at < 700
+      );
 
-        if (!coalesced) {
-          undoRef.current = [...undoRef.current.slice(-49), current];
-          setHistoryVersion((value) => value + 1);
-        }
-
-        redoRef.current = [];
-        historyGroupRef.current = { key: automaticKey, at: now };
+      if (!coalesced) {
+        undoRef.current = [...undoRef.current.slice(-49), current];
+        setHistoryVersion((value) => value + 1);
       }
 
-      return updated;
-    });
-  }, []);
+      redoRef.current = [];
+      historyGroupRef.current = { key: automaticKey, at: now };
+    }
+
+    replaceDesign(updated);
+    return updated;
+  }, [replaceDesign]);
 
   const undo = useCallback(() => {
     historyGroupRef.current = { key: '', at: 0 };
     const previous = undoRef.current.pop();
     if (!previous) return;
 
-    applyingHistory.current = true;
-    setDesign((current) => {
-      redoRef.current = [...redoRef.current.slice(-49), current];
-      return previous;
-    });
-    applyingHistory.current = false;
+    const current = designRef.current;
+    redoRef.current = [...redoRef.current.slice(-49), current];
+    replaceDesign(previous);
     setHistoryVersion((value) => value + 1);
     setMessage('Undid change');
-  }, []);
+  }, [replaceDesign]);
 
   const redo = useCallback(() => {
     historyGroupRef.current = { key: '', at: 0 };
     const next = redoRef.current.pop();
     if (!next) return;
 
-    applyingHistory.current = true;
-    setDesign((current) => {
-      undoRef.current = [...undoRef.current.slice(-49), current];
-      return next;
-    });
-    applyingHistory.current = false;
+    const current = designRef.current;
+    undoRef.current = [...undoRef.current.slice(-49), current];
+    replaceDesign(next);
     setHistoryVersion((value) => value + 1);
     setMessage('Redid change');
-  }, []);
+  }, [replaceDesign]);
 
   const rememberArtwork = useCallback((item) => {
     setRecent((current) => {
@@ -1300,7 +1299,7 @@ export default function Page() {
           parsed.background = parsed.background && isPersistableBackground(parsed.background)
             ? parsed.background
             : '';
-          setDesign((current) => ({ ...current, ...parsed }));
+          replaceDesign({ ...designRef.current, ...parsed });
         } else {
           const legacy = localStorage.getItem('aircard-sticker-fvp-v3');
           if (legacy) {
@@ -1309,7 +1308,7 @@ export default function Page() {
               parsed.background = parsed.background && isPersistableBackground(parsed.background)
                 ? parsed.background
                 : '';
-              setDesign((current) => ({ ...current, ...parsed }));
+              replaceDesign({ ...designRef.current, ...parsed });
             }
           }
         }
@@ -2483,7 +2482,7 @@ export default function Page() {
     redoRef.current = [];
     historyGroupRef.current = { key: '', at: 0 };
     setHistoryVersion((value) => value + 1);
-    setDesign({ ...DEFAULTS, ...project.design });
+    replaceDesign({ ...DEFAULTS, ...project.design });
     setTab('studio');
     setMessage(project.name + ' opened');
   }
@@ -2600,7 +2599,7 @@ export default function Page() {
     redoRef.current = [];
     historyGroupRef.current = { key: '', at: 0 };
     setHistoryVersion((value) => value + 1);
-    setDesign(DEFAULTS);
+    replaceDesign(DEFAULTS);
     setImage(null);
     setLoadedBackgroundKey('');
     setLayerImages({});
