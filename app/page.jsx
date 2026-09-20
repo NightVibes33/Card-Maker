@@ -3116,7 +3116,7 @@ export default function Page() {
               top: (design.chipY * 100) + '%',
               width: ((255 * design.chipScale / OUT_W) * 100) + '%',
               height: ((188 * design.chipScale / OUT_H) * 100) + '%',
-              transform: 'rotate(' + Number(design.chipRotation || 0) + 'deg)'
+              '--chip-rotation': Number(design.chipRotation || 0) + 'deg'
             }}
           />
         ) : null}
