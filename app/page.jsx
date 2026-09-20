@@ -605,21 +605,34 @@ function customLayerBounds(layer, layerImage) {
   };
 }
 
-function pointInRotatedBounds(px, py, cx, cy, rotation, scale, bounds, padding = 0) {
+function pointToLocal(px, py, cx, cy, rotation, scale) {
   const radians = (Number(rotation || 0) * Math.PI) / 180;
   const cos = Math.cos(radians);
   const sin = Math.sin(radians);
   const dx = px - cx;
   const dy = py - cy;
   const safeScale = Math.max(0.0001, Number(scale || 1));
-  const localX = (dx * cos + dy * sin) / safeScale;
-  const localY = (-dx * sin + dy * cos) / safeScale;
+  return {
+    x: (dx * cos + dy * sin) / safeScale,
+    y: (-dx * sin + dy * cos) / safeScale
+  };
+}
+
+function pointInRotatedBounds(px, py, cx, cy, rotation, scale, bounds, padding = 0) {
+  const local = pointToLocal(px, py, cx, cy, rotation, scale);
   return (
-    localX >= bounds.left - padding &&
-    localX <= bounds.right + padding &&
-    localY >= bounds.top - padding &&
-    localY <= bounds.bottom + padding
+    local.x >= bounds.left - padding &&
+    local.x <= bounds.right + padding &&
+    local.y >= bounds.top - padding &&
+    local.y <= bounds.bottom + padding
   );
+}
+
+function pointInRotatedEllipse(px, py, cx, cy, rotation, scale, width, height, padding = 0) {
+  const local = pointToLocal(px, py, cx, cy, rotation, scale);
+  const rx = Math.max(1, Number(width || 0) / 2 + padding);
+  const ry = Math.max(1, Number(height || 0) / 2 + padding);
+  return (local.x * local.x) / (rx * rx) + (local.y * local.y) / (ry * ry) <= 1;
 }
 
 function selectionStyleForBounds(originX, originY, scale, rotation, bounds) {
@@ -3773,15 +3786,38 @@ export default function Page() {
           : null;
       if (layer.type === 'image' && !exactLayerImage) continue;
 
+      const layerX = Number(layer.x ?? 0.5) * OUT_W;
+      const layerY = Number(layer.y ?? 0.5) * OUT_H;
+      const layerScale = clamp(Number(layer.scale ?? 1), 0.1, 6);
+
+      if (layer.type === 'shape' && layer.shape === 'ellipse') {
+        if (
+          pointInRotatedEllipse(
+            px,
+            py,
+            layerX,
+            layerY,
+            layer.rotation,
+            layerScale,
+            clamp(Number(layer.width ?? 280), 20, 1200),
+            clamp(Number(layer.height ?? 120), 20, 800),
+            14
+          )
+        ) {
+          return layer.id;
+        }
+        continue;
+      }
+
       const bounds = customLayerBounds(layer, exactLayerImage);
       if (
         pointInRotatedBounds(
           px,
           py,
-          Number(layer.x ?? 0.5) * OUT_W,
-          Number(layer.y ?? 0.5) * OUT_H,
+          layerX,
+          layerY,
           layer.rotation,
-          clamp(Number(layer.scale ?? 1), 0.1, 6),
+          layerScale,
           bounds,
           14
         )
