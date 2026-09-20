@@ -2769,6 +2769,31 @@ export default function Page() {
                     <SliderRow label="Layer Scale" value={selectedLayer.scale || 1} min={0.1} max={6} step={0.01} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
                     <SliderRow label="Layer Rotation" value={selectedLayer.rotation || 0} min={-180} max={180} step={1} suffix="°" onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} />
                     <SliderRow label="Opacity" value={selectedLayer.opacity ?? 1} min={0} max={1} step={0.01} onChange={(value) => updateLayer(selectedLayer.id, { opacity: value })} />
+                    {expertMode ? (
+                      <div className="layerExpertValues">
+                        <NumericField label="Exact Layer X" value={selectedLayer.x || 0.5} min={0} max={1} onChange={(value) => updateLayer(selectedLayer.id, { x: value })} />
+                        <NumericField label="Exact Layer Y" value={selectedLayer.y || 0.5} min={0} max={1} onChange={(value) => updateLayer(selectedLayer.id, { y: value })} />
+                        <NumericField label="Exact Layer Scale" value={selectedLayer.scale || 1} min={0.1} max={6} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
+                        <NumericField label="Exact Layer Rotation" value={selectedLayer.rotation || 0} min={-180} max={180} step={0.1} onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} suffix="°" />
+                        <NumericField label="Exact Layer Opacity" value={selectedLayer.opacity ?? 1} min={0} max={1} onChange={(value) => updateLayer(selectedLayer.id, { opacity: value })} />
+                        {selectedLayer.type === 'text' ? (
+                          <>
+                            <NumericField label="Exact Font Size" value={selectedLayer.fontSize || 58} min={10} max={240} step={1} onChange={(value) => updateLayer(selectedLayer.id, { fontSize: value })} />
+                            <NumericField label="Exact Font Weight" value={selectedLayer.weight || 700} min={100} max={900} step={100} onChange={(value) => updateLayer(selectedLayer.id, { weight: value })} />
+                            <NumericField label="Exact Letter Spacing" value={selectedLayer.letterSpacing || 0} min={-4} max={30} step={0.1} onChange={(value) => updateLayer(selectedLayer.id, { letterSpacing: value })} />
+                          </>
+                        ) : null}
+                        {selectedLayer.type === 'shape' ? (
+                          <>
+                            <NumericField label="Exact Shape Width" value={selectedLayer.width || 280} min={20} max={1200} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
+                            <NumericField label="Exact Shape Height" value={selectedLayer.height || 120} min={20} max={800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { height: value })} />
+                          </>
+                        ) : null}
+                        {selectedLayer.type === 'image' ? (
+                          <NumericField label="Exact Image Width" value={selectedLayer.width || 320} min={20} max={1300} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
+                        ) : null}
+                      </div>
+                    ) : null}
                     <SwitchRow label="Lock Layer" value={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id, { locked: value })} />
                     <div className="layerActionGrid">
                       <button type="button" onClick={() => moveLayer(selectedLayer.id, 1)}>Bring Forward</button>
