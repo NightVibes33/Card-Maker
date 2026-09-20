@@ -66,12 +66,10 @@ async function readLimitedBody(response, maxBytes) {
 }
 
 async function fetchAllowedImage(startUrl, options) {
-  let current = new URL(startUrl);
+  let current = parseAllowedRemoteImageUrl(startUrl);
+  if (!current) throw new Error('Redirect host not allowed');
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-    if (!isAllowed(current)) {
-      throw new Error('Redirect host not allowed');
-    }
 
     const response = await fetch(current, {
       ...options,
@@ -91,8 +89,8 @@ async function fetchAllowedImage(startUrl, options) {
       throw new Error('Image redirect missing location');
     }
 
-    const next = new URL(location, current);
-    if (!isAllowed(next)) {
+    const next = parseAllowedRemoteImageUrl(new URL(location, current));
+    if (!next) {
       throw new Error('Redirect host not allowed');
     }
     current = next;
@@ -107,14 +105,8 @@ export async function GET(request) {
     return new NextResponse('Invalid url', { status: 400 });
   }
 
-  let url;
-  try {
-    url = new URL(raw);
-  } catch {
-    return new NextResponse('Invalid url', { status: 400 });
-  }
-
-  if (!isAllowed(url)) {
+  const url = parseAllowedRemoteImageUrl(raw);
+  if (!url) {
     return new NextResponse('Host not allowed', { status: 403 });
   }
 
