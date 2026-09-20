@@ -3488,8 +3488,8 @@ export default function Page() {
     const id = makeId('import');
     const asset = {
       id,
-      name: file.name || 'Imported image',
-      type: preparedImage.blob.type || file.type || 'image/*',
+      name: safeDisplayText(file.name, 'Imported image', 160),
+      type: safeDisplayText(preparedImage.blob.type || file.type, 'image/*', 80),
       blob: preparedImage.blob,
       createdAt: Date.now()
     };
@@ -3577,8 +3577,8 @@ export default function Page() {
     const layerId = makeId('layer');
     const asset = {
       id: assetId,
-      name: file.name || 'Image layer',
-      type: preparedImage.blob.type || file.type || 'image/*',
+      name: safeDisplayText(file.name, 'Image layer', 160),
+      type: safeDisplayText(preparedImage.blob.type || file.type, 'image/*', 80),
       blob: preparedImage.blob,
       createdAt: Date.now()
     };
@@ -4531,8 +4531,8 @@ export default function Page() {
         idMap[oldId] = newId;
         await dbPut('imports', {
           id: newId,
-          name: asset.name || 'Preset asset',
-          type: preparedImage.blob.type || asset.type || 'image/*',
+          name: safeDisplayText(asset.name, 'Preset asset', 160),
+          type: safeDisplayText(preparedImage.blob.type || asset.type, 'image/*', 80),
           blob: preparedImage.blob,
           createdAt: Date.now()
         });
