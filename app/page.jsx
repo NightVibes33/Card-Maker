@@ -1709,6 +1709,7 @@ export default function Page() {
 
   useEffect(() => {
     let cancelled = false;
+    const startupDesign = designRef.current;
     let controllerChangeHandler = null;
     let controllerReloadInFlight = false;
     let reloadGuardTimer = 0;
@@ -1725,30 +1726,32 @@ export default function Page() {
 
         if (cancelled) return;
 
-        if (draft?.design && typeof draft.design === 'object') {
-          const parsed = { ...draft.design };
-          parsed.background = parsed.background && isPersistableBackground(parsed.background)
-            ? parsed.background
-            : '';
-          replaceDesign({ ...designRef.current, ...parsed });
-        } else {
-          let legacy = null;
-          try {
-            legacy = localStorage.getItem('aircard-sticker-fvp-v3');
-          } catch {}
-          if (legacy) {
+        if (designRef.current === startupDesign) {
+          if (draft?.design && typeof draft.design === 'object') {
+            const parsed = { ...draft.design };
+            parsed.background = parsed.background && isPersistableBackground(parsed.background)
+              ? parsed.background
+              : '';
+            replaceDesign({ ...startupDesign, ...parsed });
+          } else {
+            let legacy = null;
             try {
-              const parsed = JSON.parse(legacy);
-              if (parsed && typeof parsed === 'object') {
-                parsed.background = parsed.background && isPersistableBackground(parsed.background)
-                  ? parsed.background
-                  : '';
-                replaceDesign({ ...designRef.current, ...parsed });
-              }
-            } catch {
+              legacy = localStorage.getItem('aircard-sticker-fvp-v3');
+            } catch {}
+            if (legacy) {
               try {
-                localStorage.removeItem('aircard-sticker-fvp-v3');
-              } catch {}
+                const parsed = JSON.parse(legacy);
+                if (parsed && typeof parsed === 'object') {
+                  parsed.background = parsed.background && isPersistableBackground(parsed.background)
+                    ? parsed.background
+                    : '';
+                  replaceDesign({ ...startupDesign, ...parsed });
+                }
+              } catch {
+                try {
+                  localStorage.removeItem('aircard-sticker-fvp-v3');
+                } catch {}
+              }
             }
           }
         }
