@@ -135,6 +135,46 @@ try {
   const initialCanvasBox = await editorCanvas.boundingBox();
   assert.ok(initialCanvasBox, 'editor canvas must have a layout box');
 
+  // Studio scroll chrome must have one sticky layer only. The card preview
+  // scrolls naturally; the tool dock owns the safe-area sticky position.
+  const scrollChrome = await page.evaluate(async () => {
+    const preview = document.querySelector('.studioPreview');
+    const dock = document.querySelector('.studioModeRow');
+    if (!preview || !dock) return null;
+
+    window.scrollTo(0, Math.max(0, document.documentElement.scrollHeight - window.innerHeight));
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+    const dockRect = dock.getBoundingClientRect();
+    const safeTop = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-top')) || 0;
+    const hit = document.elementFromPoint(
+      Math.max(1, Math.min(window.innerWidth - 1, dockRect.left + dockRect.width / 2)),
+      Math.max(1, Math.min(window.innerHeight - 1, dockRect.top + 8))
+    );
+
+    const result = {
+      previewPosition: getComputedStyle(preview).position,
+      dockPosition: getComputedStyle(dock).position,
+      dockTop: dockRect.top,
+      safeTop,
+      dockOwnsTopHit: Boolean(hit?.closest?.('.studioModeRow'))
+    };
+
+    window.scrollTo(0, 0);
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return result;
+  });
+
+  assert.ok(scrollChrome, 'Studio scroll chrome must exist');
+  assert.equal(scrollChrome.previewPosition, 'relative', 'Studio card preview must not become a giant sticky header');
+  assert.equal(scrollChrome.dockPosition, 'sticky', 'Studio tool dock must remain sticky while settings scroll');
+  assert.ok(
+    Math.abs(scrollChrome.dockTop - scrollChrome.safeTop) <= 2,
+    `Studio tool dock must pin exactly below the safe area; top=${scrollChrome.dockTop}, safe=${scrollChrome.safeTop}`
+  );
+  assert.equal(scrollChrome.dockOwnsTopHit, true, 'Studio sticky dock must own the top hit target without preview overlap');
+  console.log('PASS Studio scroll chrome => single safe-area sticky dock, preview scrolls normally');
+
   // Prove the main Discover/Card Library action is exactly a New-project boundary:
   // dirty multiple project fields first, then use a library skin and require the
   // original defaults to return before any unrelated editor smoke can fail.
