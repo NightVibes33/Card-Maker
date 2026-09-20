@@ -1056,7 +1056,7 @@ function proxyImageWidth(src = '', width = 1600) {
 function CatalogArtwork({ item, alt, useThumbnail = true }) {
   const crop = item?.sourceCrop;
   const src = useThumbnail
-    ? (item.thumbnail || proxyImageWidth(item.image, 560))
+    ? proxyImageWidth(item.thumbnail || item.image, 560)
     : proxyImageWidth(item.image, 1600);
 
   return (
@@ -2879,7 +2879,7 @@ export default function Page() {
     }
 
     cacheArtwork(proxyImageWidth(item.image, 3072));
-    if (item.thumbnail) cacheArtwork(item.thumbnail);
+    if (item.thumbnail) cacheArtwork(proxyImageWidth(item.thumbnail, 560));
 
     setFavoriteIds((current) => new Set([...current, item.id]));
     setFavorites((current) => [stored, ...current.filter((entry) => entry.id !== item.id)]);
