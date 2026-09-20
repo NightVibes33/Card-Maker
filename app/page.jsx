@@ -2011,6 +2011,7 @@ export default function Page() {
   const draftSaveVersionRef = useRef(0);
   const favoriteOpsRef = useRef(new Set());
   const projectSaveInFlightRef = useRef(false);
+  const projectOpsRef = useRef(new Set());
   const presetTransferInFlightRef = useRef(false);
   const cleanupInFlightRef = useRef(false);
   const exportInFlightRef = useRef(false);
@@ -4034,8 +4035,9 @@ export default function Page() {
 
   async function withProjectOperation(projectId, task) {
     const id = String(projectId || '');
-    if (!id || projectBusyIds.has(id)) return false;
+    if (!id || projectOpsRef.current.has(id)) return false;
 
+    projectOpsRef.current.add(id);
     setProjectBusyIds((current) => {
       if (current.has(id)) return current;
       const next = new Set(current);
@@ -4047,6 +4049,7 @@ export default function Page() {
       await task();
       return true;
     } finally {
+      projectOpsRef.current.delete(id);
       setProjectBusyIds((current) => {
         if (!current.has(id)) return current;
         const next = new Set(current);
@@ -4058,7 +4061,7 @@ export default function Page() {
 
   function openProject(project) {
     if (!project?.design) return;
-    if (projectBusyIds.has(String(project.id || ''))) {
+    if (projectOpsRef.current.has(String(project.id || ''))) {
       setMessage('That design is still being updated');
       return;
     }
