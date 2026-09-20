@@ -2711,6 +2711,7 @@ export default function Page() {
     event.currentTarget.setPointerCapture(event.pointerId);
 
     if (pointers.current.size === 0) {
+      historyGroupRef.current = { key: '', at: 0 };
       const target = hitTestElement(event);
       gestureTarget.current = target;
       gestureStartDesign.current = design;
@@ -3186,10 +3187,11 @@ export default function Page() {
                   aria-selected={!query && cucuCategory === value}
                   className={!query && cucuCategory === value ? 'categoryChip selected' : 'categoryChip'}
                   onClick={() => {
+                    const clearingSearch = Boolean(query || searchInput.trim());
                     setSearchInput('');
                     setQuery('');
-                    if (value === cucuCategory && cucuPage > 0) return;
                     catalogIntentRef.current = value + '\u0000';
+                    if (value === cucuCategory && cucuPage > 0 && !clearingSearch) return;
                     setCucuCategory(value);
                     setCucuCategoryLabel(label);
                     setCucuItems([]);
