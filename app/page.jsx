@@ -4338,33 +4338,34 @@ export default function Page() {
     const value = clamp(Number(rawValue), 0, 0.9);
     patch((current) => {
       const layers = current.customLayers || [];
-      let changed = false;
-      const nextLayers = layers.map((layer) => {
-        if (layer.id !== id || layer.type !== 'image' || layer.locked) return layer;
-        const crop = layer.crop || { x: 0, y: 0, w: 1, h: 1 };
-        let left = clamp(crop.x, 0, 0.9);
-        let top = clamp(crop.y, 0, 0.9);
-        let right = clamp(1 - crop.x - crop.w, 0, 0.9);
-        let bottom = clamp(1 - crop.y - crop.h, 0, 0.9);
+      const index = layers.findIndex((layer) => layer.id === id);
+      if (index < 0) return {};
 
-        if (edge === 'left') left = Math.min(value, 0.9 - right);
-        if (edge === 'right') right = Math.min(value, 0.9 - left);
-        if (edge === 'top') top = Math.min(value, 0.9 - bottom);
-        if (edge === 'bottom') bottom = Math.min(value, 0.9 - top);
+      const layer = layers[index];
+      if (layer.type !== 'image' || layer.locked) return {};
 
-        const nextCrop = normalizeCrop({
-          x: left,
-          y: top,
-          w: Math.max(0.1, 1 - left - right),
-          h: Math.max(0.1, 1 - top - bottom)
-        });
-        if (cropsEqual(normalizeCrop(crop), nextCrop)) return layer;
+      const crop = layer.crop || { x: 0, y: 0, w: 1, h: 1 };
+      let left = clamp(crop.x, 0, 0.9);
+      let top = clamp(crop.y, 0, 0.9);
+      let right = clamp(1 - crop.x - crop.w, 0, 0.9);
+      let bottom = clamp(1 - crop.y - crop.h, 0, 0.9);
 
-        changed = true;
-        return { ...layer, crop: nextCrop };
+      if (edge === 'left') left = Math.min(value, 0.9 - right);
+      if (edge === 'right') right = Math.min(value, 0.9 - left);
+      if (edge === 'top') top = Math.min(value, 0.9 - bottom);
+      if (edge === 'bottom') bottom = Math.min(value, 0.9 - top);
+
+      const nextCrop = normalizeCrop({
+        x: left,
+        y: top,
+        w: Math.max(0.1, 1 - left - right),
+        h: Math.max(0.1, 1 - top - bottom)
       });
+      if (cropsEqual(normalizeCrop(crop), nextCrop)) return {};
 
-      return changed ? { customLayers: nextLayers } : {};
+      const nextLayers = layers.slice();
+      nextLayers[index] = { ...layer, crop: nextCrop };
+      return { customLayers: nextLayers };
     }, true, 'layer-crop:' + id + ':' + edge);
   }
 
@@ -4511,39 +4512,42 @@ export default function Page() {
         : '';
     patch((current) => {
       const layers = current.customLayers || [];
-      let changed = false;
-      const nextLayers = layers.map((layer) => {
-        if (layer.id !== id) return layer;
+      const index = layers.findIndex((layer) => layer.id === id);
+      if (index < 0) return {};
 
-        const deltaKeys = Object.keys(delta || {});
-        const lockedSafeChange = deltaKeys.every((keyName) => keyName === 'locked' || keyName === 'hidden');
-        if (layer.locked && !lockedSafeChange) return layer;
+      const layer = layers[index];
+      const lockedSafeChange = deltaKeys.every(
+        (keyName) => keyName === 'locked' || keyName === 'hidden'
+      );
+      if (layer.locked && !lockedSafeChange) return {};
 
-        const updated = { ...layer, ...delta };
-        if (updated.type === 'shape') {
-          const width = clamp(Number(updated.width ?? 280), 20, 1200);
-          const height = clamp(Number(updated.height ?? 120), 20, 800);
-          updated.width = width;
-          updated.height = height;
-          updated.radius = clamp(Number(updated.radius ?? 28), 0, Math.min(width, height) / 2);
-        }
+      const updated = { ...layer, ...delta };
+      if (updated.type === 'shape') {
+        const width = clamp(Number(updated.width ?? 280), 20, 1200);
+        const height = clamp(Number(updated.height ?? 120), 20, 800);
+        updated.width = width;
+        updated.height = height;
+        updated.radius = clamp(
+          Number(updated.radius ?? 28),
+          0,
+          Math.min(width, height) / 2
+        );
+      }
 
-        const relevantKeys = new Set(Object.keys(delta || {}));
-        if (updated.type === 'shape') {
-          relevantKeys.add('width');
-          relevantKeys.add('height');
-          relevantKeys.add('radius');
-        }
+      const relevantKeys = new Set(deltaKeys);
+      if (updated.type === 'shape') {
+        relevantKeys.add('width');
+        relevantKeys.add('height');
+        relevantKeys.add('radius');
+      }
 
-        if ([...relevantKeys].every((keyName) => Object.is(layer[keyName], updated[keyName]))) {
-          return layer;
-        }
+      if ([...relevantKeys].every((keyName) => Object.is(layer[keyName], updated[keyName]))) {
+        return {};
+      }
 
-        changed = true;
-        return updated;
-      });
-
-      return changed ? { customLayers: nextLayers } : {};
+      const nextLayers = layers.slice();
+      nextLayers[index] = updated;
+      return { customLayers: nextLayers };
     }, true, key);
   }
 
@@ -4638,30 +4642,28 @@ export default function Page() {
         ? 'image:' + selectedElement + ':' + deltaKeys[0]
         : '';
     patch((current) => {
-      const layer = (current.customLayers || []).find((entry) => entry.id === selectedElement);
+      const layers = current.customLayers || [];
+      const index = layers.findIndex((entry) => entry.id === selectedElement);
+      const layer = index >= 0 ? layers[index] : null;
       if (layer?.type === 'image') {
         if (layer.locked) return {};
         const currentSettings = {
           ...IMAGE_LAYER_DEFAULTS,
           ...(layer.adjustments || {})
         };
-        const deltaKeys = Object.keys(delta || {});
         if (deltaKeys.every((keyName) => Object.is(currentSettings[keyName], delta[keyName]))) {
           return {};
         }
-        return {
-          customLayers: (current.customLayers || []).map((entry) =>
-            entry.id === layer.id
-              ? {
-                  ...entry,
-                  adjustments: {
-                    ...currentSettings,
-                    ...delta
-                  }
-                }
-              : entry
-          )
+
+        const nextLayers = layers.slice();
+        nextLayers[index] = {
+          ...layer,
+          adjustments: {
+            ...currentSettings,
+            ...delta
+          }
         };
+        return { customLayers: nextLayers };
       }
       return delta;
     }, true, key);
