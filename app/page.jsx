@@ -26,6 +26,8 @@ const MAX_IMAGE_PIXELS = 65_000_000;
 const MAX_IMAGE_DIMENSION = 12_000;
 const MAX_STORED_IMAGE_PIXELS = 12_000_000;
 const MAX_STORED_IMAGE_DIMENSION = 4096;
+const MAX_STORED_LAYER_IMAGE_PIXELS = 4_000_000;
+const MAX_STORED_LAYER_IMAGE_DIMENSION = 2560;
 
 const CUCU_CATEGORIES = [
   ['all', 'All Card Skins'],
@@ -1307,11 +1309,19 @@ function decodeLocalImageBlob(blob, timeoutMs = 15000) {
   });
 }
 
-async function prepareLocalImageBlob(blob) {
+async function prepareLocalImageBlob(blob, limits = {}) {
   const decoded = await decodeLocalImageBlob(blob);
   const { image, width, height } = decoded;
-  const pixelScale = Math.sqrt(MAX_STORED_IMAGE_PIXELS / Math.max(1, width * height));
-  const dimensionScale = MAX_STORED_IMAGE_DIMENSION / Math.max(width, height);
+  const maxPixels = Math.max(
+    1,
+    Number(limits.maxPixels || MAX_STORED_IMAGE_PIXELS)
+  );
+  const maxDimension = Math.max(
+    1,
+    Number(limits.maxDimension || MAX_STORED_IMAGE_DIMENSION)
+  );
+  const pixelScale = Math.sqrt(maxPixels / Math.max(1, width * height));
+  const dimensionScale = maxDimension / Math.max(width, height);
   const scale = Math.min(1, pixelScale, dimensionScale);
 
   if (scale >= 0.999) {
@@ -2836,7 +2846,10 @@ export default function Page() {
 
     let preparedImage;
     try {
-      preparedImage = await prepareLocalImageBlob(file);
+      preparedImage = await prepareLocalImageBlob(file, {
+        maxPixels: MAX_STORED_LAYER_IMAGE_PIXELS,
+        maxDimension: MAX_STORED_LAYER_IMAGE_DIMENSION
+      });
     } catch (error) {
       setMessage(
         error?.message === 'Image dimensions are too large'
@@ -3480,6 +3493,9 @@ export default function Page() {
         throw new Error('Preset contains too many visible image layers');
       }
 
+      const presetBackgroundAssetId = String(payload.design.background || '').startsWith('idb://imports/')
+        ? String(payload.design.background).slice('idb://imports/'.length)
+        : '';
       let estimatedEmbeddedBytes = 0;
 
       for (const [oldId, asset] of presetAssets) {
@@ -3502,7 +3518,15 @@ export default function Page() {
         if (blob.size > MAX_IMAGE_IMPORT_BYTES) {
           throw new Error('Preset image asset is too large');
         }
-        const preparedImage = await prepareLocalImageBlob(blob);
+        const preparedImage = await prepareLocalImageBlob(
+          blob,
+          oldId === presetBackgroundAssetId
+            ? {}
+            : {
+                maxPixels: MAX_STORED_LAYER_IMAGE_PIXELS,
+                maxDimension: MAX_STORED_LAYER_IMAGE_DIMENSION
+              }
+        );
 
         const newId = makeId('import');
         idMap[oldId] = newId;
