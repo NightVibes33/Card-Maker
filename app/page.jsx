@@ -5807,6 +5807,14 @@ export default function Page() {
     ? (selectedImageLayer.name || 'Image Layer')
     : 'Artwork';
 
+  const activateStudioTool = useCallback((value) => {
+    if (selectedElement === 'card-text' && value !== 'card') {
+      setSelectedElement('artwork');
+      setMessage('Artwork selected');
+    }
+    setStudioTool(value);
+  }, [selectedElement]);
+
   const visualLayerStack = useMemo(() => {
     const custom = new Map((design.customLayers || []).map((layer) => [layer.id, layer]));
     return normalizeLayerOrder(design)
@@ -6127,9 +6135,9 @@ export default function Page() {
                       event,
                       STUDIO_TOOLS.map(([tool]) => tool),
                       studioTool,
-                      setStudioTool
+                      activateStudioTool
                     )}
-                    onClick={() => setStudioTool(value)}
+                    onClick={() => activateStudioTool(value)}
                   >
                     {label}
                   </button>
