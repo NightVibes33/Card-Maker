@@ -2398,6 +2398,8 @@ export default function Page() {
       flipX: false,
       fit: 'cover'
     });
+    setSelectedElement('artwork');
+    setShowOriginal(false);
     setStudioTool('crop');
     setTab('studio');
     setMessage('Imported image ready to crop');
@@ -2778,6 +2780,9 @@ export default function Page() {
     historyGroupRef.current = { key: '', at: 0 };
     setHistoryVersion((value) => value + 1);
     replaceDesign({ ...DEFAULTS, ...project.design });
+    setSelectedElement('artwork');
+    setShowOriginal(false);
+    setActiveGuides({ x: null, y: null });
     setTab('studio');
     setMessage(project.name + ' opened');
   }
@@ -2881,6 +2886,9 @@ export default function Page() {
       });
 
       patch({ ...DEFAULTS, ...imported });
+      setSelectedElement('artwork');
+      setShowOriginal(false);
+      setActiveGuides({ x: null, y: null });
       setImports(await dbGetAll('imports'));
       setTab('studio');
       setMessage('Design preset imported');
