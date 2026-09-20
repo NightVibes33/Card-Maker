@@ -2337,6 +2337,8 @@ export default function Page() {
   const exportInFlightRef = useRef(false);
   const imageImportInFlightRef = useRef(false);
   const imageImportGenerationRef = useRef(0);
+  const pendingDesignFrameRef = useRef(0);
+  const pendingVisualDesignRef = useRef(null);
 
   const gradient = useMemo(
     () => GRADIENTS.find((item) => item.id === design.gradient) || GRADIENTS[0],
@@ -2366,9 +2368,28 @@ export default function Page() {
     [assetsReadyForDesign, design]
   );
 
-  const replaceDesign = useCallback((nextDesign, shouldNormalize = true) => {
+  const replaceDesign = useCallback((nextDesign, shouldNormalize = true, deferVisual = false) => {
     const resolved = shouldNormalize ? normalizeDesignState(nextDesign) : nextDesign;
     designRef.current = resolved;
+
+    if (deferVisual && typeof window !== 'undefined') {
+      pendingVisualDesignRef.current = resolved;
+      if (!pendingDesignFrameRef.current) {
+        pendingDesignFrameRef.current = window.requestAnimationFrame(() => {
+          pendingDesignFrameRef.current = 0;
+          const pending = pendingVisualDesignRef.current;
+          pendingVisualDesignRef.current = null;
+          if (pending) setDesign(pending);
+        });
+      }
+      return resolved;
+    }
+
+    if (pendingDesignFrameRef.current && typeof window !== 'undefined') {
+      window.cancelAnimationFrame(pendingDesignFrameRef.current);
+      pendingDesignFrameRef.current = 0;
+    }
+    pendingVisualDesignRef.current = null;
     setDesign(resolved);
     return resolved;
   }, []);
@@ -2424,9 +2445,19 @@ export default function Page() {
     // Continuous controls already clamp/sanitize at their own input boundary.
     // Avoid remapping every layer and rebuilding z-order on each slider/text tick.
     const shouldNormalize = recordHistory && !historyGroupKey;
-    const resolved = replaceDesign(updated, shouldNormalize);
+    const resolved = replaceDesign(updated, shouldNormalize, !recordHistory);
     return resolved;
   }, [replaceDesign]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingDesignFrameRef.current) {
+        window.cancelAnimationFrame(pendingDesignFrameRef.current);
+        pendingDesignFrameRef.current = 0;
+      }
+      pendingVisualDesignRef.current = null;
+    };
+  }, []);
 
   const undo = useCallback(() => {
     if (cleanupInFlightRef.current) {
