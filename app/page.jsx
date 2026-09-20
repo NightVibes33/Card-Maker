@@ -4691,6 +4691,12 @@ export default function Page() {
                     <span>Text Color</span>
                     <input aria-label="Text color" type="color" value={design.textColor} onChange={(event) => patch({ textColor: event.target.value })} />
                   </label>
+                  <SwitchRow
+                    label="Text Shadow"
+                    detail="Applies to the built-in number, holder, expiry, and badge text"
+                    value={Boolean(design.shadow)}
+                    onChange={(value) => patch({ shadow: value })}
+                  />
                 </Group>
 
 <Group title="CUSTOM LAYERS" footer="Image, text, and shape layers are embedded into the final AirCard PNG.">
