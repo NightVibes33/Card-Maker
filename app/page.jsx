@@ -2677,6 +2677,10 @@ export default function Page() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    if ((designRef.current.customLayers || []).length >= MAX_CUSTOM_LAYERS) {
+      setMessage('Layer limit reached. Delete a layer before adding another.');
+      return;
+    }
     if (file.type && !file.type.startsWith('image/')) {
       setMessage('Choose an image file.');
       return;
@@ -2796,6 +2800,10 @@ export default function Page() {
   }
 
   function addTextLayer() {
+    if ((designRef.current.customLayers || []).length >= MAX_CUSTOM_LAYERS) {
+      setMessage('Layer limit reached. Delete a layer before adding another.');
+      return;
+    }
     const id = makeId('layer');
     patch((current) => ({
       layerOrder: insertCustomLayerBelowHardware(current, id),
@@ -2828,6 +2836,10 @@ export default function Page() {
   }
 
   function addShapeLayer() {
+    if ((designRef.current.customLayers || []).length >= MAX_CUSTOM_LAYERS) {
+      setMessage('Layer limit reached. Delete a layer before adding another.');
+      return;
+    }
     const id = makeId('layer');
     patch((current) => ({
       layerOrder: insertCustomLayerBelowHardware(current, id),
@@ -2856,6 +2868,10 @@ export default function Page() {
   }
 
   function addChipLayer() {
+    if ((designRef.current.customLayers || []).length >= MAX_CUSTOM_LAYERS) {
+      setMessage('Layer limit reached. Delete a layer before adding another.');
+      return;
+    }
     const id = makeId('layer');
     patch((current) => ({
       layerOrder: insertCustomLayerBelowHardware(current, id),
@@ -2880,6 +2896,10 @@ export default function Page() {
   }
 
   function addContactlessLayer() {
+    if ((designRef.current.customLayers || []).length >= MAX_CUSTOM_LAYERS) {
+      setMessage('Layer limit reached. Delete a layer before adding another.');
+      return;
+    }
     const id = makeId('layer');
     patch((current) => ({
       layerOrder: insertCustomLayerBelowHardware(current, id),
@@ -2940,6 +2960,10 @@ export default function Page() {
   }
 
   function duplicateLayer(id) {
+    if ((designRef.current.customLayers || []).length >= MAX_CUSTOM_LAYERS) {
+      setMessage('Layer limit reached. Delete a layer before duplicating.');
+      return;
+    }
     patch((current) => {
       const source = (current.customLayers || []).find((layer) => layer.id === id);
       if (!source) return {};
