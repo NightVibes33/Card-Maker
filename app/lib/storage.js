@@ -3,8 +3,8 @@
 const DB_NAME = 'aircard-studio-v2';
 const DB_VERSION = 1;
 const STORES = ['kv', 'favorites', 'projects', 'imports', 'exports'];
-const ART_CACHE = 'card-studio-art-v3';
-const ART_CACHE_LIMIT = 180;
+const ART_CACHE = 'card-studio-art-v4';
+const ART_CACHE_LIMIT = 40;
 
 let dbPromise = null;
 
