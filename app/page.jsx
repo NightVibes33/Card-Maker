@@ -3596,21 +3596,54 @@ export default function Page() {
               <span>Full-Screen Preview</span>
             </button>
 
-            <button type="button" className="primaryAction bigAction" onClick={share}>
-              <IOSIcon name="export" size={21} />
-              <span>Share 3× PNG</span>
+            <button
+              type="button"
+              className="primaryAction bigAction"
+              onClick={() => isIOS
+                ? sharePng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png', true)
+                : share()
+              }
+            >
+              <IOSIcon name={isIOS ? 'photo' : 'export'} size={21} />
+              <span>{isIOS ? 'Save 3× to Photos' : 'Share 3× PNG'}</span>
             </button>
 
-            <Group title="DOWNLOADS">
-              <button type="button" className="actionRow" onClick={() => download(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}>
-                <span><strong>Save 3× PNG</strong><small>1536 × 969</small></span>
-                <IOSIcon name="chevron" size={17} />
-              </button>
-              <button type="button" className="actionRow" onClick={() => download(1024, 646, 'cardBackgroundCombined@2x.png')}>
-                <span><strong>Save 2× PNG</strong><small>1024 × 646</small></span>
-                <IOSIcon name="chevron" size={17} />
-              </button>
-            </Group>
+            {isIOS ? (
+              <>
+                <Group title="SAVE TO PHOTOS" footer="The iOS share sheet opens with the PNG. Choose “Save Image” to place it in Photos.">
+                  <button type="button" className="actionRow" onClick={() => sharePng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png', true)}>
+                    <span><strong>Save 3× to Photos</strong><small>1536 × 969 · highest quality</small></span>
+                    <IOSIcon name="photo" size={19} />
+                  </button>
+                  <button type="button" className="actionRow" onClick={() => sharePng(1024, 646, 'cardBackgroundCombined@2x.png', true)}>
+                    <span><strong>Save 2× to Photos</strong><small>1024 × 646</small></span>
+                    <IOSIcon name="photo" size={19} />
+                  </button>
+                </Group>
+
+                <Group title="OTHER EXPORT OPTIONS">
+                  <button type="button" className="actionRow" onClick={() => sharePng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png', false)}>
+                    <span><strong>Share 3× PNG</strong><small>Messages, AirDrop, apps, and more</small></span>
+                    <IOSIcon name="export" size={18} />
+                  </button>
+                  <button type="button" className="actionRow" onClick={() => download(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}>
+                    <span><strong>Save 3× to Files</strong><small>Fallback file download</small></span>
+                    <IOSIcon name="chevron" size={17} />
+                  </button>
+                </Group>
+              </>
+            ) : (
+              <Group title="DOWNLOADS">
+                <button type="button" className="actionRow" onClick={() => download(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}>
+                  <span><strong>Save 3× PNG</strong><small>1536 × 969</small></span>
+                  <IOSIcon name="chevron" size={17} />
+                </button>
+                <button type="button" className="actionRow" onClick={() => download(1024, 646, 'cardBackgroundCombined@2x.png')}>
+                  <span><strong>Save 2× PNG</strong><small>1024 × 646</small></span>
+                  <IOSIcon name="chevron" size={17} />
+                </button>
+              </Group>
+            )}
 
             <button type="button" className="secondaryAction bigAction" onClick={() => saveProject()}>Save Design to Library</button>
 
@@ -3660,7 +3693,16 @@ export default function Page() {
           <div className="fullPreviewFrame">
             <canvas ref={fullPreviewCanvasRef} width={OUT_W} height={OUT_H} aria-label="Full-screen final card preview" />
           </div>
-          <button type="button" className="primaryAction" onClick={share}>Share 3× PNG</button>
+          <button
+            type="button"
+            className="primaryAction"
+            onClick={() => isIOS
+              ? sharePng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png', true)
+              : share()
+            }
+          >
+            {isIOS ? 'Save to Photos' : 'Share 3× PNG'}
+          </button>
         </Modal>
       ) : null}
 
