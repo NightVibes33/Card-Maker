@@ -1697,6 +1697,7 @@ export default function Page() {
   useEffect(() => {
     let cancelled = false;
     let controllerChangeHandler = null;
+    let controllerReloadInFlight = false;
     let reloadGuardTimer = 0;
 
     async function hydrate() {
@@ -1767,11 +1768,37 @@ export default function Page() {
           };
           reloadGuardTimer = window.setTimeout(clearReloadGuard, 8000);
 
-          controllerChangeHandler = () => {
+          controllerChangeHandler = async () => {
+            if (controllerReloadInFlight || cancelled) return;
+
             try {
               if (sessionStorage.getItem(reloadKey) === '1') return;
+            } catch {}
+
+            controllerReloadInFlight = true;
+            const snapshot = designRef.current;
+
+            try {
+              await dbPut('kv', {
+                id: 'draft',
+                design: snapshot,
+                updatedAt: Date.now()
+              });
+            } catch {
+              controllerReloadInFlight = false;
+              setSaveStatus('Save failed');
+              setMessage('Update ready, but the latest edit could not be saved. Reload manually when it is safe.');
+              return;
+            }
+
+            try {
+              localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(snapshot));
+            } catch {}
+
+            try {
               sessionStorage.setItem(reloadKey, '1');
             } catch {}
+
             window.location.reload();
           };
           navigator.serviceWorker.addEventListener('controllerchange', controllerChangeHandler);
