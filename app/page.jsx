@@ -4160,6 +4160,7 @@ export default function Page() {
     setActiveGuides({ x: null, y: null });
     setStudioTool(studioTool);
     setProjectName('');
+    setSaveStatus(hydrated && autosaveReady ? 'Saving…' : 'Saved');
     setTab('studio');
     setMenuItem(null);
     setMessage(statusMessage);
