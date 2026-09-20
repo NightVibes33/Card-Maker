@@ -645,6 +645,9 @@ function IOSIcon({ name, size = 24 }) {
   if (name === 'chevron') {
     return <svg {...common}><path d="m9 6 6 6-6 6"/></svg>;
   }
+  if (name === 'trash') {
+    return <svg {...common}><path d="M4.5 7h15M9 7V4.8h6V7M7 7l.8 13h8.4L17 7M10 10.5v6M14 10.5v6"/></svg>;
+  }
   return null;
 }
 
