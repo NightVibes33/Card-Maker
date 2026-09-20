@@ -85,6 +85,13 @@ const GRADIENTS = [
   ['Candy', '#2b133d', '#a43f8f', '#ff89c9']
 ].map((x, i) => ({ id: i, name: x[0], a: x[1], b: x[2], c: x[3] }));
 
+// Card Library previews intentionally overscan by 2.25% on every edge.
+// Studio uses the mathematically equivalent 1.045x artwork scale so the
+// selected card keeps the exact framing the user tapped in the Library.
+const CATALOG_ARTWORK_OVERSCAN = 0.0225;
+const CATALOG_ARTWORK_EDITOR_ZOOM = 1 + CATALOG_ARTWORK_OVERSCAN * 2;
+const MAX_DECODED_CATALOG_PREVIEWS = 24;
+
 const DEFAULTS = {
   background: '',
   backgroundLabel: 'Midnight',
@@ -143,7 +150,8 @@ function createDefaultProjectDesign({
   background = DEFAULTS.background,
   backgroundLabel = DEFAULTS.backgroundLabel,
   sourceCrop = DEFAULTS.sourceCrop,
-  originalSourceCrop = sourceCrop
+  originalSourceCrop = sourceCrop,
+  zoom = DEFAULTS.zoom
 } = {}) {
   return {
     ...DEFAULTS,
@@ -151,6 +159,7 @@ function createDefaultProjectDesign({
     backgroundLabel,
     sourceCrop,
     originalSourceCrop,
+    zoom,
     customLayers: [],
     layerOrder: [...DEFAULTS.layerOrder]
   };
@@ -1292,6 +1301,28 @@ function proxyImageWidth(src = '', width = 1600) {
   return '/api/image?' + normalized.toString();
 }
 
+const decodedCatalogImageCache = new Map();
+
+function rememberDecodedCatalogImage(src, image) {
+  if (!src || !image?.complete || !Number(image.naturalWidth) || !Number(image.naturalHeight)) return;
+  decodedCatalogImageCache.delete(src);
+  decodedCatalogImageCache.set(src, image);
+
+  while (decodedCatalogImageCache.size > MAX_DECODED_CATALOG_PREVIEWS) {
+    const oldestKey = decodedCatalogImageCache.keys().next().value;
+    if (!oldestKey) break;
+    decodedCatalogImageCache.delete(oldestKey);
+  }
+}
+
+function decodedCatalogImageForItem(item) {
+  const src = proxyImageWidth(item?.thumbnail || item?.image, 560);
+  if (!src) return null;
+  const image = decodedCatalogImageCache.get(src) || null;
+  if (!image?.complete || !Number(image.naturalWidth) || !Number(image.naturalHeight)) return null;
+  return image;
+}
+
 function CatalogArtwork({ item, alt, useThumbnail = true }) {
   const crop = item?.sourceCrop;
   const src = useThumbnail
@@ -1304,7 +1335,10 @@ function CatalogArtwork({ item, alt, useThumbnail = true }) {
   }, [src]);
 
   return (
-    <span className="catalogArtworkFrame">
+    <span
+      className="catalogArtworkFrame"
+      style={{ '--catalog-artwork-overscan': (CATALOG_ARTWORK_OVERSCAN * 100) + '%' }}
+    >
       {failed || !src ? (
         <span className="catalogArtworkFallback" role="img" aria-label={alt || 'Artwork unavailable'}>
           <IOSIcon name="photo" size={24} />
@@ -1316,6 +1350,7 @@ function CatalogArtwork({ item, alt, useThumbnail = true }) {
           alt={alt}
           loading="lazy"
           decoding="async"
+          onLoad={(event) => rememberDecodedCatalogImage(src, event.currentTarget)}
           onError={() => setFailed(true)}
           style={{
             width: (100 / crop.w) + '%',
@@ -1330,6 +1365,7 @@ function CatalogArtwork({ item, alt, useThumbnail = true }) {
           alt={alt}
           loading="lazy"
           decoding="async"
+          onLoad={(event) => rememberDecodedCatalogImage(src, event.currentTarget)}
           onError={() => setFailed(true)}
         />
       )}
@@ -2452,6 +2488,7 @@ export default function Page() {
   const fullPreviewCanvasRef = useRef(null);
   const uploadRef = useRef(null);
   const uploadIntentRef = useRef('replace-artwork');
+  const pendingBackgroundPreviewRef = useRef(null);
   const layerUploadRef = useRef(null);
   const presetImportRef = useRef(null);
   const loadMoreRef = useRef(null);
@@ -3182,6 +3219,14 @@ export default function Page() {
     let objectUrl = '';
     let cancelled = false;
     const backgroundKey = design.background || '';
+    const pendingPreview = pendingBackgroundPreviewRef.current;
+    const previewImage =
+      pendingPreview?.key === backgroundKey &&
+      pendingPreview.image?.complete &&
+      Number(pendingPreview.image.naturalWidth) > 0
+        ? pendingPreview.image
+        : null;
+    pendingBackgroundPreviewRef.current = null;
 
     async function loadBackground() {
       if (!backgroundKey) {
@@ -3191,10 +3236,20 @@ export default function Page() {
         return;
       }
 
-      setImage(null);
-      setLoadedBackgroundKey('');
-      setBackgroundLoadError('');
-      setMessage('Loading artwork…');
+      if (previewImage) {
+        // Keep the already-decoded Library artwork on screen while the 3072px
+        // source upgrades silently in the background. There is never a blank
+        // "Loading artwork" frame after a user taps a visible Library card.
+        setImage(previewImage);
+        setLoadedBackgroundKey(backgroundKey);
+        setBackgroundLoadError('');
+      } else {
+        setImage(null);
+        setLoadedBackgroundKey('');
+        setBackgroundLoadError('');
+        setMessage('Loading artwork…');
+      }
+
       let src = backgroundKey;
 
       try {
@@ -3203,6 +3258,7 @@ export default function Page() {
           const asset = await dbGet('imports', id);
           if (cancelled) return;
           if (!asset?.blob) {
+            if (previewImage) return;
             setImage(null);
             setLoadedBackgroundKey('');
             setBackgroundLoadError('Imported artwork is missing.');
@@ -3223,6 +3279,15 @@ export default function Page() {
         );
       } catch {
         if (cancelled) return;
+        if (previewImage) {
+          // The visible decoded preview is a safe display fallback. Keep it
+          // instead of flashing an empty card if the high-resolution upgrade
+          // is temporarily unavailable.
+          setImage(previewImage);
+          setLoadedBackgroundKey(backgroundKey);
+          setBackgroundLoadError('');
+          return;
+        }
         setImage(null);
         setLoadedBackgroundKey('');
         setBackgroundLoadError('Artwork could not load.');
@@ -4144,22 +4209,41 @@ export default function Page() {
 
   function startFreshWorkingProject(nextDesign, {
     studioTool = 'position',
-    statusMessage = 'New card ready'
+    statusMessage = 'New card ready',
+    backgroundPreviewImage = null
   } = {}) {
     finishActiveGesture();
     invalidatePendingImageImport();
     invalidatePendingPresetImport();
 
     const next = normalizeDesignState(nextDesign);
+    const sameBackground =
+      Boolean(next.background) &&
+      next.background === designRef.current.background &&
+      loadedBackgroundKey === next.background &&
+      image;
+    const suppliedPreview =
+      backgroundPreviewImage?.complete &&
+      Number(backgroundPreviewImage.naturalWidth) > 0 &&
+      Number(backgroundPreviewImage.naturalHeight) > 0
+        ? backgroundPreviewImage
+        : null;
+    const decodedPreview = sameBackground ? image : suppliedPreview;
+    pendingBackgroundPreviewRef.current =
+      decodedPreview && !sameBackground
+        ? { key: next.background, image: decodedPreview }
+        : null;
+
     historyGroupRef.current = { key: '', at: 0 };
     undoRef.current = [];
     redoRef.current = [];
     setHistoryVersion((value) => value + 1);
 
-    // A fresh project must not inherit decoded artwork/layer state from the
-    // previous working draft, even when the new background URL is identical.
-    setImage(null);
-    setLoadedBackgroundKey('');
+    // A fresh project never inherits unrelated decoded artwork. A Library
+    // selection may explicitly hand off the already-visible decoded thumbnail
+    // so Studio can paint the chosen card on its very first frame.
+    setImage(decodedPreview);
+    setLoadedBackgroundKey(decodedPreview ? next.background : '');
     setBackgroundLoadError('');
     setLayerImages({});
     setLoadedImageLayerSourceKey('[]');
@@ -4213,14 +4297,18 @@ export default function Page() {
       return false;
     }
 
+    const decodedPreview = decodedCatalogImageForItem(item);
+
     startFreshWorkingProject(createDefaultProjectDesign({
       background: workingImage,
       backgroundLabel: item.title,
       sourceCrop: item.sourceCrop || null,
-      originalSourceCrop: item.sourceCrop || null
+      originalSourceCrop: item.sourceCrop || null,
+      zoom: CATALOG_ARTWORK_EDITOR_ZOOM
     }), {
       studioTool: 'position',
-      statusMessage: 'New project created from ' + item.title
+      statusMessage: 'New project created from ' + item.title,
+      backgroundPreviewImage: decodedPreview
     });
 
     rememberArtwork(item);
