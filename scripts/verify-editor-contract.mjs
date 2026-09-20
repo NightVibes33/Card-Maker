@@ -41,6 +41,8 @@ const pageChecks = [
   [/gestureStartDesign\.current = designRef\.current/, 'gestures snapshot authoritative state'],
   [/if \(pointers\.current\.size >= 2\) return;/, 'gesture tracking ignores accidental third touches'],
   [/function textLayerLines\(/, 'multiline text is modeled explicitly'],
+  [/className="catalogArtworkFallback"/, 'failed catalog artwork has an in-app visual fallback'],
+  [/onError=\{\(\) => setFailed\(true\)\}/, 'catalog artwork decode failures switch to the fallback'],
   [/function pointInBuiltinText\(/, 'built-in card text is directly tappable'],
   [/return 'card-text';/, 'built-in text hit testing routes to card controls'],
   [/setStudioTool\('card'\)/, 'tapping built-in text opens the Card tool'],
