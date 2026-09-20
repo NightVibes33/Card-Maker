@@ -406,52 +406,17 @@ try {
   await page.getByRole('tab', { name: 'Discover', exact: true }).click();
   const discoverChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: 'Import Photo or File', exact: true }).click();
-  const discoverChooser = await discoverChooserPromise;
-  await discoverChooser.setFiles({
+  await discoverChooserPromise;
+  // WebKit's synthetic FileChooser#setFiles does not reliably dispatch React's
+  // change event for a picker opened through input.click(). The real button is
+  // still exercised above (including its new-project intent); set the exact
+  // input afterward so the import change event is deterministic in CI.
+  const discoverUploadInput = page.locator('#panel-discover input[type="file"][accept="image/*"]').first();
+  await discoverUploadInput.setInputFiles({
     name: 'fresh-main-menu-import.png',
     mimeType: 'image/png',
     buffer: imageLayerUpload
   });
-
-  await page.waitForTimeout(2500);
-  const mainMenuImportDebug = await page.evaluate(async () => {
-    let importRows = [];
-    try {
-      const db = await new Promise((resolve, reject) => {
-        const request = indexedDB.open('aircard-studio-v2', 2);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error || new Error('IndexedDB open failed'));
-      });
-      importRows = await new Promise((resolve, reject) => {
-        const tx = db.transaction('importMeta', 'readonly');
-        const request = tx.objectStore('importMeta').getAll();
-        request.onsuccess = () => resolve(request.result || []);
-        request.onerror = () => reject(request.error || new Error('IndexedDB read failed'));
-      });
-      db.close();
-    } catch (error) {
-      importRows = [{ debugError: String(error?.message || error) }];
-    }
-
-    let draft = {};
-    try {
-      draft = JSON.parse(localStorage.getItem('aircard-sticker-fvp-v3') || '{}');
-    } catch {}
-
-    return {
-      draftBackground: draft.background || '',
-      draftLabel: draft.backgroundLabel || '',
-      activeTab: document.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.trim() || '',
-      importButtonDisabled: Boolean(
-        [...document.querySelectorAll('button')]
-          .find((node) => node.textContent?.includes('Import Photo or File'))
-          ?.disabled
-      ),
-      importRows: importRows.map((row) => ({ id: row?.id, name: row?.name, type: row?.type }))
-    };
-  });
-  console.log('DEBUG main-menu local import => ' + JSON.stringify(mainMenuImportDebug));
-  if (pageErrors.length) console.log('DEBUG page errors => ' + JSON.stringify(pageErrors));
 
   await page.waitForFunction(
     () => {
@@ -498,8 +463,9 @@ try {
   await page.getByRole('tab', { name: 'Crop', exact: true }).click();
   const replaceChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: /Replace Artwork/i }).click();
-  const replaceChooser = await replaceChooserPromise;
-  await replaceChooser.setFiles({
+  await replaceChooserPromise;
+  const replaceUploadInput = page.locator('#panel-studio input[type="file"][accept="image/*"]').first();
+  await replaceUploadInput.setInputFiles({
     name: 'replacement-artwork.png',
     mimeType: 'image/png',
     buffer: catalogSkinPng
