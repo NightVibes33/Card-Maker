@@ -1607,6 +1607,8 @@ export default function Page() {
 
   useEffect(() => {
     let cancelled = false;
+    let controllerChangeHandler = null;
+    let reloadGuardTimer = 0;
 
     async function hydrate() {
       try {
@@ -1669,14 +1671,21 @@ export default function Page() {
           }).catch(() => {});
 
           const reloadKey = 'card-studio-sw-v3-reloaded';
-          const clearReloadGuard = () => sessionStorage.removeItem(reloadKey);
-          window.setTimeout(clearReloadGuard, 8000);
+          const clearReloadGuard = () => {
+            try {
+              sessionStorage.removeItem(reloadKey);
+            } catch {}
+          };
+          reloadGuardTimer = window.setTimeout(clearReloadGuard, 8000);
 
-          navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (sessionStorage.getItem(reloadKey) === '1') return;
-            sessionStorage.setItem(reloadKey, '1');
+          controllerChangeHandler = () => {
+            try {
+              if (sessionStorage.getItem(reloadKey) === '1') return;
+              sessionStorage.setItem(reloadKey, '1');
+            } catch {}
             window.location.reload();
-          });
+          };
+          navigator.serviceWorker.addEventListener('controllerchange', controllerChangeHandler);
         }
 
         const standalone =
@@ -1700,6 +1709,10 @@ export default function Page() {
 
     return () => {
       cancelled = true;
+      if (reloadGuardTimer) window.clearTimeout(reloadGuardTimer);
+      if (controllerChangeHandler && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('controllerchange', controllerChangeHandler);
+      }
       window.removeEventListener('online', updateOnline);
       window.removeEventListener('offline', updateOnline);
     };
@@ -1710,26 +1723,36 @@ export default function Page() {
 
     setSaveStatus('Editing…');
     const timer = setTimeout(async () => {
+      const copy = { ...design };
+      if (copy.background && !isPersistableBackground(copy.background)) copy.background = '';
+
+      let indexedDbSaved = false;
+      let localSaved = false;
+
       try {
-        const copy = { ...design };
-        if (copy.background && !isPersistableBackground(copy.background)) copy.background = '';
         await dbPut('kv', {
           id: 'draft',
           design: copy,
           updatedAt: Date.now()
         });
+        indexedDbSaved = true;
+      } catch {}
+
+      try {
         localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(copy));
-        setSaveStatus('Saved');
-      } catch {
-        setSaveStatus('Save failed');
-      }
+        localSaved = true;
+      } catch {}
+
+      setSaveStatus(indexedDbSaved || localSaved ? 'Saved' : 'Save failed');
     }, 420);
 
     return () => clearTimeout(timer);
   }, [design, hydrated]);
 
   useEffect(() => {
-    localStorage.setItem('aircard-expert-v2', expertMode ? '1' : '0');
+    try {
+      localStorage.setItem('aircard-expert-v2', expertMode ? '1' : '0');
+    } catch {}
   }, [expertMode]);
 
   useEffect(() => {
