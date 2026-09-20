@@ -393,17 +393,17 @@ features:
     file: app/globals.css
     contains:
       - "@supports (font: -apple-system-body)"
-  ios_save_to_photos:
+  native_png_exports:
     file: app/page.jsx
     contains:
-      - "Save 3× to Photos"
-      - "Save 2× to Photos"
-      - "Choose “Save Image” in the iOS share sheet"
+      - "nativeExportPng"
       - "navigator.share"
       - "navigator.canShare"
-      - "photos-share-sheet"
       - "makePngFile"
       - "toDataURL('image/png')"
+      - "Save 3× Image"
+      - "Save 2× Image"
+      - "Choose “Save Image” to save it to Photos."
   exact_aircard_exports:
     file: app/page.jsx
     contains:
@@ -432,13 +432,3 @@ features:
       - "grain: 0"
       - "gloss: 0"
       - "overlay: 0"
-
-  native_image_export_sheet:
-    file: app/page.jsx
-    contains:
-      - "nativeExportPng"
-      - "navigator.share"
-      - "navigator.canShare"
-      - "Save 3× Image"
-      - "Save 2× Image"
-      - "Choose “Save Image” to save it to Photos."
