@@ -4110,8 +4110,20 @@ export default function Page() {
 
     let offlineCacheComplete = true;
     if (remoteArtwork.size) {
-      const cacheResults = await Promise.all(
-        [...remoteArtwork].map((src) => cacheArtwork(src))
+      const queue = [...remoteArtwork];
+      const cacheResults = new Array(queue.length).fill(false);
+      let cursor = 0;
+
+      const worker = async () => {
+        while (cursor < queue.length) {
+          const index = cursor;
+          cursor += 1;
+          cacheResults[index] = await cacheArtwork(queue[index]);
+        }
+      };
+
+      await Promise.all(
+        Array.from({ length: Math.min(3, queue.length) }, () => worker())
       );
       offlineCacheComplete = cacheResults.every(Boolean);
     }
