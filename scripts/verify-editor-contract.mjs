@@ -19,7 +19,9 @@ const inspectRoute = read('app/api/cucu/inspect/route.js');
 
 const pageChecks = [
   [/function normalizeDesignState\(/, 'restored designs are normalized'],
-  [/if \(!hydrated\) return undefined;/, 'autosave waits for hydration'],
+  [/if \(!hydrated \|\| !autosaveReady\) return undefined;/, 'autosave waits for safe draft hydration'],
+  [/draftReadFailed = true/, 'draft read failures are tracked separately from an empty draft'],
+  [/setSaveStatus\('Autosave paused'\)/, 'unsafe draft hydration pauses autosave instead of overwriting storage'],
   [/function pointInRotatedBounds\(/, 'rotated geometry hit testing exists'],
   [/function pointInRotatedEllipse\(/, 'ellipse layers use true ellipse hit testing'],
   [/function pointInRotatedRoundedRect\(/, 'rounded shape hit testing follows rendered corners'],
