@@ -4653,7 +4653,8 @@ export default function Page() {
   async function duplicateProject(project) {
     await withProjectOperation(project?.id, async () => {
     const pendingOtherProjectOps = Math.max(0, projectOpsRef.current.size - 1);
-    if (projects.length + pendingOtherProjectOps >= MAX_SAVED_PROJECTS) {
+    const pendingNamedSave = projectSaveInFlightRef.current ? 1 : 0;
+    if (projects.length + pendingOtherProjectOps + pendingNamedSave >= MAX_SAVED_PROJECTS) {
       setMessage('Project limit reached. Delete an older saved design before duplicating.');
       return;
     }
