@@ -1294,8 +1294,8 @@ button:disabled{opacity:.38}
   100%{transform:translateX(22%)}
 }
 @keyframes chipSheen{
-  0%{opacity:.32;transform:translateX(-8%)}
-  100%{opacity:.78;transform:translateX(8%)}
+  0%{opacity:.32;transform:rotate(var(--chip-rotation,0deg)) translateX(-8%)}
+  100%{opacity:.78;transform:rotate(var(--chip-rotation,0deg)) translateX(8%)}
 }
 .layerAddRow{
   grid-template-columns:repeat(2,minmax(0,1fr));
