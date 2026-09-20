@@ -770,6 +770,71 @@ try {
     'preset import must restore the exported text-layer state'
   );
 
+  // Simulate another Safari/PWA instance filling the project store without
+  // updating this page's React state. The capacity check must still reject a
+  // new named save because IndexedDB is the authority.
+  await page.getByRole('tab', { name: 'Library', exact: true }).click();
+  await page.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('aircard-studio-v2', 2);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('IndexedDB open failed'));
+    });
+
+    const currentCount = await new Promise((resolve, reject) => {
+      const tx = db.transaction('projects', 'readonly');
+      const request = tx.objectStore('projects').count();
+      request.onsuccess = () => resolve(Number(request.result || 0));
+      request.onerror = () => reject(request.error || new Error('Project count failed'));
+    });
+
+    if (currentCount < 200) {
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction('projects', 'readwrite');
+        const store = tx.objectStore('projects');
+        for (let index = currentCount; index < 200; index += 1) {
+          store.put({
+            id: 'webkit-capacity-' + index,
+            name: 'Capacity ' + index,
+            design: { gradient: 0 },
+            preview: '',
+            createdAt: Date.now() + index,
+            updatedAt: Date.now() + index
+          });
+        }
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error || new Error('Project capacity seed failed'));
+        tx.onabort = () => reject(tx.error || new Error('Project capacity seed aborted'));
+      });
+    }
+
+    db.close();
+  });
+
+  await page.getByLabel('Project name').fill('Capacity Overflow');
+  await page.getByRole('button', { name: 'Save Current Design', exact: true }).click();
+  await page.getByText(
+    'Project limit reached. Delete an older saved design before saving another.',
+    { exact: true }
+  ).waitFor({ state: 'visible', timeout: 10000 });
+
+  const durableProjectCount = await page.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('aircard-studio-v2', 2);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('IndexedDB open failed'));
+    });
+    const count = await new Promise((resolve, reject) => {
+      const tx = db.transaction('projects', 'readonly');
+      const request = tx.objectStore('projects').count();
+      request.onsuccess = () => resolve(Number(request.result || 0));
+      request.onerror = () => reject(request.error || new Error('Project count failed'));
+    });
+    db.close();
+    return count;
+  });
+  assert.equal(durableProjectCount, 200, 'atomic project capacity must never exceed 200 rows');
+
   // New Card is destructive-looking UI but must remain one-step undoable.
   await page.getByRole('button', { name: /New Card/ }).click();
   await page.getByText('New card · Undo is available', { exact: true }).waitFor({
