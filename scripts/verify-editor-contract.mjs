@@ -57,6 +57,8 @@ const pageChecks = [
   [/setSelectedElement\('artwork'\);[\s\S]{0,220}setStudioTool\('crop'\)/, 'Library artwork selection targets the background before crop editing'],
   [/for \(const snapshot of undoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves undo history assets'],
   [/for \(const snapshot of redoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves redo history assets'],
+  [/storedDraft = await dbGet\('kv', 'draft'\)/, 'cleanup protects IndexedDB autosave assets'],
+  [/const fallbackDraft = localStorage\.getItem\('aircard-sticker-fvp-v3'\)/, 'cleanup protects local fallback draft assets'],
   [/storedImports = await dbGetImportMetadata\(\)/, 'import cleanup verifies authoritative IndexedDB metadata'],
   [/for \(const layer of currentDesign\.customLayers \|\| \[\]\)/, 'project saving scans custom layers for remote artwork'],
   [/some remote art is not cached offline/, 'project saving reports incomplete offline artwork caching'],
