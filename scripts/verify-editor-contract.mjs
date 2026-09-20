@@ -84,6 +84,7 @@ const pageChecks = [
   [/label="Line Height"/, 'multiline text has line-height controls'],
   [/<textarea[\s\S]*aria-label="Layer text"/, 'text layers use a multiline editor'],
   [/designRef\.current === startupDesign/, 'startup hydration does not overwrite newer edits'],
+  [/async function saveProject\([\s\S]*?if \(!hydrated\)/, 'named project saves wait for Library hydration before enforcing project limits'],
   [/setFavorites\(\(current\) => \{[\s\S]*?mergedById/, 'startup favorite hydration merges early user actions'],
   [/setProjects\(\(current\) => \{[\s\S]*?projectCountRef\.current = merged\.length/, 'startup project hydration merges early user actions'],
   [/setImports\(\(current\) => \{[\s\S]*?mergedById/, 'startup import hydration merges early user actions'],
