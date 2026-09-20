@@ -24,6 +24,7 @@ const SAFE_IMAGE_TYPES = new Set([
   'image/gif'
 ]);
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+const MAX_PROXY_OUTPUT_BYTES = 15 * 1024 * 1024;
 const MAX_DECODED_IMAGE_PIXELS = 80_000_000;
 
 function isAllowed(url) {
@@ -214,6 +215,10 @@ export async function GET(request) {
         console.error('image proxy resize failed', error);
         return new NextResponse('Image resize failed', { status: 422 });
       }
+    }
+
+    if (Number(responseBody?.byteLength || 0) > MAX_PROXY_OUTPUT_BYTES) {
+      return new NextResponse('Processed image too large', { status: 413 });
     }
 
     return new NextResponse(responseBody, {
