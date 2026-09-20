@@ -1772,15 +1772,21 @@ function safeDisplayText(value, fallback, maxLength = 120) {
 
 function normalizeStoredArtworkItem(item) {
   if (!item || typeof item !== 'object' || !item.id) return null;
+  const id = safeDisplayText(item.id, '', 160);
   const image = normalizePersistedArtworkSource(item.image, 3072);
-  if (!image || image.startsWith('idb://imports/')) return null;
+  if (!id || !image || image.startsWith('idb://imports/')) return null;
+
+  const thumbnailSource =
+    typeof item.thumbnail === 'string' && item.thumbnail.trim()
+      ? item.thumbnail
+      : image;
 
   return {
     ...item,
-    id: safeDisplayText(item.id, '', 160),
+    id,
     title: safeDisplayText(item.title, 'Card Skin', 160),
     image,
-    thumbnail: item.thumbnail ? proxyImageWidth(item.thumbnail, 560) : proxyImageWidth(image, 560),
+    thumbnail: proxyImageWidth(thumbnailSource, 560),
     sourceCrop: normalizeCrop(item.sourceCrop, 0.1)
   };
 }
@@ -2091,7 +2097,7 @@ export default function Page() {
         setFavoriteIds(new Set(validFavorites.map((entry) => entry.item.id)));
         setProjects(
           storedProjects
-            .filter((entry) => entry?.id && entry?.design && typeof entry.design === 'object')
+            .filter((entry) => entry?.design && typeof entry.design === 'object')
             .map((entry) => ({
               ...entry,
               id: safeDisplayText(entry.id, '', 160),
@@ -2100,6 +2106,7 @@ export default function Page() {
               createdAt: Number(entry.createdAt || 0),
               updatedAt: Number(entry.updatedAt || entry.createdAt || 0)
             }))
+            .filter((entry) => entry.id)
             .sort((a, b) => b.updatedAt - a.updatedAt)
         );
         setImports(
@@ -2110,10 +2117,9 @@ export default function Page() {
         );
         setExportHistory(
           storedExports
-            .filter((entry) => entry?.id)
             .map((entry) => ({
               ...entry,
-              id: safeDisplayText(entry.id, '', 160),
+              id: safeDisplayText(entry?.id, '', 160),
               name: safeDisplayText(entry.name, 'Export', 160),
               designName: safeDisplayText(entry.designName, 'Untitled Card', 160),
               action: safeDisplayText(entry.action, 'export', 80),
@@ -2121,6 +2127,7 @@ export default function Page() {
               height: Math.max(0, Number(entry.height || 0)),
               createdAt: Number(entry.createdAt || 0)
             }))
+            .filter((entry) => entry.id)
             .sort((a, b) => b.createdAt - a.createdAt)
             .slice(0, 40)
         );
@@ -2131,7 +2138,7 @@ export default function Page() {
             setRecent(
               storedRecent
                 .map(normalizeStoredArtworkItem)
-                .filter(Boolean)
+                .filter((item) => item?.id)
                 .slice(0, 20)
             );
           }
