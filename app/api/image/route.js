@@ -33,6 +33,17 @@ export async function GET(request) {
     return new NextResponse('Host not allowed', { status: 403 });
   }
 
+  const requestedWidth = Number(request.nextUrl.searchParams.get('w') || 0);
+  const width = Number.isFinite(requestedWidth)
+    ? Math.max(0, Math.min(1600, Math.floor(requestedWidth)))
+    : 0;
+
+  // Shopify's CDN can resize source artwork before it reaches our function.
+  // Browse thumbnails use this; Studio/export continue to request the original.
+  if (width >= 160 && /(^|\.)cucucovers\.com$/i.test(url.hostname)) {
+    url.searchParams.set('width', String(width));
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
 
