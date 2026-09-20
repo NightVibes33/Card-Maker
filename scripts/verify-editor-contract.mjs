@@ -73,11 +73,13 @@ const pageChecks = [
   [/imageLayers\.length > MAX_VISIBLE_IMAGE_LAYERS/, 'image hydration refuses unsafe visible-image counts'],
   [/visibleImageLayers\(designRef\.current\)\.length >= MAX_VISIBLE_IMAGE_LAYERS/, 'image-layer creation enforces the visible-image cap'],
   [/draftSaveQueueRef\.current/, 'draft writes are serialized through one persistence queue'],
+  [/const queuedAt = Date\.now\(\);/, 'draft timestamps are assigned when snapshots are queued'],
+  [/version === draftSaveVersionRef\.current/, 'stale queued drafts cannot overwrite the latest local fallback'],
   [/const flushDraftBeforeSuspend = \(\) =>/, 'draft flushes before iOS suspension'],
   [/document\.addEventListener\('visibilitychange', onVisibilityChange\)/, 'backgrounding triggers a draft flush'],
   [/window\.addEventListener\('pagehide', flushDraftBeforeSuspend\)/, 'pagehide triggers a draft flush'],
   [/aircard-sticker-fvp-v3-updated-at/, 'local draft fallback records a comparable timestamp'],
-  [/localUpdatedAt > indexedUpdatedAt/, 'startup restores the newest durable draft copy'],
+  [/localUpdatedAt >= indexedUpdatedAt/, 'startup prefers the synchronous fallback when draft timestamps tie'],
   [/const next = normalizeDesignState\(DEFAULTS\)/, 'New Card replaces state with a normalized clean design'],
   [/setMessage\(changed \? 'New card · Undo is available' : 'New card is already empty'\)/, 'New Card is undoable without creating fake no-op history']
 ];
