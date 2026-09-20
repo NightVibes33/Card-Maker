@@ -1,3 +1,5 @@
+import sharp from 'sharp';
+
 const base = process.env.SMOKE_BASE || 'http://127.0.0.1:3000';
 
 async function fetchJsonRetry(url, label, attempts = 5) {
@@ -88,7 +90,26 @@ async function checkCatalog() {
     throw new Error('CUCU thumbnail pipeline failed');
   }
 
-  console.log('PASS CUCU catalog + thumbnail pipeline =>', json.total, 'products');
+  const thumbBytes = Buffer.from(await thumb.arrayBuffer());
+  const thumbMeta = await sharp(thumbBytes, { animated: false }).metadata();
+  if (
+    !Number(thumbMeta.width) ||
+    !Number(thumbMeta.height) ||
+    Number(thumbMeta.width) > 560 ||
+    Number(thumbMeta.height) > 560
+  ) {
+    throw new Error(
+      'CUCU thumbnail was not physically downsampled: ' +
+      String(thumbMeta.width || '?') + 'x' + String(thumbMeta.height || '?')
+    );
+  }
+
+  console.log(
+    'PASS CUCU catalog + thumbnail pipeline =>',
+    json.total,
+    'products ·',
+    thumbMeta.width + 'x' + thumbMeta.height
+  );
   return json.results;
 }
 
