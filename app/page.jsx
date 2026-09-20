@@ -126,6 +126,26 @@ const ADJUSTMENT_PRESETS = {
   Monochrome: { exposure: 0, brightness: 1.02, contrast: 1.12, saturation: 0, highlights: 0.02, shadows: 0.02, temperature: 0, tint: 0, sharpness: 0.08, blur: 0 }
 };
 
+const IMAGE_LAYER_DEFAULTS = {
+  exposure: 0,
+  brightness: 1,
+  contrast: 1,
+  saturation: 1,
+  highlights: 0,
+  shadows: 0,
+  temperature: 0,
+  tint: 0,
+  sharpness: 0,
+  blur: 0,
+  vignette: 0,
+  grain: 0,
+  gloss: 0,
+  overlay: 0,
+  fade: 0,
+  effectTint: '#7b61ff',
+  effectTintStrength: 0
+};
+
 const CARD_PRESETS = {
   'Classic Gold': { chip: true, chipTone: 'gold', contactless: true, textColor: '#ffffff', number: false, holder: false, expiry: false, badge: false },
   'Black Metal': { chip: true, chipTone: 'black', contactless: true, textColor: '#f7f7f7', shadow: true },
@@ -1780,7 +1800,10 @@ export default function Page() {
           scale: 1,
           rotation: 0,
           opacity: 1,
-          width: 320,
+          width: 640,
+          crop: null,
+          originalCrop: null,
+          adjustments: { ...IMAGE_LAYER_DEFAULTS },
           locked: false
         }
       ]
@@ -1812,6 +1835,35 @@ export default function Page() {
         }
       };
     });
+  }
+
+  function updateLayerCropEdge(id, edge, rawValue) {
+    const value = clamp(Number(rawValue), 0, 0.48);
+    patch((current) => ({
+      customLayers: (current.customLayers || []).map((layer) => {
+        if (layer.id !== id || layer.type !== 'image') return layer;
+        const crop = layer.crop || { x: 0, y: 0, w: 1, h: 1 };
+        let left = clamp(crop.x, 0, 0.9);
+        let top = clamp(crop.y, 0, 0.9);
+        let right = clamp(1 - crop.x - crop.w, 0, 0.9);
+        let bottom = clamp(1 - crop.y - crop.h, 0, 0.9);
+
+        if (edge === 'left') left = Math.min(value, 0.9 - right);
+        if (edge === 'right') right = Math.min(value, 0.9 - left);
+        if (edge === 'top') top = Math.min(value, 0.9 - bottom);
+        if (edge === 'bottom') bottom = Math.min(value, 0.9 - top);
+
+        return {
+          ...layer,
+          crop: {
+            x: left,
+            y: top,
+            w: Math.max(0.1, 1 - left - right),
+            h: Math.max(0.1, 1 - top - bottom)
+          }
+        };
+      })
+    }));
   }
 
   function addTextLayer() {
