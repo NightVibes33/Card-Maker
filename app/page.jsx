@@ -3739,6 +3739,12 @@ export default function Page() {
 
   function pointerDown(event) {
     event.preventDefault();
+
+    // The editor supports one-finger drag and two-finger transform. Ignore
+    // additional touches so an accidental third finger cannot stale the
+    // pinch baseline and cause a jump when it lifts.
+    if (pointers.current.size >= 2) return;
+
     event.currentTarget.setPointerCapture(event.pointerId);
 
     if (pointers.current.size === 0) {
