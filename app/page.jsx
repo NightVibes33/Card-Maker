@@ -1779,7 +1779,7 @@ export default function Page() {
     ctx.fillStyle = base;
     ctx.fillRect(0, 0, OUT_W, OUT_H);
 
-    if (image) {
+    if (image && loadedBackgroundKey === design.background) {
       const crop = design.sourceCrop;
       const sx = crop ? clamp(crop.x, 0, 1) * image.width : 0;
       const sy = crop ? clamp(crop.y, 0, 1) * image.height : 0;
@@ -2166,7 +2166,7 @@ export default function Page() {
     }
 
     ctx.restore();
-  }, [design, gradient, image, layerImages]);
+  }, [design, gradient, image, layerImages, loadedBackgroundKey]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -2968,8 +2968,10 @@ export default function Page() {
     replaceDesign(DEFAULTS);
     setImage(null);
     setLoadedBackgroundKey('');
+    setBackgroundLoadError('');
     setLayerImages({});
     setLoadedImageLayerSourceKey('[]');
+    setLayerLoadError('');
     setSelectedElement('artwork');
     setMessage('New card');
   }
