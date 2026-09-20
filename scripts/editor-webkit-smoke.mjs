@@ -135,6 +135,17 @@ try {
   const initialCanvasBox = await editorCanvas.boundingBox();
   assert.ok(initialCanvasBox, 'editor canvas must have a layout box');
 
+  const initialStudioChromeFit = await page.evaluate(() => {
+    const actionBar = document.querySelector('.studioPreview .studioFloatingBar');
+    const toolBar = document.querySelector('.studioToolBar');
+    return {
+      actionFits: Boolean(actionBar && actionBar.scrollWidth <= actionBar.clientWidth + 1),
+      toolsFit: Boolean(toolBar && toolBar.scrollWidth <= toolBar.clientWidth + 1)
+    };
+  });
+  assert.equal(initialStudioChromeFit.actionFits, true, 'Studio action bar must fit a 390px iPhone without wrapping or clipping');
+  assert.equal(initialStudioChromeFit.toolsFit, true, 'Studio tool dock must fit a 390px iPhone without horizontal overflow');
+
   // Studio scroll chrome must have one sticky layer only. The card preview
   // scrolls naturally; the tool dock owns the safe-area sticky position.
   const scrollChrome = await page.evaluate(async () => {
@@ -194,6 +205,15 @@ try {
   });
 
   await page.getByRole('button', { name: /^EMV Chip Built-in hardware /i }).click();
+  const selectedStudioChromeFits = await page.evaluate(() => {
+    const actionBar = document.querySelector('.studioPreview .studioFloatingBar');
+    return Boolean(actionBar && actionBar.scrollWidth <= actionBar.clientWidth + 1);
+  });
+  assert.equal(
+    selectedStudioChromeFits,
+    true,
+    'Studio action bar must still fit when the Done selection action is visible'
+  );
   await page.getByRole('tab', { name: 'Position', exact: true }).click();
   for (const [label, value] of [
     ['Chip horizontal position', '0.42'],
