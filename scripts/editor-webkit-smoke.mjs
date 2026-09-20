@@ -414,6 +414,23 @@ try {
   assert.equal(exportMeta.width, 1024);
   assert.equal(exportMeta.height, 646);
 
+  const save3x = page.getByRole('button', { name: /Save 3× Image/ }).first();
+  await save3x.waitFor({ state: 'visible' });
+  assert.equal(await save3x.isDisabled(), false);
+
+  const [download3x] = await Promise.all([
+    page.waitForEvent('download', { timeout: 20000 }),
+    save3x.click()
+  ]);
+  assert.equal(download3x.suggestedFilename(), 'cardBackgroundCombined@3x.png');
+
+  const download3xPath = await download3x.path();
+  assert.ok(download3xPath, '3× exported PNG must have a local download path');
+  const export3xMeta = await sharp(download3xPath).metadata();
+  assert.equal(export3xMeta.format, 'png');
+  assert.equal(export3xMeta.width, 1536);
+  assert.equal(export3xMeta.height, 969);
+
   if (pageErrors.length) {
     throw new Error('Page errors:\n' + pageErrors.join('\n\n'));
   }
