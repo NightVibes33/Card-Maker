@@ -129,6 +129,7 @@ requireMatch(page, /const decodedBySource = new Map\(\);/, 'duplicate image laye
 requireMatch(page, /const animatedOrVectorSource =/, 'animated and vector imports are normalized');
 requireMatch(page, /gif\|apng\|svg\\\+xml/, 'APNG, GIF, and SVG imports use deterministic rasterization');
 requireMatch(page, /const encodeCanvas = \(type, quality\)/, 'image optimization has an encoder fallback path');
+requireMatch(page, /optimizedBlob\.size > MAX_IMAGE_IMPORT_BYTES/, 'optimized image blobs cannot exceed the import storage ceiling');
 if (/dbGetAll\('imports'\)/.test(page)) {
   throw new Error('Editor contract failed: Library must not hydrate full import blobs into React state');
 }
