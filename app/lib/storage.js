@@ -39,6 +39,7 @@ function openDb() {
 
   dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
+    let settled = false;
 
     request.onupgradeneeded = (event) => {
       const db = request.result;
@@ -70,6 +71,12 @@ function openDb() {
 
     request.onsuccess = () => {
       const db = request.result;
+      if (settled) {
+        db.close();
+        return;
+      }
+
+      settled = true;
       db.onversionchange = () => {
         db.close();
         dbPromise = null;
@@ -78,11 +85,15 @@ function openDb() {
     };
 
     request.onerror = () => {
+      if (settled) return;
+      settled = true;
       dbPromise = null;
       reject(request.error || new Error('IndexedDB unavailable'));
     };
 
     request.onblocked = () => {
+      if (settled) return;
+      settled = true;
       dbPromise = null;
       reject(new Error('IndexedDB upgrade blocked'));
     };
