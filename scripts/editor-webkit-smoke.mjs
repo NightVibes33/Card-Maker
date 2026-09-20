@@ -30,6 +30,12 @@ try {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.locator('main.studio').waitFor({ state: 'visible', timeout: 15000 });
 
+  const installDialog = page.getByRole('dialog', { name: 'Install Card Studio' });
+  if (await installDialog.isVisible().catch(() => false)) {
+    await page.getByRole('button', { name: 'Close Install Card Studio' }).click();
+    await installDialog.waitFor({ state: 'hidden', timeout: 5000 });
+  }
+
   await page.getByRole('tab', { name: 'Studio', exact: true }).click();
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
 
