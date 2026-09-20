@@ -208,6 +208,20 @@ try {
   });
 
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
+
+  await page.getByRole('button', { name: '+ Chip', exact: true }).click();
+  const customChipFinish = page.getByRole('radiogroup', { name: 'Custom chip finish' });
+  await customChipFinish.waitFor({ state: 'visible', timeout: 5000 });
+  const silverChip = customChipFinish.getByRole('radio', { name: 'Silver', exact: true });
+  await silverChip.click();
+  assert.equal(await silverChip.getAttribute('aria-checked'), 'true');
+
+  await page.getByRole('button', { name: '+ Contactless', exact: true }).click();
+  await page.getByText('Contactless Color', { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 5000
+  });
+
   const imageInputs = page.locator('input[type="file"][accept="image/*"]');
   assert.ok(await imageInputs.count() >= 2, 'background and image-layer file inputs must exist');
 
