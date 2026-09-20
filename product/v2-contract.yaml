@@ -397,3 +397,24 @@ features:
       - "1024 × 646"
       - "cardBackgroundCombined@3x.png"
       - "cardBackgroundCombined@2x.png"
+
+  imported_image_editing:
+    file: app/page.jsx
+    contains:
+      - "IMAGE_LAYER_DEFAULTS"
+      - "patchImageTarget"
+      - "activeImageSettings"
+      - "activeImageAvailable"
+      - "activeImageLabel"
+      - "adjustments: { ...IMAGE_LAYER_DEFAULTS }"
+      - "Effects apply only to this imported layer"
+      - "Layer Crop Left"
+      - "Reset Layer Crop"
+      - "Reset Layer Position"
+  neutral_effect_baseline:
+    file: app/page.jsx
+    contains:
+      - "vignette: 0"
+      - "grain: 0"
+      - "gloss: 0"
+      - "overlay: 0"
