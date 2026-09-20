@@ -5896,7 +5896,7 @@ export default function Page() {
     <>
       <main
         className="studio"
-        inert={blockingAssetOperation ? '' : undefined}
+        inert={blockingAssetOperation || undefined}
         aria-busy={blockingAssetOperation || undefined}
       >
       <header className="largeTitleBar">
