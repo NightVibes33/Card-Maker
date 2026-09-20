@@ -3797,7 +3797,7 @@ export default function Page() {
 
       <div className="screenContent">
         {tab === 'discover' && (
-          <div className="tabScreen discoverScreen">
+          <div className="tabScreen discoverScreen" role="tabpanel" id="panel-discover" aria-labelledby="tab-discover">
             <section className="discoverHero">
               <div>
                 <span className="eyebrow">Card Library</span>
@@ -3900,7 +3900,7 @@ export default function Page() {
         )}
 
         {tab === 'studio' && (
-          <div className="tabScreen studioScreen">
+          <div className="tabScreen studioScreen" role="tabpanel" id="panel-studio" aria-labelledby="tab-studio">
             <div className="studioModeRow">
               <div className="studioToolBar" role="tablist" aria-label="Studio tools">
                 {STUDIO_TOOLS.map(([value, label]) => (
@@ -4461,7 +4461,7 @@ export default function Page() {
         )}
 
         {tab === 'library' && (
-          <div className="tabScreen libraryScreen">
+          <div className="tabScreen libraryScreen" role="tabpanel" id="panel-library" aria-labelledby="tab-library">
             <section className="librarySummary">
               <div><strong>{favorites.length}</strong><span>Favorites</span></div>
               <div><strong>{projects.length}</strong><span>Projects</span></div>
@@ -4589,7 +4589,7 @@ export default function Page() {
         )}
 
         {tab === 'export' && (
-          <div className="tabScreen exportScreen">
+          <div className="tabScreen exportScreen" role="tabpanel" id="panel-export" aria-labelledby="tab-export">
             <section className="exportCard" aria-label="Card export details">
               <div className="exportGlyph"><IOSIcon name="export" size={30} /></div>
               <h2>Ready to Export</h2>
@@ -4659,8 +4659,11 @@ export default function Page() {
           <button
             type="button"
             key={value}
+            id={'tab-' + value}
             role="tab"
             aria-selected={tab === value}
+            aria-controls={'panel-' + value}
+            tabIndex={tab === value ? 0 : -1}
             className={tab === value ? 'active' : ''}
             onClick={() => setTab(value)}
           >
