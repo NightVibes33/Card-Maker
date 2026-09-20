@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 const ORIGIN = 'https://cucucovers.com';
 const DEFAULT_COLLECTION = 'all-card-covers';
-const SHOPIFY_PAGE_SIZE = 250;
+const SHOPIFY_PAGE_SIZE = 100;
 const FALLBACK_TOTAL = 2225;
 
 const COLLECTIONS = {
@@ -180,7 +180,7 @@ async function getShopifyPage(collectionHandle, page) {
     throw new Error('CUCU collection page ' + page + ' returned ' + lastStatus);
   })();
 
-  pageCache.set(key, { promise, expires: now + 30 * 60 * 1000 });
+  pageCache.set(key, { promise, expires: now + 6 * 60 * 60 * 1000 });
 
   try {
     return await promise;
@@ -214,7 +214,7 @@ async function getFallbackCatalog(categoryKey) {
 
   const promise = (async () => {
     const batches = [];
-    for (let sourcePage = 1; sourcePage <= 12; sourcePage += 1) {
+    for (let sourcePage = 1; sourcePage <= 30; sourcePage += 1) {
       const batch = await getShopifyPage(DEFAULT_COLLECTION, sourcePage);
       batches.push(...batch);
       if (batch.length < SHOPIFY_PAGE_SIZE) break;
