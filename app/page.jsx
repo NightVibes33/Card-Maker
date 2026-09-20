@@ -3179,6 +3179,8 @@ export default function Page() {
     };
 
     addDesignRefs(designRef.current);
+    for (const snapshot of undoRef.current) addDesignRefs(snapshot);
+    for (const snapshot of redoRef.current) addDesignRefs(snapshot);
 
     let storedProjects = projects;
     try {
