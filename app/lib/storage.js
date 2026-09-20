@@ -141,12 +141,52 @@ export async function dbGetImportMetadata() {
   const db = await openDb();
   if (!db) return [];
 
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('importMeta', 'readonly');
-    const request = tx.objectStore('importMeta').getAll();
-    request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
-    request.onerror = () => reject(request.error || new Error('IndexedDB import metadata read failed'));
+  const snapshot = await new Promise((resolve, reject) => {
+    const tx = db.transaction(['imports', 'importMeta'], 'readonly');
+    const importsCountRequest = tx.objectStore('imports').count();
+    const metaRequest = tx.objectStore('importMeta').getAll();
+    let importCount = 0;
+    let metadata = [];
+
+    importsCountRequest.onsuccess = () => {
+      importCount = Number(importsCountRequest.result || 0);
+    };
+    metaRequest.onsuccess = () => {
+      metadata = Array.isArray(metaRequest.result) ? metaRequest.result : [];
+    };
+    tx.oncomplete = () => resolve({ importCount, metadata });
+    tx.onerror = () => reject(tx.error || new Error('IndexedDB import metadata read failed'));
     tx.onabort = () => reject(tx.error || new Error('IndexedDB import metadata read aborted'));
+  });
+
+  if (snapshot.metadata.length === snapshot.importCount) {
+    return snapshot.metadata;
+  }
+
+  // Self-heal metadata if an interrupted/older upgrade left it incomplete.
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(['imports', 'importMeta'], 'readwrite');
+    const importsStore = tx.objectStore('imports');
+    const metaStore = tx.objectStore('importMeta');
+    const items = [];
+    const cursorRequest = importsStore.openCursor();
+
+    metaStore.clear();
+
+    cursorRequest.onsuccess = () => {
+      const cursor = cursorRequest.result;
+      if (!cursor) return;
+      const metadata = importMetadata(cursor.value || {});
+      if (metadata.id) {
+        items.push(metadata);
+        metaStore.put(metadata);
+      }
+      cursor.continue();
+    };
+    cursorRequest.onerror = () => reject(cursorRequest.error || new Error('IndexedDB import metadata rebuild failed'));
+    tx.oncomplete = () => resolve(items);
+    tx.onerror = () => reject(tx.error || new Error('IndexedDB import metadata rebuild failed'));
+    tx.onabort = () => reject(tx.error || new Error('IndexedDB import metadata rebuild aborted'));
   });
 }
 
