@@ -1163,6 +1163,7 @@ export default function Page() {
   const undoRef = useRef([]);
   const redoRef = useRef([]);
   const applyingHistory = useRef(false);
+  const historyGroupRef = useRef({ key: '', at: 0 });
   const gestureTarget = useRef('artwork');
   const gestureStartDesign = useRef(null);
   const gestureHistoryRecorded = useRef(false);
@@ -1172,16 +1173,33 @@ export default function Page() {
     [design.gradient]
   );
 
-  const patch = useCallback((next, recordHistory = true) => {
+  const patch = useCallback((next, recordHistory = true, historyKey = '') => {
     setDesign((current) => {
       const delta = typeof next === 'function' ? next(current) : next;
       const updated = { ...current, ...delta };
       if (JSON.stringify(updated) === JSON.stringify(current)) return current;
 
       if (recordHistory && !applyingHistory.current) {
-        undoRef.current = [...undoRef.current.slice(-49), current];
+        const now = Date.now();
+        const automaticKey = historyKey || (
+          typeof next === 'function'
+            ? ''
+            : Object.keys(delta || {}).sort().join('|')
+        );
+        const previousGroup = historyGroupRef.current;
+        const coalesced = Boolean(
+          automaticKey &&
+          previousGroup.key === automaticKey &&
+          now - previousGroup.at < 700
+        );
+
+        if (!coalesced) {
+          undoRef.current = [...undoRef.current.slice(-49), current];
+          setHistoryVersion((value) => value + 1);
+        }
+
         redoRef.current = [];
-        setHistoryVersion((value) => value + 1);
+        historyGroupRef.current = { key: automaticKey, at: now };
       }
 
       return updated;
@@ -1189,6 +1207,7 @@ export default function Page() {
   }, []);
 
   const undo = useCallback(() => {
+    historyGroupRef.current = { key: '', at: 0 };
     const previous = undoRef.current.pop();
     if (!previous) return;
 
@@ -1203,6 +1222,7 @@ export default function Page() {
   }, []);
 
   const redo = useCallback(() => {
+    historyGroupRef.current = { key: '', at: 0 };
     const next = redoRef.current.pop();
     if (!next) return;
 
@@ -2109,7 +2129,7 @@ export default function Page() {
           h: Math.max(0.1, 1 - top - bottom)
         }
       };
-    });
+    }, true, 'crop:' + edge);
   }
 
   function updateLayerCropEdge(id, edge, rawValue) {
@@ -2138,7 +2158,7 @@ export default function Page() {
           }
         };
       })
-    }));
+    }), true, 'layer-crop:' + id + ':' + edge);
   }
 
   function addTextLayer() {
@@ -2249,11 +2269,12 @@ export default function Page() {
   }
 
   function updateLayer(id, delta) {
+    const key = 'layer:' + id + ':' + Object.keys(delta || {}).sort().join('|');
     patch((current) => ({
       customLayers: (current.customLayers || []).map((layer) =>
         layer.id === id ? { ...layer, ...delta } : layer
       )
-    }));
+    }), true, key);
   }
 
   function deleteLayer(id) {
@@ -2312,6 +2333,7 @@ export default function Page() {
   }
 
   function patchImageTarget(delta) {
+    const key = 'image:' + selectedElement + ':' + Object.keys(delta || {}).sort().join('|');
     patch((current) => {
       const layer = (current.customLayers || []).find((entry) => entry.id === selectedElement);
       if (layer?.type === 'image') {
@@ -2331,7 +2353,7 @@ export default function Page() {
         };
       }
       return delta;
-    });
+    }, true, key);
   }
 
   function applyAdjustmentPreset(name) {
