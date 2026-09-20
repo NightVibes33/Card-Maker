@@ -202,7 +202,7 @@ async function checkBrowseTaxonomy() {
     throw new Error('Browse UI still contains removed sources, fake taxonomy, or outbound storefront controls');
   }
 
-  console.log('PASS Browse taxonomy => CUCU-only real collections, no Blitz, no storefront redirects');
+  console.log('PASS Browse taxonomy => CUCU-only real collections with no storefront redirects');
 }
 
 await check('Naruto', /naruto|konohagakure|akatsuki/i);
