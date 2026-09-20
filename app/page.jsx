@@ -1822,9 +1822,9 @@ async function validateSafeSvgBlob(blob) {
     /<\s*foreignObject\b/i,
     /<!\s*(?:DOCTYPE|ENTITY)\b/i,
     /\bon[a-z][a-z0-9_-]*\s*=/i,
-    /\b(?:href|xlink:href|src)\s*=\s*["']?\s*(?:https?:|\/\/|javascript:|data:text\/html)/i,
+    /\b(?:href|xlink:href|src)\s*=\s*["']?\s*(?!#)/i,
     /@import\b/i,
-    /url\(\s*["']?\s*(?:https?:|\/\/|javascript:)/i
+    /url\(\s*["']?\s*(?!#)/i
   ];
 
   if (unsafeMarkup.some((pattern) => pattern.test(markup))) {
