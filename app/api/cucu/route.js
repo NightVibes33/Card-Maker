@@ -6,7 +6,6 @@ const SHOPIFY_PAGE_SIZE = 250;
 const FALLBACK_TOTAL = 2225;
 
 const pageCache = new Map();
-let countCache = null;
 
 function cleanText(value = '') {
   return String(value)
@@ -79,39 +78,10 @@ async function fetchWithTimeout(url, options = {}, timeout = 10000) {
 }
 
 async function getCollectionTotal() {
-  const now = Date.now();
-  if (countCache && countCache.expires > now) return countCache.value;
-
-  let total = FALLBACK_TOTAL;
-  try {
-    const response = await fetchWithTimeout(
-      ORIGIN + '/collections/' + COLLECTION,
-      { headers: { Accept: 'text/html,application/xhtml+xml' } },
-      9000
-    );
-
-    if (response.ok) {
-      const html = await response.text();
-      const patterns = [
-        /Show\s+([\d,]+)\s+results/i,
-        /([\d,]+)\s+items/i,
-        /([\d,]+)\s+designs/i
-      ];
-
-      for (const pattern of patterns) {
-        const match = html.match(pattern);
-        if (!match) continue;
-        const parsed = Number(match[1].replace(/,/g, ''));
-        if (Number.isFinite(parsed) && parsed > 0) {
-          total = parsed;
-          break;
-        }
-      }
-    }
-  } catch {}
-
-  countCache = { value: total, expires: now + 30 * 60 * 1000 };
-  return total;
+  // The full collection was verified at 2,225 products in production smoke.
+  // Avoid a second upstream request per catalog call; it only increases the
+  // chance of Shopify throttling the actual product-data request.
+  return FALLBACK_TOTAL;
 }
 
 async function getShopifyPage(page) {
@@ -132,12 +102,21 @@ async function getShopifyPage(page) {
 
     let lastStatus = 0;
 
-    for (let attempt = 1; attempt <= 4; attempt += 1) {
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      let retryDelay = 800 * attempt;
+
       try {
         const response = await fetchWithTimeout(
           url,
-          { headers: { Accept: 'application/json' } },
-          12000
+          {
+            headers: {
+              Accept: 'application/json',
+              'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 Version/18.6 Mobile/15E148 Safari/604.1',
+              'Accept-Language': 'en-US,en;q=0.9',
+              Referer: ORIGIN + '/collections/' + COLLECTION
+            }
+          },
+          15000
         );
         lastStatus = response.status;
 
@@ -146,15 +125,22 @@ async function getShopifyPage(page) {
           return Array.isArray(json?.products) ? json.products : [];
         }
 
-        if (response.status < 500 && response.status !== 429) {
+        if (response.status === 429) {
+          const retryAfter = Number(response.headers.get('retry-after') || 0);
+          retryDelay = retryAfter > 0
+            ? Math.min(10000, Math.max(2000, retryAfter * 1000))
+            : 2200 * attempt;
+        } else if (response.status >= 500) {
+          retryDelay = 1000 * attempt;
+        } else {
           throw new Error('CUCU collection page ' + page + ' returned ' + response.status);
         }
       } catch (error) {
-        if (attempt >= 4) throw error;
+        if (attempt >= 5) throw error;
       }
 
-      if (attempt < 4) {
-        await new Promise((resolve) => setTimeout(resolve, 450 * attempt));
+      if (attempt < 5) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
       }
     }
 
