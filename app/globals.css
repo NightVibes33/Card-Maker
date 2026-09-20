@@ -1248,3 +1248,99 @@ button:disabled{opacity:.38}
 @media (prefers-reduced-transparency:reduce){
   .studioFloatingBar,.modalSheet{background:var(--secondary-bg);-webkit-backdrop-filter:none;backdrop-filter:none}
 }
+
+.bleedEdge{
+  inset:1.5%;
+  border:1px dashed rgba(255,59,48,.46);
+  border-radius:16px;
+}
+.physicalCard{
+  animation:physicalTilt 5.5s ease-in-out infinite alternate;
+}
+.physicalCard:after{
+  animation:physicalSheen 3.8s ease-in-out infinite alternate;
+}
+.physicalChipReflection{
+  position:absolute;
+  z-index:3;
+  pointer-events:none;
+  border-radius:12px;
+  background:linear-gradient(118deg,transparent 18%,rgba(255,255,255,.48) 45%,rgba(255,255,255,.08) 58%,transparent 76%);
+  mix-blend-mode:screen;
+  animation:chipSheen 2.9s ease-in-out infinite alternate;
+}
+@keyframes physicalTilt{
+  0%{transform:perspective(900px) rotateX(3deg) rotateY(-5deg) translateY(-1px)}
+  100%{transform:perspective(900px) rotateX(-2deg) rotateY(5deg) translateY(-3px)}
+}
+@keyframes physicalSheen{
+  0%{transform:translateX(-30%)}
+  100%{transform:translateX(22%)}
+}
+@keyframes chipSheen{
+  0%{opacity:.32;transform:translateX(-8%)}
+  100%{opacity:.78;transform:translateX(8%)}
+}
+.layerAddRow{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+.selectRow{
+  min-height:56px;
+  padding:8px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border-bottom:.5px solid var(--separator);
+}
+.selectRow select{
+  min-width:140px;
+  min-height:38px;
+  border:0;
+  border-radius:9px;
+  padding:0 10px;
+  background:var(--tertiary-bg);
+  color:var(--label);
+}
+.textAlignRow{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:5px;
+  padding:10px 12px;
+  border-bottom:.5px solid var(--separator);
+}
+.textAlignRow button{
+  min-height:40px;
+  border:0;
+  border-radius:9px;
+  background:var(--tertiary-bg);
+  color:var(--secondary-label);
+  font-size:13px;
+  font-weight:650;
+}
+.textAlignRow button.selected{
+  background:var(--blue);
+  color:#fff;
+}
+.projectSaveComposer{
+  padding:10px;
+  margin-bottom:12px;
+  border-radius:15px;
+  background:var(--secondary-bg);
+  box-shadow:inset 0 0 0 .5px var(--separator);
+}
+.projectSaveComposer .iosTextField{
+  width:100%;
+  margin:0 0 9px;
+}
+.projectSaveComposer .librarySaveButton{margin:0}
+.cropControlBlock{
+  border-top:.5px solid var(--separator);
+}
+@supports (font: -apple-system-body){
+  body{font:-apple-system-body}
+  button,input,select{font:inherit}
+}
+@media (prefers-reduced-motion:reduce){
+  .physicalCard,.physicalCard:after,.physicalChipReflection{animation:none!important}
+}
