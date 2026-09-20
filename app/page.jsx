@@ -475,9 +475,11 @@ function normalizeDesignState(value) {
 
 function insertCustomLayerBelowHardware(design, id) {
   const order = normalizeLayerOrder(design).filter((entry) => entry !== id);
-  const firstBuiltin = order.findIndex((entry) => BUILTIN_LAYER_IDS.includes(entry));
-  if (firstBuiltin >= 0) order.splice(firstBuiltin, 0, id);
-  else order.push(id);
+
+  // layerOrder is rendered bottom -> top. New custom art should begin behind
+  // existing custom layers and built-in card hardware/text; users can then
+  // explicitly Bring Forward when they want it above something.
+  order.unshift(id);
   return order;
 }
 
