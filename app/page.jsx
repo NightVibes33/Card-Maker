@@ -4111,19 +4111,51 @@ export default function Page() {
     }
   }
 
-  function beginArtworkReplacement(nextBackground) {
+  function startFreshWorkingProject(nextDesign, {
+    studioTool = 'position',
+    statusMessage = 'New card ready'
+  } = {}) {
     finishActiveGesture();
     invalidatePendingImageImport();
     invalidatePendingPresetImport();
 
-    if (String(nextBackground || '') !== String(designRef.current.background || '')) {
-      setImage(null);
-      setLoadedBackgroundKey('');
-      setBackgroundLoadError('');
+    const next = normalizeDesignState(nextDesign);
+    historyGroupRef.current = { key: '', at: 0 };
+    undoRef.current = [];
+    redoRef.current = [];
+    setHistoryVersion((value) => value + 1);
+
+    // A fresh project must not inherit decoded artwork/layer state from the
+    // previous working draft, even when the new background URL is identical.
+    setImage(null);
+    setLoadedBackgroundKey('');
+    setBackgroundLoadError('');
+    setLayerImages({});
+    setLoadedImageLayerSourceKey('[]');
+    setLayerLoadError('');
+
+    replaceDesign(next, false);
+    setSelectedElement('artwork');
+    setShowOriginal(false);
+    setShowExportPreview(false);
+    setActiveGuides({ x: null, y: null });
+    setStudioTool(studioTool);
+    setProjectName('');
+    setTab('studio');
+    setMenuItem(null);
+    setMessage(statusMessage);
+
+    // Queue the replacement immediately instead of waiting only for the
+    // debounced autosave. Saved named projects remain untouched in IndexedDB.
+    if (hydrated && autosaveReady) {
+      setSaveStatus('Saving…');
+      persistDraftSnapshot(next).then((result) => {
+        if (designRef.current !== next || result.version !== draftSaveVersionRef.current) return;
+        setSaveStatus(result.success ? 'Saved' : 'Save failed');
+      });
     }
 
-    setShowOriginal(false);
-    setActiveGuides({ x: null, y: null });
+    return next;
   }
 
   function useArtwork(item) {
@@ -4136,8 +4168,9 @@ export default function Page() {
       setMessage('This artwork source is unavailable or unsupported.');
       return false;
     }
-    beginArtworkReplacement(workingImage);
-    patch({
+
+    startFreshWorkingProject({
+      ...DEFAULTS,
       background: workingImage,
       backgroundLabel: item.title,
       sourceCrop: item.sourceCrop || null,
@@ -4148,14 +4181,13 @@ export default function Page() {
       rotate: 0,
       flipX: false,
       fit: 'cover'
+    }, {
+      studioTool: 'position',
+      statusMessage: item.title + ' imported as a new card'
     });
+
     rememberArtwork(item);
     cacheArtwork(workingImage);
-    setSelectedElement('artwork');
-    setStudioTool('position');
-    setTab('studio');
-    setMenuItem(null);
-    setMessage(item.title + ' selected');
     return true;
   }
 
@@ -4167,8 +4199,8 @@ export default function Page() {
     }
 
     const importedBackground = 'idb://imports/' + asset.id;
-    beginArtworkReplacement(importedBackground);
-    patch({
+    startFreshWorkingProject({
+      ...DEFAULTS,
       background: importedBackground,
       backgroundLabel: safeDisplayText(asset.name, 'Imported image', 160),
       sourceCrop: null,
@@ -4179,12 +4211,10 @@ export default function Page() {
       rotate: 0,
       flipX: false,
       fit: 'cover'
+    }, {
+      studioTool: 'crop',
+      statusMessage: (asset.name || 'Imported image') + ' opened as a new card'
     });
-    setSelectedElement('artwork');
-    setTab('studio');
-    setStudioTool('crop');
-    setMenuItem(null);
-    setMessage((asset.name || 'Imported image') + ' selected');
     return true;
   }
 
@@ -4891,33 +4921,17 @@ export default function Page() {
       setMessage('Finish cleaning imported images before opening a design.');
       return;
     }
-    invalidatePendingImageImport();
-    invalidatePendingPresetImport();
     if (projectOpsRef.current.has(String(project.id || ''))) {
       setMessage('That design is still being updated');
       return;
     }
 
-    historyGroupRef.current = { key: '', at: 0 };
-    const current = designRef.current;
-    const next = normalizeDesignState({ ...DEFAULTS, ...project.design });
-    const changed = JSON.stringify(current) !== JSON.stringify(next);
-
-    if (changed) {
-      undoRef.current = [...undoRef.current.slice(-49), current];
-      redoRef.current = [];
-      setHistoryVersion((value) => value + 1);
-      replaceDesign(next, false);
-    }
-
-    setSelectedElement('artwork');
-    setShowOriginal(false);
-    setActiveGuides({ x: null, y: null });
-    setTab('studio');
-    setMessage(
-      changed
-        ? (project.name || 'Design') + ' opened · Undo returns to your previous card'
-        : (project.name || 'Design') + ' is already open'
+    startFreshWorkingProject(
+      { ...DEFAULTS, ...project.design },
+      {
+        studioTool: 'position',
+        statusMessage: (project.name || 'Design') + ' opened · previous unsaved work cleared'
+      }
     );
   }
 
@@ -5451,14 +5465,15 @@ export default function Page() {
       const nextImports = await dbGetImportMetadata();
       ensureCurrentPresetImport();
       presetImportActiveRef.current = false;
-      patch({ ...DEFAULTS, ...imported });
-      presetApplied = true;
-      setSelectedElement('artwork');
-      setShowOriginal(false);
-      setActiveGuides({ x: null, y: null });
       setImports(nextImports);
-      setTab('studio');
-      setMessage('Design preset imported');
+      startFreshWorkingProject(
+        { ...DEFAULTS, ...imported },
+        {
+          studioTool: 'position',
+          statusMessage: 'Design preset imported'
+        }
+      );
+      presetApplied = true;
     } catch {
       if (!presetApplied && createdImportIds.length) {
         await Promise.all(createdImportIds.map((id) => dbDelete('imports', id).catch(() => {})));
@@ -5479,30 +5494,11 @@ export default function Page() {
       setMessage('Finish cleaning imported images before starting a new card.');
       return;
     }
-    invalidatePendingImageImport();
-    invalidatePendingPresetImport();
-    historyGroupRef.current = { key: '', at: 0 };
-    const current = designRef.current;
-    const next = normalizeDesignState(DEFAULTS);
-    const changed = JSON.stringify(current) !== JSON.stringify(next);
 
-    if (changed) {
-      undoRef.current = [...undoRef.current.slice(-49), current];
-      redoRef.current = [];
-      setHistoryVersion((value) => value + 1);
-      replaceDesign(next, false);
-    }
-
-    setImage(null);
-    setLoadedBackgroundKey('');
-    setBackgroundLoadError('');
-    setLayerImages({});
-    setLoadedImageLayerSourceKey('[]');
-    setLayerLoadError('');
-    setSelectedElement('artwork');
-    setShowOriginal(false);
-    setActiveGuides({ x: null, y: null });
-    setMessage(changed ? 'New card · Undo is available' : 'New card is already empty');
+    startFreshWorkingProject(DEFAULTS, {
+      studioTool: 'position',
+      statusMessage: 'New card ready · unsaved work cleared'
+    });
   }
 
   function hitTestElement(event) {
@@ -7235,7 +7231,7 @@ export default function Page() {
                 disabled={cleanupInProgress || presetTransferInProgress || imageImportInProgress}
                 onClick={reset}
               >
-                <span><strong>New Card</strong><small>Start with a clean card. Undo can restore your current design.</small></span>
+                <span><strong>New Card</strong><small>Start with a clean card. Unsaved work is discarded; saved projects stay in Library.</small></span>
                 <IOSIcon name="reset" size={18} />
               </button>
               <SwitchRow label="Expert Mode" detail="Show precise numeric editing controls" value={expertMode} onChange={setExpertMode} />

@@ -765,17 +765,31 @@ try {
     'Library → Imports must replace the currently decoded artwork instead of leaving the old image rendered'
   );
 
-  // Let the 420ms autosave commit both the imported-image reference and
-  // custom layer state, then verify hydration restores them after a reload.
+  // A Library import is a new working project. It must discard custom layers
+  // from the previous unsaved draft rather than carrying them forward.
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  assert.equal(
+    await page.getByRole('button', { name: /^Text text /i }).count(),
+    0,
+    'Library import must not inherit text layers from the previous working draft'
+  );
+
+  // Let autosave commit the fresh project and verify the discarded state does
+  // not reappear after hydration.
   await page.waitForTimeout(900);
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.locator('main.studio').waitFor({ state: 'visible', timeout: 15000 });
   await page.getByRole('tab', { name: 'Studio', exact: true }).click();
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  assert.equal(
+    await page.getByRole('button', { name: /^Text text /i }).count(),
+    0,
+    'fresh Library project must remain clean after reload'
+  );
 
-  const restoredTextRow = page.getByRole('button', { name: /^Text text /i }).first();
-  await restoredTextRow.waitFor({ state: 'visible', timeout: 10000 });
-  await restoredTextRow.click();
+  // Build a new design to exercise named-project persistence independently.
+  await page.getByRole('button', { name: '+ Text', exact: true }).click();
+  await page.getByLabel('Layer text').fill('AVATAR\nWA');
   assert.equal(await page.getByLabel('Layer text').inputValue(), 'AVATAR\nWA');
 
   // Exercise the named-project Library independently of autosave. Save this
@@ -803,6 +817,11 @@ try {
     await page.getByLabel('Layer text').inputValue(),
     'AVATAR\nWA',
     'opening a named project must restore its saved design snapshot'
+  );
+  assert.equal(
+    await page.getByRole('button', { name: 'Undo', exact: true }).isDisabled(),
+    true,
+    'opening a saved project must not retain undo history from unsaved work'
   );
 
   // Round-trip the complete editable preset, including embedded imported
@@ -905,20 +924,29 @@ try {
   });
   assert.equal(durableProjectCount, 200, 'atomic project capacity must never exceed 200 rows');
 
-  // New Card is destructive-looking UI but must remain one-step undoable.
+  // New Card must be a real project boundary: no undo path back into unsaved
+  // work, while the explicitly saved named project remains available.
   await page.getByRole('button', { name: /New Card/ }).click();
-  await page.getByText('New card · Undo is available', { exact: true }).waitFor({
+  await page.getByText('New card ready · unsaved work cleared', { exact: true }).waitFor({
     state: 'visible',
     timeout: 5000
   });
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await page.getByRole('tab', { name: 'Card', exact: true }).click();
-  await page.getByRole('button', { name: /^Text text /i }).first().click();
   assert.equal(
-    await page.getByLabel('Layer text').inputValue(),
-    'AVATAR\nWA',
-    'Undo after New Card must restore the previous complete design'
+    await page.getByRole('button', { name: 'Undo', exact: true }).isDisabled(),
+    true,
+    'New Card must clear undo history from the previous working project'
   );
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  assert.equal(
+    await page.getByRole('button', { name: /^Text text /i }).count(),
+    0,
+    'New Card must not inherit custom layers'
+  );
+  await page.getByRole('tab', { name: 'Library', exact: true }).click();
+  await page.locator('article.projectCard').filter({ hasText: 'WebKit Project' }).first().waitFor({
+    state: 'visible',
+    timeout: 5000
+  });
 
   // Verify signed Expert Mode values on mobile WebKit. iPhone numeric
   // keyboards historically made negative values impossible to enter.

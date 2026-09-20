@@ -67,7 +67,7 @@ const pageChecks = [
   [/Object\.is\(currentDesign\.zoom, nextZoom\)/, 'bounded artwork pinch gestures do not create no-op history'],
   [/return true;\s*\n\s*}\s*\n\s*\n\s*async function uploadImage/, 'artwork selection reports successful application'],
   [/if \(useArtwork\(menuItem\)\) \{\s*setShowExportPreview\(true\)/, 'final preview opens only after artwork selection succeeds'],
-  [/const workingImage = proxyImageWidth\(item\.image, 3072\);[\s\S]{0,180}if \(!workingImage\)[\s\S]{0,220}beginArtworkReplacement\(workingImage\)/, 'invalid artwork sources are rejected before clearing decoded artwork'],
+  [/const workingImage = proxyImageWidth\(item\.image, 3072\);[\s\S]{0,180}if \(!workingImage\)[\s\S]{0,520}startFreshWorkingProject\(/, 'invalid artwork sources are rejected before starting a fresh project'],
   [/finishActiveGesture\(\);[\s\S]{0,120}if \(cleanupInFlightRef\.current\)/, 'Undo and other guarded actions finalize active gestures first'],
   [/inert=\{blockingAssetOperation \|\| undefined\}/, 'blocking editor operations use a boolean inert attribute'],
   [/setSelectedElement\('card-text'\)/, 'built-in card text keeps an independent selection state'],
@@ -104,8 +104,8 @@ const pageChecks = [
   [/setSelectedElement\('artwork'\);[\s\S]{0,220}setStudioTool\('crop'\)/, 'Library artwork selection targets the background before crop editing'],
   [/for \(const snapshot of undoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves undo history assets'],
   [/for \(const snapshot of redoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves redo history assets'],
-  [/function beginArtworkReplacement\(/, 'artwork swaps clear decoded background state before loading the new source'],
-  [/function applyImportedArtwork\(/, 'Library imports use the hardened artwork replacement path'],
+  [/function startFreshWorkingProject\(/, 'fresh project transitions centralize state replacement'],
+  [/function applyImportedArtwork\([\s\S]{0,700}startFreshWorkingProject\(/, 'Library imports start a fresh working project'],
   [/onClick=\{\(\) => applyImportedArtwork\(asset\)\}/, 'Library import rows cannot bypass artwork replacement safety'],
   [/className="studioNewCardButton"/, 'Studio exposes a New Card action'],
   [/dbPutIfBelowLimit\('projects', project, MAX_SAVED_PROJECTS\)/, 'named project saves enforce capacity inside IndexedDB'],
@@ -124,7 +124,7 @@ const pageChecks = [
   [/Finish saving the design before cleaning imported images\./, 'import cleanup cannot race an in-flight project save'],
   [/className="cleanupShield"/, 'cleanup presents an interaction shield while deleting blobs'],
   [/if \(presetImportActiveRef\.current\) \{[\s\S]{0,120}presetImportGenerationRef\.current \+= 1;/, 'editor edits invalidate pending preset imports'],
-  [/ensureCurrentPresetImport\(\);[\s\S]{0,100}presetImportActiveRef\.current = false;[\s\S]{0,100}patch\(\{ \.\.\.DEFAULTS, \.\.\.imported \}\)/, 'preset final apply does not self-cancel'],
+  [/ensureCurrentPresetImport\(\);[\s\S]{0,120}presetImportActiveRef\.current = false;[\s\S]{0,220}startFreshWorkingProject\([\s\S]{0,120}\.\.\.DEFAULTS, \.\.\.imported/, 'preset final apply starts a fresh project without self-canceling'],
   [/const flushedDraft = await persistDraftSnapshot\(designRef\.current\)/, 'cleanup flushes the authoritative current draft before deleting blobs'],
   [/await draftSaveQueueRef\.current;[\s\S]{0,120}const latestDraft = await dbGet\('kv', 'draft'\)/, 'cleanup drains queued autosaves before its final reference check'],
   [/storedDraft = await dbGet\('kv', 'draft'\)/, 'cleanup protects IndexedDB autosave assets'],
@@ -137,7 +137,7 @@ const pageChecks = [
   [/const referencedPresetAssetIds = new Set\(\)/, 'preset import tracks only referenced embedded assets'],
   [/const stored = await dbGet\('imports', asset\.id\)/, 'preset export re-reads one image blob at a time instead of retaining all blobs'],
   [/Preset is missing a referenced image asset/, 'preset import rejects missing referenced image blobs'],
-  [/Undo returns to your previous card/, 'opening a saved project remains reversible'],
+  [/previous unsaved work cleared/, 'opening a saved project discards the previous unsaved working draft'],
   [/const undo = useCallback\(\(\) => \{[\s\S]{0,260}invalidatePendingImageImport\(\);[\s\S]{0,120}invalidatePendingPresetImport\(\);/, 'Undo cancels in-flight image and preset imports'],
   [/const redo = useCallback\(\(\) => \{[\s\S]{0,260}invalidatePendingImageImport\(\);[\s\S]{0,120}invalidatePendingPresetImport\(\);/, 'Redo cancels in-flight image and preset imports'],
   [/const MAX_VISIBLE_IMAGE_LAYERS = 12;/, 'visible image layers have an iPhone memory cap'],
@@ -171,8 +171,10 @@ const pageChecks = [
   [/window\.addEventListener\('pagehide', flushDraftBeforeSuspend\)/, 'pagehide triggers a draft flush'],
   [/aircard-sticker-fvp-v3-updated-at/, 'local draft fallback records a comparable timestamp'],
   [/localUpdatedAt >= indexedUpdatedAt/, 'startup prefers the synchronous fallback when draft timestamps tie'],
-  [/const next = normalizeDesignState\(DEFAULTS\)/, 'New Card replaces state with a normalized clean design'],
-  [/setMessage\(changed \? 'New card · Undo is available' : 'New card is already empty'\)/, 'New Card is undoable without creating fake no-op history']
+  [/startFreshWorkingProject\(DEFAULTS,[\s\S]{0,180}New card ready · unsaved work cleared/, 'New Card starts a clean working project'],
+  [/undoRef\.current = \[\];[\s\S]{0,80}redoRef\.current = \[\];/, 'fresh project transitions clear undo and redo history'],
+  [/function useArtwork\([\s\S]{0,900}startFreshWorkingProject\(\{[\s\S]{0,120}\.\.\.DEFAULTS/, 'catalog artwork selection starts from defaults instead of inheriting editor state'],
+  [/function openProject\([\s\S]{0,700}startFreshWorkingProject\(/, 'opening a saved project starts a new working session rather than preserving unsaved undo history']
 ];
 
 for (const [pattern, label] of pageChecks) requireMatch(page, pattern, label);
