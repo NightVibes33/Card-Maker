@@ -48,8 +48,8 @@ await page.route('**/api/cucu**', async (route) => {
       contentType: 'application/json',
       body: JSON.stringify({
         usable: true,
-        full: '/api/image?url=' + encodeURIComponent('https://example.test/webkit-library.png'),
-        thumbnail: '/api/image?url=' + encodeURIComponent('https://example.test/webkit-library.png') + '&w=560',
+        full: '/api/image?url=' + encodeURIComponent('https://cdn.shopify.com/s/files/1/0000/0001/files/webkit-library.png'),
+        thumbnail: '/api/image?url=' + encodeURIComponent('https://cdn.shopify.com/s/files/1/0000/0001/files/webkit-library.png') + '&w=560',
         crop: null,
         ratio: 640 / 404,
         quality: { variance: 1200 }
@@ -65,10 +65,10 @@ await page.route('**/api/cucu**', async (route) => {
       results: [{
         id: 'cucu-webkit-library',
         title: 'WebKit Library Skin',
-        image: '/api/image?url=' + encodeURIComponent('https://example.test/webkit-library.png'),
-        thumbnail: '/api/image?url=' + encodeURIComponent('https://example.test/webkit-library.png') + '&w=560',
-        inspectUrls: ['/api/cucu/inspect?url=' + encodeURIComponent('https://example.test/webkit-library.png')],
-        candidateImages: ['/api/image?url=' + encodeURIComponent('https://example.test/webkit-library.png')],
+        image: '/api/image?url=' + encodeURIComponent('https://cdn.shopify.com/s/files/1/0000/0001/files/webkit-library.png'),
+        thumbnail: '/api/image?url=' + encodeURIComponent('https://cdn.shopify.com/s/files/1/0000/0001/files/webkit-library.png') + '&w=560',
+        inspectUrls: ['/api/cucu/inspect?url=' + encodeURIComponent('https://cdn.shopify.com/s/files/1/0000/0001/files/webkit-library.png')],
+        candidateImages: ['/api/image?url=' + encodeURIComponent('https://cdn.shopify.com/s/files/1/0000/0001/files/webkit-library.png')],
         assetMode: 'direct-card-art',
         mediaAlt: 'WebKit Library Skin'
       }],
@@ -926,6 +926,15 @@ try {
     state: 'visible',
     timeout: 10000
   });
+  await page.getByText('Artwork loaded', { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 15000
+  });
+  const mainLibraryPixel = await sampleBackgroundCorner();
+  assert.ok(
+    mainLibraryPixel[2] > mainLibraryPixel[0],
+    'main Card Library selection must render the newly selected artwork instead of retaining the prior bitmap'
+  );
   assert.equal(
     await page.getByRole('button', { name: 'Undo', exact: true }).isDisabled(),
     true,
