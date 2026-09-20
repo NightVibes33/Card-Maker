@@ -217,6 +217,182 @@ function normalizeLayerOrder(design) {
   return ordered;
 }
 
+function finiteClamp(value, fallback, min, max) {
+  const number = Number(value);
+  return clamp(Number.isFinite(number) ? number : fallback, min, max);
+}
+
+function normalizeHexColor(value, fallback = '#ffffff') {
+  const raw = String(value || '').trim();
+  if (/^#[0-9a-f]{6}$/i.test(raw)) return raw.toLowerCase();
+  if (/^#[0-9a-f]{3}$/i.test(raw)) {
+    return '#' + raw.slice(1).split('').map((char) => char + char).join('').toLowerCase();
+  }
+  return fallback;
+}
+
+function normalizeCrop(crop, minSize = 0.1) {
+  if (!crop || typeof crop !== 'object') return null;
+  const width = finiteClamp(crop.w, 1, minSize, 1);
+  const height = finiteClamp(crop.h, 1, minSize, 1);
+  return {
+    x: finiteClamp(crop.x, 0, 0, 1 - width),
+    y: finiteClamp(crop.y, 0, 0, 1 - height),
+    w: width,
+    h: height
+  };
+}
+
+function normalizeImageAdjustments(value) {
+  const raw = value && typeof value === 'object' ? value : {};
+  return {
+    exposure: finiteClamp(raw.exposure, IMAGE_LAYER_DEFAULTS.exposure, -1, 1),
+    brightness: finiteClamp(raw.brightness, IMAGE_LAYER_DEFAULTS.brightness, 0.4, 1.7),
+    contrast: finiteClamp(raw.contrast, IMAGE_LAYER_DEFAULTS.contrast, 0.45, 1.8),
+    saturation: finiteClamp(raw.saturation, IMAGE_LAYER_DEFAULTS.saturation, 0, 2.4),
+    highlights: finiteClamp(raw.highlights, IMAGE_LAYER_DEFAULTS.highlights, -1, 1),
+    shadows: finiteClamp(raw.shadows, IMAGE_LAYER_DEFAULTS.shadows, -1, 1),
+    temperature: finiteClamp(raw.temperature, IMAGE_LAYER_DEFAULTS.temperature, -1, 1),
+    tint: finiteClamp(raw.tint, IMAGE_LAYER_DEFAULTS.tint, -1, 1),
+    sharpness: finiteClamp(raw.sharpness, IMAGE_LAYER_DEFAULTS.sharpness, -1, 1),
+    blur: finiteClamp(raw.blur, IMAGE_LAYER_DEFAULTS.blur, 0, 1),
+    vignette: finiteClamp(raw.vignette, IMAGE_LAYER_DEFAULTS.vignette, 0, 0.8),
+    grain: finiteClamp(raw.grain, IMAGE_LAYER_DEFAULTS.grain, 0, 0.22),
+    gloss: finiteClamp(raw.gloss, IMAGE_LAYER_DEFAULTS.gloss, 0, 0.8),
+    overlay: finiteClamp(raw.overlay, IMAGE_LAYER_DEFAULTS.overlay, 0, 0.75),
+    fade: finiteClamp(raw.fade, IMAGE_LAYER_DEFAULTS.fade, 0, 1),
+    effectTint: normalizeHexColor(raw.effectTint, IMAGE_LAYER_DEFAULTS.effectTint),
+    effectTintStrength: finiteClamp(raw.effectTintStrength, IMAGE_LAYER_DEFAULTS.effectTintStrength, 0, 1)
+  };
+}
+
+function normalizeCustomLayer(layer) {
+  if (!layer || typeof layer !== 'object' || !layer.id) return null;
+  const type = ['text', 'shape', 'image', 'chip', 'contactless'].includes(layer.type)
+    ? layer.type
+    : null;
+  if (!type) return null;
+
+  const normalized = {
+    ...layer,
+    id: String(layer.id),
+    type,
+    name: String(layer.name || type).slice(0, 80),
+    x: finiteClamp(layer.x, 0.5, 0, 1),
+    y: finiteClamp(layer.y, 0.5, 0, 1),
+    scale: finiteClamp(layer.scale, 1, 0.1, 6),
+    rotation: finiteClamp(layer.rotation, 0, -180, 180),
+    opacity: finiteClamp(layer.opacity, 1, 0, 1),
+    locked: Boolean(layer.locked),
+    hidden: Boolean(layer.hidden)
+  };
+
+  if (type === 'text') {
+    normalized.text = String(layer.text ?? 'Text').slice(0, 500);
+    normalized.color = normalizeHexColor(layer.color, '#ffffff');
+    normalized.fontSize = finiteClamp(layer.fontSize, 58, 10, 240);
+    normalized.fontFamily = ['system', 'rounded', 'serif', 'mono'].includes(layer.fontFamily)
+      ? layer.fontFamily
+      : 'system';
+    normalized.weight = Math.round(finiteClamp(layer.weight, 700, 100, 900) / 100) * 100;
+    normalized.letterSpacing = finiteClamp(layer.letterSpacing, 0, -4, 30);
+    normalized.align = ['left', 'center', 'right'].includes(layer.align) ? layer.align : 'center';
+    normalized.shadow = Boolean(layer.shadow);
+  } else if (type === 'shape') {
+    normalized.shape = layer.shape === 'ellipse' ? 'ellipse' : 'rectangle';
+    normalized.width = finiteClamp(layer.width, 280, 20, 1200);
+    normalized.height = finiteClamp(layer.height, 120, 20, 800);
+    normalized.radius = finiteClamp(layer.radius, 28, 0, Math.min(normalized.width, normalized.height) / 2);
+    normalized.color = normalizeHexColor(layer.color, '#ffffff');
+  } else if (type === 'image') {
+    normalized.src = typeof layer.src === 'string' ? layer.src : '';
+    normalized.width = finiteClamp(layer.width, 640, 20, 1800);
+    normalized.flipX = Boolean(layer.flipX);
+    normalized.crop = normalizeCrop(layer.crop, 0.1);
+    normalized.originalCrop = normalizeCrop(layer.originalCrop, 0.1);
+    normalized.adjustments = normalizeImageAdjustments(layer.adjustments);
+  } else if (type === 'chip') {
+    normalized.tone = ['gold', 'silver', 'black', 'rose'].includes(layer.tone) ? layer.tone : 'gold';
+  } else if (type === 'contactless') {
+    normalized.color = normalizeHexColor(layer.color, '#ffffff');
+  }
+
+  return normalized;
+}
+
+function normalizeDesignState(value) {
+  const raw = value && typeof value === 'object' ? value : {};
+  const next = { ...DEFAULTS, ...raw };
+  next.background = typeof raw.background === 'string' ? raw.background : '';
+  next.backgroundLabel = String(raw.backgroundLabel || DEFAULTS.backgroundLabel).slice(0, 120);
+  next.sourceCrop = normalizeCrop(raw.sourceCrop, 0.1);
+  next.originalSourceCrop = normalizeCrop(raw.originalSourceCrop, 0.1);
+  next.gradient = Math.round(finiteClamp(raw.gradient, DEFAULTS.gradient, 0, GRADIENTS.length - 1));
+  next.fit = raw.fit === 'contain' ? 'contain' : 'cover';
+  next.zoom = finiteClamp(raw.zoom, DEFAULTS.zoom, 0.5, 5);
+  next.x = finiteClamp(raw.x, DEFAULTS.x, -1.5, 1.5);
+  next.y = finiteClamp(raw.y, DEFAULTS.y, -1.5, 1.5);
+  next.rotate = finiteClamp(raw.rotate, DEFAULTS.rotate, -180, 180);
+  next.flipX = Boolean(raw.flipX);
+
+  next.exposure = finiteClamp(raw.exposure, DEFAULTS.exposure, -1, 1);
+  next.brightness = finiteClamp(raw.brightness, DEFAULTS.brightness, 0.4, 1.7);
+  next.saturation = finiteClamp(raw.saturation, DEFAULTS.saturation, 0, 2.4);
+  next.contrast = finiteClamp(raw.contrast, DEFAULTS.contrast, 0.45, 1.8);
+  next.highlights = finiteClamp(raw.highlights, DEFAULTS.highlights, -1, 1);
+  next.shadows = finiteClamp(raw.shadows, DEFAULTS.shadows, -1, 1);
+  next.temperature = finiteClamp(raw.temperature, DEFAULTS.temperature, -1, 1);
+  next.tint = finiteClamp(raw.tint, DEFAULTS.tint, -1, 1);
+  next.sharpness = finiteClamp(raw.sharpness, DEFAULTS.sharpness, -1, 1);
+  next.blur = finiteClamp(raw.blur, DEFAULTS.blur, 0, 1);
+  next.vignette = finiteClamp(raw.vignette, DEFAULTS.vignette, 0, 0.8);
+  next.grain = finiteClamp(raw.grain, DEFAULTS.grain, 0, 0.22);
+  next.gloss = finiteClamp(raw.gloss, DEFAULTS.gloss, 0, 0.8);
+  next.overlay = finiteClamp(raw.overlay, DEFAULTS.overlay, 0, 0.75);
+  next.fade = finiteClamp(raw.fade, DEFAULTS.fade, 0, 1);
+  next.effectTint = normalizeHexColor(raw.effectTint, DEFAULTS.effectTint);
+  next.effectTintStrength = finiteClamp(raw.effectTintStrength, DEFAULTS.effectTintStrength, 0, 1);
+
+  next.chip = raw.chip == null ? DEFAULTS.chip : Boolean(raw.chip);
+  next.chipTone = ['gold', 'silver', 'black', 'rose'].includes(raw.chipTone) ? raw.chipTone : DEFAULTS.chipTone;
+  next.chipX = finiteClamp(raw.chipX, DEFAULTS.chipX, 0, 0.82);
+  next.chipY = finiteClamp(raw.chipY, DEFAULTS.chipY, 0, 0.8);
+  next.chipScale = finiteClamp(raw.chipScale, DEFAULTS.chipScale, 0.5, 2);
+  next.chipRotation = finiteClamp(raw.chipRotation, DEFAULTS.chipRotation, -45, 45);
+
+  next.contactless = raw.contactless == null ? DEFAULTS.contactless : Boolean(raw.contactless);
+  next.contactlessX = finiteClamp(raw.contactlessX, DEFAULTS.contactlessX, 0.03, 0.97);
+  next.contactlessY = finiteClamp(raw.contactlessY, DEFAULTS.contactlessY, 0.03, 0.97);
+  next.contactlessScale = finiteClamp(raw.contactlessScale, DEFAULTS.contactlessScale, 0.4, 2.2);
+  next.contactlessRotation = finiteClamp(raw.contactlessRotation, DEFAULTS.contactlessRotation, -180, 180);
+
+  next.number = Boolean(raw.number);
+  next.numberText = String(raw.numberText ?? DEFAULTS.numberText).slice(0, 32);
+  next.holder = Boolean(raw.holder);
+  next.holderText = String(raw.holderText ?? DEFAULTS.holderText).slice(0, 28);
+  next.expiry = Boolean(raw.expiry);
+  next.expiryText = String(raw.expiryText ?? DEFAULTS.expiryText).slice(0, 8);
+  next.badge = Boolean(raw.badge);
+  next.badgeText = String(raw.badgeText ?? DEFAULTS.badgeText).slice(0, 18);
+  next.textColor = normalizeHexColor(raw.textColor, DEFAULTS.textColor);
+  next.shadow = raw.shadow == null ? DEFAULTS.shadow : Boolean(raw.shadow);
+
+  const seen = new Set();
+  next.customLayers = (Array.isArray(raw.customLayers) ? raw.customLayers : [])
+    .map(normalizeCustomLayer)
+    .filter((layer) => {
+      if (!layer || seen.has(layer.id)) return false;
+      seen.add(layer.id);
+      return true;
+    });
+  next.layerOrder = normalizeLayerOrder({
+    ...next,
+    layerOrder: Array.isArray(raw.layerOrder) ? raw.layerOrder : DEFAULTS.layerOrder
+  });
+
+  return next;
+}
+
 function insertCustomLayerBelowHardware(design, id) {
   const order = normalizeLayerOrder(design).filter((entry) => entry !== id);
   const firstBuiltin = order.findIndex((entry) => BUILTIN_LAYER_IDS.includes(entry));
@@ -1166,6 +1342,8 @@ export default function Page() {
   const [historyVersion, setHistoryVersion] = useState(0);
   const [layerImages, setLayerImages] = useState({});
   const [loadedImageLayerSourceKey, setLoadedImageLayerSourceKey] = useState('[]');
+  const [backgroundLoadError, setBackgroundLoadError] = useState('');
+  const [layerLoadError, setLayerLoadError] = useState('');
   const canvasRef = useRef(null);
   const fullPreviewCanvasRef = useRef(null);
   const uploadRef = useRef(null);
@@ -1217,8 +1395,10 @@ export default function Page() {
   ]);
 
   const replaceDesign = useCallback((nextDesign) => {
-    designRef.current = nextDesign;
-    setDesign(nextDesign);
+    const normalized = normalizeDesignState(nextDesign);
+    designRef.current = normalized;
+    setDesign(normalized);
+    return normalized;
   }, []);
 
   const patch = useCallback((next, recordHistory = true, historyKey = '') => {
@@ -1409,11 +1589,13 @@ export default function Page() {
       if (!backgroundKey) {
         setImage(null);
         setLoadedBackgroundKey('');
+        setBackgroundLoadError('');
         return;
       }
 
       setImage(null);
       setLoadedBackgroundKey('');
+      setBackgroundLoadError('');
       setMessage('Loading artwork…');
       let src = backgroundKey;
 
@@ -1424,6 +1606,7 @@ export default function Page() {
         if (!asset?.blob) {
           setImage(null);
           setLoadedBackgroundKey('');
+          setBackgroundLoadError('Imported artwork is missing.');
           setMessage('Imported artwork is missing');
           return;
         }
@@ -1437,12 +1620,14 @@ export default function Page() {
         if (cancelled) return;
         setImage(img);
         setLoadedBackgroundKey(backgroundKey);
+        setBackgroundLoadError('');
         setMessage('Artwork loaded');
       };
       img.onerror = () => {
         if (cancelled) return;
         setImage(null);
         setLoadedBackgroundKey('');
+        setBackgroundLoadError('Artwork could not load.');
         setMessage('Artwork could not load');
       };
       img.src = src;
@@ -1467,6 +1652,7 @@ export default function Page() {
 
       setLayerImages({});
       setLoadedImageLayerSourceKey('');
+      setLayerLoadError('');
 
       for (const layer of imageLayers) {
         let src = layer.src;
@@ -1491,6 +1677,7 @@ export default function Page() {
       if (!cancelled) {
         setLayerImages(next);
         setLoadedImageLayerSourceKey(imageLayerSourceKey);
+        setLayerLoadError(failed ? 'One or more image layers could not load.' : '');
         if (failed) setMessage('Some image layers could not load');
       }
     }
@@ -2375,9 +2562,14 @@ export default function Page() {
   }
 
   function deleteLayer(id) {
+    const layer = (designRef.current.customLayers || []).find((entry) => entry.id === id);
+    if (layer?.locked) {
+      setMessage('Unlock the layer before deleting it');
+      return;
+    }
     patch((current) => ({
       layerOrder: normalizeLayerOrder(current).filter((entry) => entry !== id),
-      customLayers: (current.customLayers || []).filter((layer) => layer.id !== id)
+      customLayers: (current.customLayers || []).filter((entry) => entry.id !== id)
     }));
     setSelectedElement('artwork');
   }
@@ -2406,6 +2598,11 @@ export default function Page() {
   }
 
   function moveLayer(id, direction) {
+    const layer = (designRef.current.customLayers || []).find((entry) => entry.id === id);
+    if (layer?.locked) {
+      setMessage('Unlock the layer before reordering it');
+      return;
+    }
     patch((current) => {
       const order = normalizeLayerOrder(current);
       const index = order.indexOf(id);
@@ -2921,7 +3118,11 @@ export default function Page() {
     name = 'cardBackgroundCombined@3x.png'
   ) {
     if (!renderAssetsReady) {
-      setMessage('Artwork is still loading. Export is available when every image is ready.');
+      setMessage(
+        backgroundLoadError ||
+        layerLoadError ||
+        'Artwork is still loading. Export is available when every image is ready.'
+      );
       return;
     }
 
@@ -3793,10 +3994,10 @@ export default function Page() {
                     </fieldset>
                     <SwitchRow label="Lock Layer" value={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id, { locked: value })} />
                     <div className="layerActionGrid">
-                      <button type="button" onClick={() => moveLayer(selectedLayer.id, 1)}>Bring Forward</button>
-                      <button type="button" onClick={() => moveLayer(selectedLayer.id, -1)}>Send Back</button>
+                      <button type="button" disabled={Boolean(selectedLayer.locked)} onClick={() => moveLayer(selectedLayer.id, 1)}>Bring Forward</button>
+                      <button type="button" disabled={Boolean(selectedLayer.locked)} onClick={() => moveLayer(selectedLayer.id, -1)}>Send Back</button>
                       <button type="button" onClick={() => duplicateLayer(selectedLayer.id)}>Duplicate</button>
-                      <button type="button" className="destructive" onClick={() => deleteLayer(selectedLayer.id)}>Delete</button>
+                      <button type="button" disabled={Boolean(selectedLayer.locked)} className="destructive" onClick={() => deleteLayer(selectedLayer.id)}>Delete</button>
                     </div>
                   </Group>
                 ) : null}
