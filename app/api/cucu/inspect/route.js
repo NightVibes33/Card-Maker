@@ -13,6 +13,45 @@ function allowed(url) {
   return url.protocol === 'https:' && ALLOWED_HOSTS.has(url.hostname.toLowerCase());
 }
 
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const MAX_REDIRECTS = 4;
+
+async function fetchAllowedArtwork(startUrl, options) {
+  let current = new URL(startUrl);
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    if (!allowed(current)) {
+      throw new Error('CUCU artwork redirect host not allowed');
+    }
+
+    const response = await fetch(current, {
+      ...options,
+      redirect: 'manual'
+    });
+
+    if (!REDIRECT_STATUSES.has(response.status)) {
+      return response;
+    }
+
+    if (hop === MAX_REDIRECTS) {
+      throw new Error('Too many CUCU artwork redirects');
+    }
+
+    const location = response.headers.get('location');
+    if (!location) {
+      throw new Error('CUCU artwork redirect missing location');
+    }
+
+    const next = new URL(location, current);
+    if (!allowed(next)) {
+      throw new Error('CUCU artwork redirect host not allowed');
+    }
+    current = next;
+  }
+
+  throw new Error('Too many CUCU artwork redirects');
+}
+
 function proxy(url, width = 0) {
   return '/api/image?url=' + encodeURIComponent(url.toString()) + (width ? '&w=' + width : '');
 }
@@ -45,9 +84,8 @@ export async function GET(request) {
   const timer = setTimeout(() => controller.abort(), 12000);
 
   try {
-    const response = await fetch(analysisUrl, {
+    const response = await fetchAllowedArtwork(analysisUrl, {
       signal: controller.signal,
-      redirect: 'follow',
       headers: {
         Accept: 'image/avif,image/webp,image/jpeg,image/png,*/*',
         'User-Agent': 'AirCard-Card-Studio/5.0'
@@ -58,9 +96,6 @@ export async function GET(request) {
     if (!response.ok) {
       throw new Error('CUCU artwork returned ' + response.status);
     }
-
-    const finalUrl = new URL(response.url);
-    if (!allowed(finalUrl)) throw new Error('CUCU artwork redirected to a disallowed host');
 
     const type = response.headers.get('content-type') || '';
     if (!type.startsWith('image/')) throw new Error('CUCU artwork was not an image');
