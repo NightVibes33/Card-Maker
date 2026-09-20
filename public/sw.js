@@ -1,8 +1,8 @@
-const SHELL_CACHE = 'card-studio-shell-v3';
+const SHELL_CACHE = 'card-studio-shell-v4';
 const ART_CACHE = 'card-studio-art-v5';
 const THUMB_CACHE = 'card-studio-thumb-v2';
 const CATALOG_CACHE = 'card-studio-catalog-v3';
-const STATIC_CACHE = 'card-studio-static-v3';
+const STATIC_CACHE = 'card-studio-static-v4';
 const OWNED_CACHE_PREFIX = 'card-studio-';
 
 const SHELL = ['/', '/manifest.webmanifest'];
