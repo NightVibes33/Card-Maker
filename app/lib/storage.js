@@ -37,9 +37,9 @@ function importMetadata(value = {}) {
     createdAt: Number(value.createdAt || Date.now())
   };
 }
-const ART_CACHE = 'card-studio-art-v4';
+const ART_CACHE = 'card-studio-art-v5';
 const ART_CACHE_LIMIT = 40;
-const THUMB_CACHE = 'card-studio-thumb-v1';
+const THUMB_CACHE = 'card-studio-thumb-v2';
 const THUMB_CACHE_LIMIT = 160;
 const CACHE_ARTWORK_TIMEOUT_MS = 12000;
 
