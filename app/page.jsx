@@ -5685,18 +5685,29 @@ export default function Page() {
         const layer = (designRef.current.customLayers || []).find((entry) => entry.id === target);
         if (layer && !layer.locked) {
           if (moved) recordGestureHistory();
-          patch((current) => ({
-            customLayers: (current.customLayers || []).map((entry) => {
-              if (entry.id !== target) return entry;
-              const snapX = snapValue(clamp(Number(entry.x ?? 0.5) + dx, 0, 1), [0.05, 1 / 3, 0.5, 2 / 3, 0.95]);
-              const snapY = snapValue(clamp(Number(entry.y ?? 0.5) + dy, 0, 1), [0.05, 1 / 3, 0.5, 2 / 3, 0.95]);
-              setActiveGuides({
-                x: snapX.snapped ? snapX.value : null,
-                y: snapY.snapped ? snapY.value : null
-              });
-              return { ...entry, x: snapX.value, y: snapY.value };
-            })
-          }), false);
+          patch((current) => {
+            const layers = current.customLayers || [];
+            const index = layers.findIndex((entry) => entry.id === target);
+            if (index < 0) return {};
+
+            const entry = layers[index];
+            const snapX = snapValue(
+              clamp(Number(entry.x ?? 0.5) + dx, 0, 1),
+              [0.05, 1 / 3, 0.5, 2 / 3, 0.95]
+            );
+            const snapY = snapValue(
+              clamp(Number(entry.y ?? 0.5) + dy, 0, 1),
+              [0.05, 1 / 3, 0.5, 2 / 3, 0.95]
+            );
+            setActiveGuides({
+              x: snapX.snapped ? snapX.value : null,
+              y: snapY.snapped ? snapY.value : null
+            });
+
+            const nextLayers = layers.slice();
+            nextLayers[index] = { ...entry, x: snapX.value, y: snapY.value };
+            return { customLayers: nextLayers };
+          }, false);
         }
       } else if (designRef.current.background) {
         if (moved) recordGestureHistory();
@@ -5745,17 +5756,20 @@ export default function Page() {
         }), false);
       } else if (target !== 'artwork') {
         if (!transformBlocked) {
-          patch((current) => ({
-            customLayers: (current.customLayers || []).map((layer) =>
-              layer.id === target
-                ? {
-                    ...layer,
-                    scale: clamp(Number(layer.scale ?? 1) * factor, 0.1, 6),
-                    rotation: normalizeFreeRotation(Number(layer.rotation ?? 0) + angleDelta)
-                  }
-                : layer
-            )
-          }), false);
+          patch((current) => {
+            const layers = current.customLayers || [];
+            const index = layers.findIndex((layer) => layer.id === target);
+            if (index < 0) return {};
+
+            const layer = layers[index];
+            const nextLayers = layers.slice();
+            nextLayers[index] = {
+              ...layer,
+              scale: clamp(Number(layer.scale ?? 1) * factor, 0.1, 6),
+              rotation: normalizeFreeRotation(Number(layer.rotation ?? 0) + angleDelta)
+            };
+            return { customLayers: nextLayers };
+          }, false);
         }
       } else if (!transformBlocked) {
         patch((current) => ({
