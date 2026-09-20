@@ -4709,6 +4709,10 @@ export default function Page() {
       setMessage('Finish saving the design before cleaning imported images.');
       return;
     }
+    if (projectOpsRef.current.size) {
+      setMessage('Finish the current project operation before cleaning imported images.');
+      return;
+    }
 
     cleanupInFlightRef.current = true;
     setCleanupInProgress(true);
