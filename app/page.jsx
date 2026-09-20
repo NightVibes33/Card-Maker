@@ -39,6 +39,7 @@ const GRADIENTS = [
 const DEFAULTS = {
   background: '',
   backgroundLabel: 'Midnight',
+  sourceCrop: null,
   gradient: 0,
   fit: 'cover',
   zoom: 1,
@@ -284,7 +285,7 @@ function ArtworkRail({ title, items, onPick }) {
               onClick={() => onPick(item)}
               aria-label={'Use premade card skin ' + item.title}
             >
-              <img src={item.image} alt={item.mediaAlt || item.title} loading="lazy" />
+              <CatalogArtwork item={item} alt={item.mediaAlt || item.title} />
             </button>
             <div className="artSkinMeta">
               <div>
@@ -304,33 +305,69 @@ function ArtworkRail({ title, items, onPick }) {
   );
 }
 
-function CucuCatalog({ items, total, loading, hasMore, onPick, onLoadMore }) {
+function CatalogArtwork({ item, alt }) {
+  const crop = item?.sourceCrop;
+
+  if (crop && crop.w > 0 && crop.h > 0) {
+    return (
+      <img
+        className="croppedCatalogImage"
+        src={item.image}
+        alt={alt}
+        loading="lazy"
+        style={{
+          width: (100 / crop.w) + '%',
+          height: (100 / crop.h) + '%',
+          left: (-100 * crop.x / crop.w) + '%',
+          top: (-100 * crop.y / crop.h) + '%'
+        }}
+      />
+    );
+  }
+
+  return <img src={item.image} alt={alt} loading="lazy" />;
+}
+
+function StoreCatalog({
+  storeName,
+  items,
+  total,
+  loading,
+  hasMore,
+  onPick,
+  onLoadMore,
+  collectionUrl
+}) {
+  const countLabel = total > 0
+    ? items.length.toLocaleString() + ' of ' + total.toLocaleString()
+    : items.length.toLocaleString() + ' loaded';
+
   return (
-    <section className="browseSection cucuCatalogSection" aria-label="CUCU Covers catalog">
+    <section className="browseSection storeCatalogSection" aria-label={storeName + ' catalog'}>
       <div className="browseHeading">
-        <h2>CUCU Covers</h2>
-        <span>{items.length.toLocaleString()} of {total.toLocaleString()}</span>
+        <h2>{storeName}</h2>
+        <span>{countLabel}</span>
       </div>
 
       {items.length ? (
-        <div className="cucuGrid" role="list">
+        <div className="storeCatalogGrid" role="list">
           {items.map((item) => (
-            <article className="cucuGridItem" role="listitem" key={item.id}>
+            <article className="storeCatalogItem" role="listitem" key={item.id}>
               <button
                 type="button"
-                className="cucuGridPreview"
+                className="storeCatalogPreview"
                 onClick={() => onPick(item)}
-                aria-label={'Use CUCU card cover ' + item.title}
+                aria-label={'Use ' + storeName + ' card cover ' + item.title}
               >
-                <img src={item.image} alt={item.mediaAlt || item.title} loading="lazy" />
+                <CatalogArtwork item={item} alt={item.mediaAlt || item.title} />
               </button>
-              <div className="cucuGridMeta">
+              <div className="storeCatalogMeta">
                 <strong>{item.title}</strong>
                 <a
                   href={item.sourceUrl}
                   target="_blank"
                   rel="noreferrer"
-                  aria-label={'Open CUCU listing for ' + item.title}
+                  aria-label={'Open original listing for ' + item.title}
                 >
                   Original ↗
                 </a>
@@ -341,7 +378,7 @@ function CucuCatalog({ items, total, loading, hasMore, onPick, onLoadMore }) {
       ) : (
         <div className="catalogEmpty">
           {loading ? <span className="spinner" aria-hidden="true" /> : null}
-          <span>{loading ? 'Loading CUCU card covers…' : 'No clean CUCU previews loaded yet.'}</span>
+          <span>{loading ? 'Loading ' + storeName + ' card covers…' : 'No usable card covers loaded yet.'}</span>
         </div>
       )}
 
@@ -359,11 +396,11 @@ function CucuCatalog({ items, total, loading, hasMore, onPick, onLoadMore }) {
 
       <a
         className="collectionSourceLink"
-        href="https://cucucovers.com/collections/all-card-covers"
+        href={collectionUrl}
         target="_blank"
         rel="noreferrer"
       >
-        Open the full CUCU collection ↗
+        Open the original {storeName} collection ↗
       </a>
     </section>
   );
@@ -380,26 +417,32 @@ function loadSearchImage(src) {
   });
 }
 
-function inspectSearchImage(img) {
-  const width = 96;
-  const height = Math.max(48, Math.round(width / Math.max(0.5, img.naturalWidth / img.naturalHeight)));
+function inspectSearchImage(img, preferDirectAsset = false) {
+  const naturalRatio = img.naturalWidth / img.naturalHeight;
+  const width = 128;
+  const height = Math.max(48, Math.min(128, Math.round(width / Math.max(0.5, naturalRatio))));
   const canvas = document.createElement('canvas');
   canvas.width = width;
-  canvas.height = Math.min(96, height);
+  canvas.height = height;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) return { reject: false, score: 0 };
+  if (!ctx) return { reject: false, score: 0, ratio: naturalRatio, sourceCrop: null };
 
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
   let nearWhite = 0;
   let lightNeutral = 0;
+  let transparent = 0;
   let colorful = 0;
   let edgePixels = 0;
   let edgeLightNeutral = 0;
   let edgeNearWhite = 0;
   let luminanceSum = 0;
   let luminanceSqSum = 0;
+  let contentMinX = canvas.width;
+  let contentMinY = canvas.height;
+  let contentMaxX = -1;
+  let contentMaxY = -1;
   const edgeBand = 4;
 
   for (let y = 0; y < canvas.height; y += 1) {
@@ -409,13 +452,17 @@ function inspectSearchImage(img) {
       const g = data[i + 1];
       const b = data[i + 2];
       const a = data[i + 3];
-      if (a < 20) continue;
+
+      if (a < 20) {
+        transparent += 1;
+        continue;
+      }
 
       const max = Math.max(r, g, b);
       const min = Math.min(r, g, b);
       const spread = max - min;
       const lum = (r + g + b) / 3;
-      const white = r > 238 && g > 238 && b > 238;
+      const white = r > 242 && g > 242 && b > 242;
       const neutral = lum > 205 && spread < 32;
       const color = spread > 48 && lum > 35 && lum < 235;
 
@@ -424,6 +471,15 @@ function inspectSearchImage(img) {
       if (color) colorful += 1;
       luminanceSum += lum;
       luminanceSqSum += lum * lum;
+
+      // Direct Shopify card art often lives on a larger white/transparent PNG.
+      // Detect the actual printed-card bounds so the editor can crop to it.
+      if (!white || spread > 18 || lum < 235) {
+        contentMinX = Math.min(contentMinX, x);
+        contentMinY = Math.min(contentMinY, y);
+        contentMaxX = Math.max(contentMaxX, x);
+        contentMaxY = Math.max(contentMaxY, y);
+      }
 
       const edge =
         x < edgeBand ||
@@ -440,55 +496,95 @@ function inspectSearchImage(img) {
   }
 
   const total = canvas.width * canvas.height;
-  const whiteRatio = nearWhite / total;
-  const lightNeutralRatio = lightNeutral / total;
+  const opaque = Math.max(1, total - transparent);
+  const whiteRatio = nearWhite / opaque;
+  const lightNeutralRatio = lightNeutral / opaque;
+  const transparentRatio = transparent / total;
   const edgeNeutralRatio = edgePixels ? edgeLightNeutral / edgePixels : 0;
   const edgeWhiteRatio = edgePixels ? edgeNearWhite / edgePixels : 0;
-  const colorfulRatio = colorful / total;
-  const mean = luminanceSum / total;
-  const variance = Math.max(0, luminanceSqSum / total - mean * mean);
-  const ratio = img.naturalWidth / img.naturalHeight;
-  const ratioPenalty = Math.abs(Math.log(Math.max(0.2, ratio) / CARD_RATIO));
+  const colorfulRatio = colorful / opaque;
+  const mean = luminanceSum / opaque;
+  const variance = Math.max(0, luminanceSqSum / opaque - mean * mean);
+  const ratioPenalty = Math.abs(Math.log(Math.max(0.2, naturalRatio) / CARD_RATIO));
 
-  // Storefront mockups usually reveal themselves as a large white/light neutral
-  // studio background, especially around the outside edges. Flat/full-bleed
-  // artwork typically carries image detail all the way to the border.
+  let sourceCrop = null;
+  if (contentMaxX >= contentMinX && contentMaxY >= contentMinY) {
+    const pad = 1;
+    const minX = Math.max(0, contentMinX - pad);
+    const minY = Math.max(0, contentMinY - pad);
+    const maxX = Math.min(canvas.width - 1, contentMaxX + pad);
+    const maxY = Math.min(canvas.height - 1, contentMaxY + pad);
+    const cropW = maxX - minX + 1;
+    const cropH = maxY - minY + 1;
+    const cropRatio = cropW / cropH;
+    const cropCoverage = (cropW * cropH) / total;
+    const hasOuterCanvas = whiteRatio > 0.16 || transparentRatio > 0.08;
+
+    if (
+      preferDirectAsset &&
+      hasOuterCanvas &&
+      cropCoverage > 0.16 &&
+      cropCoverage < 0.9 &&
+      cropRatio >= 1.28 &&
+      cropRatio <= 2.05
+    ) {
+      sourceCrop = {
+        x: minX / canvas.width,
+        y: minY / canvas.height,
+        w: cropW / canvas.width,
+        h: cropH / canvas.height
+      };
+    }
+  }
+
   const obviousMockup =
     (edgeNeutralRatio > 0.58 && lightNeutralRatio > 0.16) ||
     (edgeWhiteRatio > 0.5 && whiteRatio > 0.12) ||
     whiteRatio > 0.5;
 
   const nearlyBlank = variance < 180 && colorfulRatio < 0.025;
-  const extremeShape = ratio < 0.72 || ratio > 2.8;
+  const extremeShape = naturalRatio < 0.55 || naturalRatio > 3.2;
+  const reject =
+    nearlyBlank ||
+    extremeShape ||
+    (!preferDirectAsset && obviousMockup) ||
+    (preferDirectAsset && obviousMockup && !sourceCrop);
 
   const score =
     colorfulRatio * 42 +
     Math.min(variance / 1800, 2) * 8 -
-    whiteRatio * 34 -
-    edgeNeutralRatio * 30 -
-    ratioPenalty * 8;
+    whiteRatio * (sourceCrop ? 4 : 34) -
+    edgeNeutralRatio * (sourceCrop ? 3 : 30) -
+    ratioPenalty * (sourceCrop ? 1 : 8) +
+    (sourceCrop ? 40 : 0) +
+    (preferDirectAsset ? 5 : 0);
 
   return {
-    reject: obviousMockup || nearlyBlank || extremeShape,
+    reject,
     score,
-    ratio,
+    ratio: sourceCrop ? (sourceCrop.w * canvas.width) / (sourceCrop.h * canvas.height) : naturalRatio,
     whiteRatio,
-    edgeNeutralRatio
+    edgeNeutralRatio,
+    sourceCrop
   };
 }
 
 async function chooseCleanProductMedia(item) {
-  const candidates = [...new Set([item.image, ...(item.candidateImages || [])].filter(Boolean))].slice(0, 6);
+  const candidates = [...new Set([item.image, ...(item.candidateImages || [])].filter(Boolean))].slice(0, 8);
+  const preferDirectAsset = item.assetMode === 'direct-card-art';
   let best = null;
 
   for (const src of candidates) {
     try {
       const img = await loadSearchImage(src);
-      const quality = inspectSearchImage(img);
+      const quality = inspectSearchImage(img, preferDirectAsset);
       if (quality.reject) continue;
       if (!best || quality.score > best.quality.score) {
         best = { src, quality };
       }
+
+      if (preferDirectAsset && quality.sourceCrop) break;
+
       // A strong full-bleed candidate is good enough; avoid downloading every
       // gallery image on mobile when the first useful one is already clean.
       if (quality.score > 17 && quality.edgeNeutralRatio < 0.16) break;
@@ -502,6 +598,7 @@ async function chooseCleanProductMedia(item) {
     image: best.src,
     visualQuality: 'client-checked',
     visualScore: Math.round(best.quality.score * 100) / 100,
+    sourceCrop: best.quality.sourceCrop || null,
     mediaAspectRatio: best.quality.ratio || item.mediaAspectRatio || null
   };
 }
@@ -543,6 +640,11 @@ export default function Page() {
   const [cucuTotal, setCucuTotal] = useState(2225);
   const [cucuHasMore, setCucuHasMore] = useState(true);
   const [cucuLoading, setCucuLoading] = useState(false);
+  const [blitzItems, setBlitzItems] = useState([]);
+  const [blitzPage, setBlitzPage] = useState(0);
+  const [blitzTotal, setBlitzTotal] = useState(0);
+  const [blitzHasMore, setBlitzHasMore] = useState(true);
+  const [blitzLoading, setBlitzLoading] = useState(false);
   const canvasRef = useRef(null);
   const uploadRef = useRef(null);
   const pointers = useRef(new Map());
@@ -626,7 +728,12 @@ export default function Page() {
     ctx.fillRect(0, 0, OUT_W, OUT_H);
 
     if (image) {
-      const ratio = image.width / image.height;
+      const crop = design.sourceCrop;
+      const sx = crop ? clamp(crop.x, 0, 1) * image.width : 0;
+      const sy = crop ? clamp(crop.y, 0, 1) * image.height : 0;
+      const sw = crop ? clamp(crop.w, 0.01, 1) * image.width : image.width;
+      const sh = crop ? clamp(crop.h, 0.01, 1) * image.height : image.height;
+      const ratio = sw / sh;
       let iw;
       let ih;
 
@@ -652,7 +759,7 @@ export default function Page() {
         ' saturate(' + design.saturation + ')' +
         ' contrast(' + design.contrast + ')' +
         ' blur(' + design.blur * 7 + 'px)';
-      ctx.drawImage(image, -iw / 2, -ih / 2, iw, ih);
+      ctx.drawImage(image, sx, sy, sw, sh, -iw / 2, -ih / 2, iw, ih);
       ctx.restore();
       ctx.filter = 'none';
     }
@@ -776,9 +883,10 @@ export default function Page() {
         patch({
           background: first.image,
           backgroundLabel: first.title,
+          sourceCrop: first.sourceCrop || null,
           // Slight overscan removes tiny storefront edge artifacts and makes
           // wide artwork sit naturally inside the AirCard aspect ratio.
-          zoom: 1.06,
+          zoom: first.sourceCrop ? 1 : 1.06,
           x: 0,
           y: 0,
           rotate: 0,
@@ -840,11 +948,57 @@ export default function Page() {
     }
   }, [cucuLoading]);
 
+  const loadBlitz = useCallback(async (nextPage = 1, replace = false) => {
+    if (blitzLoading) return;
+
+    setBlitzLoading(true);
+    setMessage('Loading Blitz Covers…');
+
+    try {
+      const response = await fetch(
+        '/api/blitz?page=' + encodeURIComponent(nextPage) + '&limit=24',
+        { cache: 'no-store' }
+      );
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'Blitz catalog failed');
+
+      const rawList = Array.isArray(json.results) ? json.results : [];
+      setBlitzTotal(Number(json.total) || 0);
+      setBlitzHasMore(Boolean(json.hasMore));
+
+      setMessage('Extracting Blitz card artwork…');
+      const cleanList = await prepareCleanResults(rawList);
+
+      setBlitzItems((current) => {
+        const base = replace ? [] : current;
+        const merged = [...base, ...cleanList];
+        const seen = new Set();
+        return merged.filter((item) => {
+          if (!item?.id || seen.has(item.id)) return false;
+          seen.add(item.id);
+          return true;
+        });
+      });
+
+      setBlitzPage(nextPage);
+      setMessage(
+        cleanList.length
+          ? cleanList.length + ' Blitz card covers loaded'
+          : 'This Blitz page had no usable card-art assets'
+      );
+    } catch (error) {
+      setMessage(error?.message || 'Blitz catalog failed');
+    } finally {
+      setBlitzLoading(false);
+    }
+  }, [blitzLoading]);
+
   function useArtwork(item) {
     patch({
       background: item.image,
       backgroundLabel: item.title,
-      zoom: 1.06,
+      sourceCrop: item.sourceCrop || null,
+      zoom: item.sourceCrop ? 1 : 1.06,
       x: 0,
       y: 0,
       rotate: 0,
@@ -867,6 +1021,7 @@ export default function Page() {
     patch({
       background: objectUrl,
       backgroundLabel: file.name,
+      sourceCrop: null,
       zoom: 1,
       x: 0,
       y: 0,
@@ -1002,9 +1157,10 @@ export default function Page() {
               <div className="segmentedControl" role="tablist" aria-label="Artwork type">
                 {[
                   ['anime', 'Anime'],
-                  ['cartoon', 'Cartoons'],
+                  ['cartoon', 'Cartoon'],
                   ['tv', 'TV'],
-                  ['cucu', 'CUCU']
+                  ['cucu', 'CUCU'],
+                  ['blitz', 'Blitz']
                 ].map(([value, label]) => (
                   <button
                     type="button"
@@ -1015,6 +1171,7 @@ export default function Page() {
                     onClick={() => {
                       setKind(value);
                       if (value === 'cucu' && !cucuItems.length) loadCucu(1, true);
+                      if (value === 'blitz' && !blitzItems.length) loadBlitz(1, true);
                     }}
                   >
                     {label}
@@ -1022,13 +1179,23 @@ export default function Page() {
                 ))}
               </div>
 
-              {kind === 'cucu' ? (
-                <div className="cucuCategoryIntro">
+              {kind === 'cucu' || kind === 'blitz' ? (
+                <div className="catalogCategoryIntro">
                   <div>
-                    <strong>All Card Covers</strong>
-                    <span>{cucuTotal.toLocaleString()} designs indexed</span>
+                    <strong>{kind === 'cucu' ? 'All Card Covers' : 'Full Card Covers'}</strong>
+                    <span>
+                      {kind === 'cucu'
+                        ? cucuTotal.toLocaleString() + ' designs indexed'
+                        : blitzTotal > 0
+                          ? blitzTotal.toLocaleString() + ' designs indexed'
+                          : 'Loading catalog…'}
+                    </span>
                   </div>
-                  <p>Directly backed by CUCU Covers’ All Card Covers collection. Pages are loaded on demand and obvious storefront mockups are screened before use.</p>
+                  <p>
+                    {kind === 'cucu'
+                      ? 'Uses CUCU’s raw Shopify CDN card-art assets and crops the actual printed-card region out of the product canvas.'
+                      : 'Uses Blitz Covers’ full-card collection and its direct Shopify product assets, with the same raw-art extraction used for CUCU.'}
+                  </p>
                 </div>
               ) : (
                 <>
@@ -1063,13 +1230,29 @@ export default function Page() {
 
             {kind === 'cucu' ? (
               <>
-                <CucuCatalog
+                <StoreCatalog
+                  storeName="CUCU Covers"
                   items={cucuItems}
                   total={cucuTotal}
                   loading={cucuLoading}
                   hasMore={cucuHasMore}
                   onPick={useArtwork}
                   onLoadMore={() => loadCucu(cucuPage + 1)}
+                  collectionUrl="https://cucucovers.com/collections/all-card-covers"
+                />
+                <ArtworkRail title="Recent" items={recent} onPick={useArtwork} />
+              </>
+            ) : kind === 'blitz' ? (
+              <>
+                <StoreCatalog
+                  storeName="Blitz Covers"
+                  items={blitzItems}
+                  total={blitzTotal}
+                  loading={blitzLoading}
+                  hasMore={blitzHasMore}
+                  onPick={useArtwork}
+                  onLoadMore={() => loadBlitz(blitzPage + 1)}
+                  collectionUrl="https://blitzcovers.com/collections/credit-card-cover"
                 />
                 <ArtworkRail title="Recent" items={recent} onPick={useArtwork} />
               </>
@@ -1079,38 +1262,38 @@ export default function Page() {
                 <ArtworkRail title="Recent" items={recent} onPick={useArtwork} />
 
                 <section className="browseSection">
-              <div className="browseHeading"><h2>Quick Picks</h2><span>Live search</span></div>
-              <div className="quickPickList">
-                {QUICK_PICKS.map((item) => (
-                  <button type="button" className="quickPickRow" key={item.title} onClick={() => useQuickPick(item)}>
-                    <span>
-                      <strong>{item.title}</strong>
-                      <small>{item.subtitle}</small>
-                    </span>
-                    <IOSIcon name="chevron" size={17} />
-                  </button>
-                ))}
-              </div>
+                  <div className="browseHeading"><h2>Quick Picks</h2><span>Live search</span></div>
+                  <div className="quickPickList">
+                    {QUICK_PICKS.map((item) => (
+                      <button type="button" className="quickPickRow" key={item.title} onClick={() => useQuickPick(item)}>
+                        <span>
+                          <strong>{item.title}</strong>
+                          <small>{item.subtitle}</small>
+                        </span>
+                        <IOSIcon name="chevron" size={17} />
+                      </button>
+                    ))}
+                  </div>
                 </section>
 
                 <section className="browseSection">
                   <div className="browseHeading"><h2>Blank Styles</h2><span>{GRADIENTS.length}</span></div>
-              <div className="gradientRail" role="list">
-                {GRADIENTS.map((item) => (
-                  <button
-                    type="button"
-                    role="listitem"
-                    key={item.id}
-                    className={design.gradient === item.id && !design.background ? 'gradientSwatch selected' : 'gradientSwatch'}
-                    style={{ background: 'linear-gradient(135deg,' + item.a + ',' + item.b + ',' + item.c + ')' }}
-                    onClick={() => patch({ gradient: item.id, background: '', backgroundLabel: item.name })}
-                    aria-label={'Use ' + item.name + ' background'}
-                  >
-                    <span>{item.name}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
+                  <div className="gradientRail" role="list">
+                    {GRADIENTS.map((item) => (
+                      <button
+                        type="button"
+                        role="listitem"
+                        key={item.id}
+                        className={design.gradient === item.id && !design.background ? 'gradientSwatch selected' : 'gradientSwatch'}
+                        style={{ background: 'linear-gradient(135deg,' + item.a + ',' + item.b + ',' + item.c + ')' }}
+                        onClick={() => patch({ gradient: item.id, background: '', backgroundLabel: item.name, sourceCrop: null })}
+                        aria-label={'Use ' + item.name + ' background'}
+                      >
+                        <span>{item.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
 
                 <button type="button" className="secondaryAction uploadAction" onClick={() => uploadRef.current?.click()}>
                   <IOSIcon name="photo" size={21} />
@@ -1119,7 +1302,7 @@ export default function Page() {
               </>
             )}
 
-            {kind === 'cucu' ? (
+            {kind === 'cucu' || kind === 'blitz' ? (
               <button type="button" className="secondaryAction uploadAction" onClick={() => uploadRef.current?.click()}>
                 <IOSIcon name="photo" size={21} />
                 <span>Choose Photo</span>
