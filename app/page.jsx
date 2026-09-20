@@ -2032,6 +2032,7 @@ export default function Page() {
   const cleanupInFlightRef = useRef(false);
   const exportInFlightRef = useRef(false);
   const imageImportInFlightRef = useRef(false);
+  const imageImportGenerationRef = useRef(0);
 
   const gradient = useMemo(
     () => GRADIENTS.find((item) => item.id === design.gradient) || GRADIENTS[0],
@@ -3410,9 +3411,10 @@ export default function Page() {
     }
 
     imageImportInFlightRef.current = true;
+    const generation = ++imageImportGenerationRef.current;
     setImageImportInProgress(true);
     try {
-      await task();
+      await task(() => imageImportGenerationRef.current === generation);
       return true;
     } finally {
       imageImportInFlightRef.current = false;
@@ -3420,7 +3422,14 @@ export default function Page() {
     }
   }
 
+  function invalidatePendingImageImport() {
+    if (imageImportInFlightRef.current) {
+      imageImportGenerationRef.current += 1;
+    }
+  }
+
   function useArtwork(item) {
+    invalidatePendingImageImport();
     const workingImage = proxyImageWidth(item.image, 3072);
     patch({
       background: workingImage,
@@ -3447,7 +3456,7 @@ export default function Page() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
-    await withImageImportLock(async () => {
+    await withImageImportLock(async (isCurrent) => {
     if (file.type && !file.type.startsWith('image/')) {
       setMessage('Choose an image file.');
       return;
@@ -3471,6 +3480,11 @@ export default function Page() {
       return;
     }
 
+    if (!isCurrent()) {
+      setMessage('Image import canceled by a newer card action');
+      return;
+    }
+
     const id = makeId('import');
     const asset = {
       id,
@@ -3486,6 +3500,13 @@ export default function Page() {
       setMessage('Could not save the imported image. Free some device storage and try again.');
       return;
     }
+
+    if (!isCurrent()) {
+      await dbDelete('imports', id).catch(() => {});
+      setMessage('Image import canceled by a newer card action');
+      return;
+    }
+
     setImports((current) => [importListItem(asset), ...current.filter((entry) => entry.id !== id)]);
 
     patch({
@@ -3512,7 +3533,7 @@ export default function Page() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
-    await withImageImportLock(async () => {
+    await withImageImportLock(async (isCurrent) => {
     if ((designRef.current.customLayers || []).length >= MAX_CUSTOM_LAYERS) {
       setMessage('Layer limit reached. Delete a layer before adding another.');
       return;
@@ -3547,6 +3568,11 @@ export default function Page() {
       return;
     }
 
+    if (!isCurrent()) {
+      setMessage('Image layer import canceled by a newer card action');
+      return;
+    }
+
     const assetId = makeId('import');
     const layerId = makeId('layer');
     const asset = {
@@ -3561,6 +3587,12 @@ export default function Page() {
       await dbPut('imports', asset);
     } catch {
       setMessage('Could not save the image layer. Free some device storage and try again.');
+      return;
+    }
+
+    if (!isCurrent()) {
+      await dbDelete('imports', assetId).catch(() => {});
+      setMessage('Image layer import canceled by a newer card action');
       return;
     }
 
@@ -3985,6 +4017,14 @@ export default function Page() {
   }
 
   async function saveProject(nameOverride = '') {
+    if (imageImportInFlightRef.current) {
+      setMessage('Finish the image import before saving this design.');
+      return null;
+    }
+    if (presetTransferInFlightRef.current || cleanupInFlightRef.current) {
+      setMessage('Finish the current asset operation before saving this design.');
+      return null;
+    }
     if (projectSaveInFlightRef.current) {
       setMessage('A design save is already in progress');
       return null;
@@ -4083,6 +4123,7 @@ export default function Page() {
 
   function openProject(project) {
     if (!project?.design) return;
+    invalidatePendingImageImport();
     if (projectOpsRef.current.has(String(project.id || ''))) {
       setMessage('That design is still being updated');
       return;
@@ -4308,6 +4349,10 @@ export default function Page() {
   }
 
   async function exportPresetJson() {
+    if (imageImportInFlightRef.current) {
+      setMessage('Finish the image import before exporting a preset.');
+      return;
+    }
     if (presetTransferInFlightRef.current) {
       setMessage('Another preset operation is already in progress');
       return;
@@ -4535,6 +4580,7 @@ export default function Page() {
   }
 
   function reset() {
+    invalidatePendingImageImport();
     historyGroupRef.current = { key: '', at: 0 };
     const current = designRef.current;
     const next = normalizeDesignState(DEFAULTS);
@@ -4986,6 +5032,14 @@ export default function Page() {
     height = OUT_H,
     name = 'cardBackgroundCombined@3x.png'
   ) {
+    if (imageImportInFlightRef.current) {
+      setMessage('Finish the image import before exporting.');
+      return;
+    }
+    if (presetTransferInFlightRef.current || cleanupInFlightRef.current) {
+      setMessage('Finish the current asset operation before exporting.');
+      return;
+    }
     if (exportInFlightRef.current) {
       setMessage('An export is already in progress');
       return;
