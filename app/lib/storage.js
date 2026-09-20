@@ -4,6 +4,7 @@ const DB_NAME = 'aircard-studio-v2';
 const DB_VERSION = 1;
 const STORES = ['kv', 'favorites', 'projects', 'imports', 'exports'];
 const ART_CACHE = 'card-studio-art-v3';
+const ART_CACHE_LIMIT = 180;
 
 let dbPromise = null;
 
@@ -105,6 +106,13 @@ export async function cacheArtwork(url) {
       return false;
     }
     await cache.put(url, response.clone());
+
+    const keys = await cache.keys();
+    const overflow = keys.length - ART_CACHE_LIMIT;
+    if (overflow > 0) {
+      await Promise.all(keys.slice(0, overflow).map((request) => cache.delete(request)));
+    }
+
     return true;
   } catch {
     return false;
