@@ -9,6 +9,20 @@ export default function manifest() {
     background_color: '#000000',
     theme_color: '#000000',
     orientation: 'portrait-primary',
+    icons: [
+      {
+        src: '/icon',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any maskable'
+      },
+      {
+        src: '/apple-icon',
+        sizes: '180x180',
+        type: 'image/png',
+        purpose: 'any'
+      }
+    ],
     categories: ['design', 'utilities']
   };
 }
