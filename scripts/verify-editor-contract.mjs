@@ -65,6 +65,8 @@ const pageChecks = [
   [/recordHistory[\s\S]{0,180}finishActiveGestureRef\.current\(\)/, 'normal Studio edits terminate a live canvas gesture before mutation'],
   [/Object\.is\(currentDesign\.chipX, snapX\.value\)/, 'snapped chip drags do not create no-op gesture history'],
   [/Object\.is\(currentDesign\.zoom, nextZoom\)/, 'bounded artwork pinch gestures do not create no-op history'],
+  [/return true;\s*\n\s*}\s*\n\s*\n\s*async function uploadImage/, 'artwork selection reports successful application'],
+  [/if \(useArtwork\(menuItem\)\) \{\s*setShowExportPreview\(true\)/, 'final preview opens only after artwork selection succeeds'],
   [/finishActiveGesture\(\);[\s\S]{0,120}if \(cleanupInFlightRef\.current\)/, 'Undo and other guarded actions finalize active gestures first'],
   [/inert=\{blockingAssetOperation \|\| undefined\}/, 'blocking editor operations use a boolean inert attribute'],
   [/setSelectedElement\('card-text'\)/, 'built-in card text keeps an independent selection state'],
