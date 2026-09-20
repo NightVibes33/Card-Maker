@@ -116,6 +116,8 @@ requireMatch(page, /proxyImageWidth\(item\.image, 3072\)/, 'editor artwork uses 
 requireMatch(storage, /const DB_VERSION = 2;/, 'IndexedDB schema includes import metadata migration');
 requireMatch(storage, /'importMeta'/, 'import metadata store exists');
 requireMatch(storage, /export async function dbGetImportMetadata\(/, 'metadata-only import listing exists');
+requireMatch(storage, /const CACHE_ARTWORK_TIMEOUT_MS = 12000;/, 'offline artwork caching has a mobile-network timeout');
+requireMatch(storage, /signal: controller\.signal/, 'offline artwork cache fetches are abortable');
 requireMatch(page, /dbGetImportMetadata\(\)/, 'Library hydrates import metadata instead of blobs');
 requireMatch(page, /const MAX_STORED_IMAGE_PIXELS = 12_000_000;/, 'local image working-set pixels are bounded');
 requireMatch(page, /const MAX_STORED_IMAGE_DIMENSION = 4096;/, 'local image working-set dimensions are bounded');
