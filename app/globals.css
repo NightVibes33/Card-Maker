@@ -717,6 +717,27 @@ button:disabled{opacity:.38}
 .exportSpec code{font-size:12px;overflow-wrap:anywhere}
 .bigAction{width:100%;margin-top:14px}
 .legalNote{padding:0 12px 8px}
+
+.cleanupShield{
+  position:fixed;
+  z-index:120;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding:24px;
+  background:color-mix(in srgb,var(--system-bg) 72%,transparent);
+  -webkit-backdrop-filter:blur(14px);
+  backdrop-filter:blur(14px);
+  color:var(--label);
+  text-align:center;
+  touch-action:none;
+}
+.cleanupShield strong{
+  font-size:15px;
+  font-weight:650;
+}
 .tabBar{
   position:fixed;
   z-index:50;
