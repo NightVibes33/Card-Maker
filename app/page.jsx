@@ -20,13 +20,14 @@ const EDITOR_PREVIEW_H = 646;
 const CARD_RATIO = OUT_W / OUT_H;
 const MAX_IMAGE_IMPORT_BYTES = 30 * 1024 * 1024;
 const MAX_SVG_IMPORT_BYTES = 2 * 1024 * 1024;
+const MAX_IMAGE_PROBE_BYTES = 1024 * 1024;
 const MAX_PRESET_IMPORT_BYTES = 48 * 1024 * 1024;
 const MAX_PRESET_EMBEDDED_BYTES = 30 * 1024 * 1024;
 const MAX_CUSTOM_LAYERS = 200;
 const MAX_VISIBLE_IMAGE_LAYERS = 12;
 const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS + 1;
-const MAX_IMAGE_PIXELS = 65_000_000;
-const MAX_IMAGE_DIMENSION = 12_000;
+const MAX_IMAGE_PIXELS = 52_000_000;
+const MAX_IMAGE_DIMENSION = 10_000;
 const MAX_STORED_IMAGE_PIXELS = 12_000_000;
 const MAX_STORED_IMAGE_DIMENSION = 4096;
 const MAX_STORED_LAYER_IMAGE_PIXELS = 4_000_000;
@@ -1566,6 +1567,185 @@ function loadSearchImage(src, timeoutMs = 12000) {
   });
 }
 
+
+function readAscii(bytes, offset, length) {
+  let output = '';
+  for (let i = 0; i < length && offset + i < bytes.length; i += 1) {
+    output += String.fromCharCode(bytes[offset + i]);
+  }
+  return output;
+}
+
+function readUint24LE(bytes, offset) {
+  return (
+    Number(bytes[offset] || 0) |
+    (Number(bytes[offset + 1] || 0) << 8) |
+    (Number(bytes[offset + 2] || 0) << 16)
+  ) >>> 0;
+}
+
+function plausibleImageDimensions(width, height) {
+  return (
+    Number.isFinite(width) &&
+    Number.isFinite(height) &&
+    width > 0 &&
+    height > 0 &&
+    width <= 1_000_000 &&
+    height <= 1_000_000
+  );
+}
+
+function svgNumericLength(tag, name) {
+  const match = tag.match(new RegExp('\\b' + name + '\\s*=\\s*["\\']\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(?:px)?\\s*["\\']', 'i'));
+  return match ? Number(match[1]) : 0;
+}
+
+async function probeLocalImageDimensions(blob) {
+  const sourceType = String(blob?.type || '').toLowerCase();
+  const sourceName = String(blob?.name || '');
+  const isSvg =
+    sourceType === 'image/svg+xml' ||
+    /\.svg$/i.test(sourceName);
+
+  if (isSvg) {
+    const markup = await blob.text();
+    const root = markup.match(/<\s*svg\b[^>]*>/i)?.[0] || '';
+    let width = svgNumericLength(root, 'width');
+    let height = svgNumericLength(root, 'height');
+
+    if (!width || !height) {
+      const viewBox = root.match(/\bviewBox\s*=\s*["']\s*[-+0-9.eE]+\s+[-+0-9.eE]+\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s*["']/i);
+      if (viewBox) {
+        width ||= Math.abs(Number(viewBox[1]));
+        height ||= Math.abs(Number(viewBox[2]));
+      }
+    }
+
+    return plausibleImageDimensions(width, height) ? { width, height } : null;
+  }
+
+  const probe = new Uint8Array(
+    await blob.slice(0, Math.min(Number(blob.size || 0), MAX_IMAGE_PROBE_BYTES)).arrayBuffer()
+  );
+  if (probe.length < 10) return null;
+  const view = new DataView(probe.buffer, probe.byteOffset, probe.byteLength);
+
+  // PNG: signature + IHDR width/height.
+  if (
+    probe.length >= 24 &&
+    probe[0] === 0x89 &&
+    readAscii(probe, 1, 3) === 'PNG' &&
+    readAscii(probe, 12, 4) === 'IHDR'
+  ) {
+    const width = view.getUint32(16, false);
+    const height = view.getUint32(20, false);
+    return plausibleImageDimensions(width, height) ? { width, height } : null;
+  }
+
+  // GIF logical screen dimensions.
+  if (readAscii(probe, 0, 3) === 'GIF') {
+    const width = view.getUint16(6, true);
+    const height = view.getUint16(8, true);
+    return plausibleImageDimensions(width, height) ? { width, height } : null;
+  }
+
+  // JPEG SOF dimensions. Scanning only the bounded prefix avoids decoding pixels.
+  if (probe[0] === 0xff && probe[1] === 0xd8) {
+    const sofMarkers = new Set([
+      0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7,
+      0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf
+    ]);
+    let offset = 2;
+
+    while (offset + 8 < probe.length) {
+      if (probe[offset] !== 0xff) {
+        offset += 1;
+        continue;
+      }
+      while (offset < probe.length && probe[offset] === 0xff) offset += 1;
+      if (offset >= probe.length) break;
+
+      const marker = probe[offset];
+      offset += 1;
+      if (marker === 0xd9 || marker === 0xda) break;
+      if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+      if (offset + 1 >= probe.length) break;
+
+      const length = view.getUint16(offset, false);
+      if (length < 2 || offset + length > probe.length) break;
+
+      if (sofMarkers.has(marker) && length >= 7) {
+        const height = view.getUint16(offset + 3, false);
+        const width = view.getUint16(offset + 5, false);
+        return plausibleImageDimensions(width, height) ? { width, height } : null;
+      }
+      offset += length;
+    }
+  }
+
+  // WebP VP8X / VP8 / VP8L dimensions.
+  if (
+    probe.length >= 30 &&
+    readAscii(probe, 0, 4) === 'RIFF' &&
+    readAscii(probe, 8, 4) === 'WEBP'
+  ) {
+    const chunk = readAscii(probe, 12, 4);
+    if (chunk === 'VP8X') {
+      const width = 1 + readUint24LE(probe, 24);
+      const height = 1 + readUint24LE(probe, 27);
+      return plausibleImageDimensions(width, height) ? { width, height } : null;
+    }
+    if (
+      chunk === 'VP8 ' &&
+      probe[23] === 0x9d &&
+      probe[24] === 0x01 &&
+      probe[25] === 0x2a
+    ) {
+      const width = view.getUint16(26, true) & 0x3fff;
+      const height = view.getUint16(28, true) & 0x3fff;
+      return plausibleImageDimensions(width, height) ? { width, height } : null;
+    }
+    if (chunk === 'VP8L' && probe[20] === 0x2f) {
+      const width = 1 + (probe[21] | ((probe[22] & 0x3f) << 8));
+      const height =
+        1 +
+        ((probe[22] >> 6) |
+          (probe[23] << 2) |
+          ((probe[24] & 0x0f) << 10));
+      return plausibleImageDimensions(width, height) ? { width, height } : null;
+    }
+  }
+
+  // AVIF/HEIF commonly expose an Image Spatial Extents ('ispe') box in the
+  // metadata prefix. Use it only for ISO-BMFF image MIME/extensions.
+  if (
+    /image\/(?:avif|heic|heif)/.test(sourceType) ||
+    /\.(?:avif|heic|heif)$/i.test(sourceName)
+  ) {
+    for (let i = 4; i + 16 <= probe.length; i += 1) {
+      if (readAscii(probe, i, 4) !== 'ispe') continue;
+      const width = view.getUint32(i + 8, false);
+      const height = view.getUint32(i + 12, false);
+      if (plausibleImageDimensions(width, height)) return { width, height };
+    }
+  }
+
+  return null;
+}
+
+function assertSafeSourceDimensions(dimensions) {
+  if (!dimensions) return;
+  const width = Number(dimensions.width || 0);
+  const height = Number(dimensions.height || 0);
+  if (
+    width > MAX_IMAGE_DIMENSION ||
+    height > MAX_IMAGE_DIMENSION ||
+    width * height > MAX_IMAGE_PIXELS
+  ) {
+    throw new Error('Image dimensions are too large');
+  }
+}
+
 function decodeLocalImageBlob(blob, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
@@ -1650,6 +1830,7 @@ async function validateSafeSvgBlob(blob) {
 
 async function prepareLocalImageBlob(blob, limits = {}) {
   await validateSafeSvgBlob(blob);
+  assertSafeSourceDimensions(await probeLocalImageDimensions(blob));
   const decoded = await decodeLocalImageBlob(blob);
   const { image, width, height } = decoded;
   const maxPixels = Math.max(
