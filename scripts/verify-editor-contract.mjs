@@ -76,6 +76,7 @@ const pageChecks = [
   [/const presetImportGenerationRef = useRef\(0\)/, 'preset imports use a generation token'],
   [/function invalidatePendingPresetImport\(\)/, 'newer card actions can invalidate stale preset imports'],
   [/Finish cleaning imported images before editing\./, 'editor mutations are blocked during destructive import cleanup'],
+  [/Finish saving the design before cleaning imported images\./, 'import cleanup cannot race an in-flight project save'],
   [/className="cleanupShield"/, 'cleanup presents an interaction shield while deleting blobs'],
   [/if \(presetImportActiveRef\.current\) \{[\s\S]{0,120}presetImportGenerationRef\.current \+= 1;/, 'editor edits invalidate pending preset imports'],
   [/ensureCurrentPresetImport\(\);[\s\S]{0,100}presetImportActiveRef\.current = false;[\s\S]{0,100}patch\(\{ \.\.\.DEFAULTS, \.\.\.imported \}\)/, 'preset final apply does not self-cancel'],
