@@ -439,6 +439,16 @@ function hexToRgb(hex = '#000000') {
 }
 
 let textMeasureCanvas = null;
+let graphemeSegmenter = null;
+
+function splitGraphemes(value) {
+  const text = String(value ?? '');
+  if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+    graphemeSegmenter ||= new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+    return Array.from(graphemeSegmenter.segment(text), (entry) => entry.segment);
+  }
+  return Array.from(text);
+}
 
 function textLayerFontFamily(fontFamily) {
   return {
@@ -465,14 +475,14 @@ function textLayerLineAdvance(layer) {
 }
 
 function measureTrackedText(ctx, text, tracking = 0) {
-  const chars = Array.from(String(text || ''));
+  const chars = splitGraphemes(text);
   if (!chars.length) return 0;
   return chars.reduce((width, char) => width + ctx.measureText(char).width, 0) +
     Math.max(0, chars.length - 1) * Number(tracking || 0);
 }
 
 function drawTrackedText(ctx, text, x, y, tracking = 0) {
-  const chars = Array.from(String(text || ''));
+  const chars = splitGraphemes(text);
   if (!tracking || chars.length < 2) {
     ctx.fillText(chars.join(''), x, y);
     return;
@@ -525,7 +535,7 @@ function customLayerBounds(layer, layerImage) {
   let measuredWidth = Math.max(
     size * 0.5,
     ...lines.map((line) => {
-      const chars = Array.from(line);
+      const chars = splitGraphemes(line);
       return chars.reduce(
         (width, char) => width + size * (char === ' ' ? 0.34 : /[ilI1|]/.test(char) ? 0.3 : /[MW@#]/.test(char) ? 0.82 : 0.58),
         0
