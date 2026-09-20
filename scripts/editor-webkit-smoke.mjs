@@ -165,6 +165,70 @@ try {
     'main Card Library import must forget all prior working-project history'
   );
 
+  const earlyFreshDraft = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('aircard-sticker-fvp-v3') || '{}')
+  );
+  const earlyDefaultState = {
+    gradient: 0,
+    fit: 'cover',
+    zoom: 1,
+    x: 0,
+    y: 0,
+    rotate: 0,
+    flipX: false,
+    exposure: 0,
+    brightness: 1,
+    saturation: 1,
+    contrast: 1,
+    highlights: 0,
+    shadows: 0,
+    temperature: 0,
+    tint: 0,
+    sharpness: 0,
+    blur: 0,
+    vignette: 0,
+    grain: 0,
+    gloss: 0,
+    overlay: 0,
+    fade: 0,
+    effectTint: '#7b61ff',
+    effectTintStrength: 0,
+    chip: true,
+    chipTone: 'gold',
+    chipX: 0.105,
+    chipY: 0.35,
+    chipScale: 1,
+    chipRotation: 0,
+    contactless: true,
+    contactlessX: 0.285,
+    contactlessY: 0.43,
+    contactlessScale: 1,
+    contactlessRotation: 0,
+    number: false,
+    numberText: '••••  ••••  ••••  4242',
+    holder: false,
+    holderText: 'CARD HOLDER',
+    expiry: false,
+    expiryText: '12/29',
+    badge: false,
+    badgeText: 'CARD',
+    textColor: '#ffffff',
+    shadow: true
+  };
+  for (const [key, expected] of Object.entries(earlyDefaultState)) {
+    assert.deepEqual(
+      earlyFreshDraft[key],
+      expected,
+      `main Card Library import must hard-reset ${key} to the original default`
+    );
+  }
+  assert.deepEqual(earlyFreshDraft.customLayers, [], 'main Card Library import must clear every custom layer');
+  assert.deepEqual(
+    earlyFreshDraft.layerOrder,
+    ['builtin-chip', 'builtin-contactless', 'builtin-text'],
+    'main Card Library import must restore original built-in layer order'
+  );
+
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
   assert.equal(
     await page.getByRole('button', { name: /^Text text /i }).count(),
