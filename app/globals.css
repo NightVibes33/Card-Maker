@@ -765,6 +765,13 @@ button:disabled{opacity:.38}
     transition-duration:.001ms!important;
   }
 }
+
+@media (max-height:620px){
+  .editingPreview,.studioModeRow{
+    position:relative;
+    top:auto;
+  }
+}
 @media (prefers-reduced-transparency:reduce){
   :root{--glass:var(--secondary-bg);--glass-strong:var(--secondary-bg)}
   .editingPreview,.tabBar{-webkit-backdrop-filter:none;backdrop-filter:none}
