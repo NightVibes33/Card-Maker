@@ -31,6 +31,7 @@ const pageChecks = [
   [/renderAssetsReady/, 'exports are gated on decoded assets'],
   [/historyGroupRef/, 'continuous edits use grouped undo history'],
   [/gestureStartDesign\.current = designRef\.current/, 'gestures snapshot authoritative state'],
+  [/if \(pointers\.current\.size >= 2\) return;/, 'gesture tracking ignores accidental third touches'],
   [/function textLayerLines\(/, 'multiline text is modeled explicitly'],
   [/label="Line Height"/, 'multiline text has line-height controls'],
   [/<textarea[\s\S]*aria-label="Layer text"/, 'text layers use a multiline editor'],
