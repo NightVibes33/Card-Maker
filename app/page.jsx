@@ -2123,26 +2123,45 @@ export default function Page() {
         return;
       }
 
-      for (const layer of imageLayers) {
+      let cursor = 0;
+
+      async function hydrateOneLayer(layer) {
         let src = layer.src;
 
         try {
           if (src.startsWith('idb://imports/')) {
             const id = src.slice('idb://imports/'.length);
             const asset = await dbGet('imports', id);
+            if (cancelled) return;
             if (!asset?.blob) {
               failed = true;
-              continue;
+              return;
             }
             src = URL.createObjectURL(asset.blob);
             urls.push(src);
           }
 
-          next[layer.id] = await loadSearchImage(src);
+          const decoded = await loadSearchImage(src);
+          if (cancelled) return;
+          next[layer.id] = decoded;
         } catch {
-          failed = true;
+          if (!cancelled) failed = true;
         }
       }
+
+      async function worker() {
+        while (!cancelled) {
+          const index = cursor;
+          cursor += 1;
+          if (index >= imageLayers.length) return;
+          await hydrateOneLayer(imageLayers[index]);
+        }
+      }
+
+      const workerCount = Math.min(3, imageLayers.length);
+      await Promise.all(
+        Array.from({ length: workerCount }, () => worker())
+      );
 
       if (!cancelled) {
         setLayerImages(next);
