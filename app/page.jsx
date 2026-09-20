@@ -3881,10 +3881,7 @@ export default function Page() {
       return;
     }
 
-    if (!isCurrent()) {
-      setMessage('Image import canceled by a newer card action');
-      return;
-    }
+    if (!isCurrent()) return;
 
     const id = makeId('import');
     const asset = {
@@ -3904,7 +3901,6 @@ export default function Page() {
 
     if (!isCurrent()) {
       await dbDelete('imports', id).catch(() => {});
-      setMessage('Image import canceled by a newer card action');
       return;
     }
 
@@ -3973,10 +3969,7 @@ export default function Page() {
       return;
     }
 
-    if (!isCurrent()) {
-      setMessage('Image layer import canceled by a newer card action');
-      return;
-    }
+    if (!isCurrent()) return;
 
     const assetId = makeId('import');
     const layerId = makeId('layer');
@@ -3997,7 +3990,6 @@ export default function Page() {
 
     if (!isCurrent()) {
       await dbDelete('imports', assetId).catch(() => {});
-      setMessage('Image layer import canceled by a newer card action');
       return;
     }
 
