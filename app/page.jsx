@@ -1155,34 +1155,49 @@ function validateLocalImageBlob(blob) {
     const url = URL.createObjectURL(blob);
     const img = new Image();
     img.decoding = 'async';
+    let settled = false;
 
-    const cleanup = () => URL.revokeObjectURL(url);
+    const cleanup = () => {
+      clearTimeout(timer);
+      URL.revokeObjectURL(url);
+    };
+
+    const finish = (callback) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback();
+    };
+
+    const timer = window.setTimeout(() => {
+      finish(() => reject(new Error('Image decode timed out')));
+    }, 15000);
 
     img.onload = () => {
       const width = Number(img.naturalWidth || img.width || 0);
       const height = Number(img.naturalHeight || img.height || 0);
-      cleanup();
 
-      if (!width || !height) {
-        reject(new Error('Image dimensions could not be read'));
-        return;
-      }
+      finish(() => {
+        if (!width || !height) {
+          reject(new Error('Image dimensions could not be read'));
+          return;
+        }
 
-      if (
-        width > MAX_IMAGE_DIMENSION ||
-        height > MAX_IMAGE_DIMENSION ||
-        width * height > MAX_IMAGE_PIXELS
-      ) {
-        reject(new Error('Image dimensions are too large'));
-        return;
-      }
+        if (
+          width > MAX_IMAGE_DIMENSION ||
+          height > MAX_IMAGE_DIMENSION ||
+          width * height > MAX_IMAGE_PIXELS
+        ) {
+          reject(new Error('Image dimensions are too large'));
+          return;
+        }
 
-      resolve({ width, height });
+        resolve({ width, height });
+      });
     };
 
     img.onerror = () => {
-      cleanup();
-      reject(new Error('Image could not be decoded'));
+      finish(() => reject(new Error('Image could not be decoded')));
     };
 
     img.src = url;
@@ -3003,6 +3018,9 @@ export default function Page() {
       return;
     }
 
+    const createdImportIds = [];
+    let presetApplied = false;
+
     try {
       const payload = JSON.parse(await file.text());
       if (!payload?.design || Number(payload.version) < 2) throw new Error('Unsupported preset');
@@ -3029,6 +3047,7 @@ export default function Page() {
           blob,
           createdAt: Date.now()
         });
+        createdImportIds.push(newId);
       }
 
       const imported = JSON.parse(JSON.stringify(payload.design));
@@ -3050,14 +3069,19 @@ export default function Page() {
         return layer;
       });
 
+      const nextImports = await dbGetAll('imports');
       patch({ ...DEFAULTS, ...imported });
+      presetApplied = true;
       setSelectedElement('artwork');
       setShowOriginal(false);
       setActiveGuides({ x: null, y: null });
-      setImports(await dbGetAll('imports'));
+      setImports(nextImports);
       setTab('studio');
       setMessage('Design preset imported');
     } catch {
+      if (!presetApplied && createdImportIds.length) {
+        await Promise.all(createdImportIds.map((id) => dbDelete('imports', id).catch(() => {})));
+      }
       setMessage('Preset could not be imported');
     }
   }
