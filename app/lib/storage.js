@@ -1,8 +1,17 @@
 'use client';
 
 const DB_NAME = 'aircard-studio-v2';
-const DB_VERSION = 1;
-const STORES = ['kv', 'favorites', 'projects', 'imports', 'exports'];
+const DB_VERSION = 2;
+const STORES = ['kv', 'favorites', 'projects', 'imports', 'importMeta', 'exports'];
+
+function importMetadata(value = {}) {
+  return {
+    id: value.id,
+    name: value.name || 'Imported image',
+    type: value.type || 'image/*',
+    createdAt: Number(value.createdAt || Date.now())
+  };
+}
 const ART_CACHE = 'card-studio-art-v4';
 const ART_CACHE_LIMIT = 40;
 
@@ -17,10 +26,29 @@ function openDb() {
 
     request.onupgradeneeded = () => {
       const db = request.result;
+      const tx = request.transaction;
+
       for (const store of STORES) {
         if (!db.objectStoreNames.contains(store)) {
           db.createObjectStore(store, { keyPath: 'id' });
         }
+      }
+
+      // Version 2 separates lightweight import-list metadata from large image
+      // blobs. Migrate existing imports once so Library hydration never needs
+      // to deserialize every stored photo into React memory again.
+      if (request.oldVersion < 2 && tx && db.objectStoreNames.contains('imports')) {
+        const importsStore = tx.objectStore('imports');
+        const metaStore = tx.objectStore('importMeta');
+        const cursorRequest = importsStore.openCursor();
+
+        cursorRequest.onsuccess = () => {
+          const cursor = cursorRequest.result;
+          if (!cursor) return;
+          const value = cursor.value || {};
+          if (value.id) metaStore.put(importMetadata(value));
+          cursor.continue();
+        };
       }
     };
 
@@ -52,8 +80,14 @@ export async function dbPut(store, value) {
   if (!db) return value;
 
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, 'readwrite');
+    const stores = store === 'imports' ? ['imports', 'importMeta'] : [store];
+    const tx = db.transaction(stores, 'readwrite');
     tx.objectStore(store).put(value);
+
+    if (store === 'imports' && value?.id) {
+      tx.objectStore('importMeta').put(importMetadata(value));
+    }
+
     tx.oncomplete = () => resolve(value);
     tx.onerror = () => reject(tx.error || new Error('IndexedDB write failed'));
     tx.onabort = () => reject(tx.error || new Error('IndexedDB write aborted'));
@@ -89,11 +123,30 @@ export async function dbDelete(store, id) {
   if (!db) return;
 
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, 'readwrite');
+    const stores = store === 'imports' ? ['imports', 'importMeta'] : [store];
+    const tx = db.transaction(stores, 'readwrite');
     tx.objectStore(store).delete(id);
+
+    if (store === 'imports') {
+      tx.objectStore('importMeta').delete(id);
+    }
+
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error || new Error('IndexedDB delete failed'));
     tx.onabort = () => reject(tx.error || new Error('IndexedDB delete aborted'));
+  });
+}
+
+export async function dbGetImportMetadata() {
+  const db = await openDb();
+  if (!db) return [];
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('importMeta', 'readonly');
+    const request = tx.objectStore('importMeta').getAll();
+    request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+    request.onerror = () => reject(request.error || new Error('IndexedDB import metadata read failed'));
+    tx.onabort = () => reject(tx.error || new Error('IndexedDB import metadata read aborted'));
   });
 }
 
