@@ -2134,6 +2134,7 @@ export default function Page() {
       setMessage('Finish cleaning imported images before using Undo.');
       return;
     }
+    invalidatePendingImageImport();
     invalidatePendingPresetImport();
     historyGroupRef.current = { key: '', at: 0 };
     const previous = undoRef.current.pop();
@@ -2151,6 +2152,7 @@ export default function Page() {
       setMessage('Finish cleaning imported images before using Redo.');
       return;
     }
+    invalidatePendingImageImport();
     invalidatePendingPresetImport();
     historyGroupRef.current = { key: '', at: 0 };
     const next = redoRef.current.pop();
