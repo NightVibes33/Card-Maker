@@ -1604,6 +1604,9 @@ export default function Page() {
           }).catch(() => {});
 
           const reloadKey = 'card-studio-sw-v3-reloaded';
+          const clearReloadGuard = () => sessionStorage.removeItem(reloadKey);
+          window.setTimeout(clearReloadGuard, 8000);
+
           navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (sessionStorage.getItem(reloadKey) === '1') return;
             sessionStorage.setItem(reloadKey, '1');
