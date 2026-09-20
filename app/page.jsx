@@ -1413,7 +1413,7 @@ async function prepareLocalImageBlob(blob, limits = {}) {
   const dimensionScale = maxDimension / Math.max(width, height);
   const scale = Math.min(1, pixelScale, dimensionScale);
   const sourceType = String(blob.type || '').toLowerCase();
-  const needsFormatNormalization = /^image\/(?:gif|svg\+xml|heic|heif)$/.test(sourceType);
+  const needsFormatNormalization = /^image\/(?:gif|apng|svg\+xml|heic|heif)$/.test(sourceType);
 
   if (scale >= 0.999 && !needsFormatNormalization) {
     image.src = '';
