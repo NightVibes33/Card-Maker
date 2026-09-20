@@ -1109,6 +1109,22 @@ button:disabled{opacity:.38}
 .layerRow small{margin-top:2px;color:var(--secondary-label);font-size:11px;text-transform:capitalize}
 .layerRow>span:last-child{color:var(--secondary-label);font-size:12px}
 .layerRow.selected{background:color-mix(in srgb,var(--blue) 10%,transparent)}
+.layerEditorFieldset{
+  min-inline-size:0;
+  margin:0;
+  border:0;
+  padding:0;
+}
+.layerEditorFieldset:disabled{opacity:.52}
+.lockedLayerNotice{
+  margin:8px 10px 0;
+  border-radius:10px;
+  padding:9px 10px;
+  background:color-mix(in srgb,var(--tertiary-bg) 78%,transparent);
+  color:var(--secondary-label);
+  font-size:12px;
+  line-height:1.35;
+}
 .layerActionGrid{
   display:grid;
   grid-template-columns:repeat(2,1fr);
