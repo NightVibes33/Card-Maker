@@ -220,15 +220,21 @@ export async function dbDelete(store, id) {
 }
 
 export async function dbGetImportMetadata() {
-  const db = await openDb();
-  if (!db) return [];
-
-  const snapshot = await new Promise((resolve, reject) => {
-    const tx = db.transaction(['imports', 'importMeta'], 'readonly');
-    const importKeysRequest = tx.objectStore('imports').getAllKeys();
-    const metaRequest = tx.objectStore('importMeta').getAll();
+  const snapshot = await withDbRetry((db) => new Promise((resolve, reject) => {
+    let tx;
+    let importKeysRequest;
+    let metaRequest;
     let importKeys = [];
     let metadata = [];
+
+    try {
+      tx = db.transaction(['imports', 'importMeta'], 'readonly');
+      importKeysRequest = tx.objectStore('imports').getAllKeys();
+      metaRequest = tx.objectStore('importMeta').getAll();
+    } catch (error) {
+      reject(error);
+      return;
+    }
 
     importKeysRequest.onsuccess = () => {
       importKeys = Array.isArray(importKeysRequest.result)
@@ -241,7 +247,7 @@ export async function dbGetImportMetadata() {
     tx.oncomplete = () => resolve({ importKeys, metadata });
     tx.onerror = () => reject(tx.error || new Error('IndexedDB import metadata read failed'));
     tx.onabort = () => reject(tx.error || new Error('IndexedDB import metadata read aborted'));
-  });
+  }));
 
   const importIds = new Set(snapshot.importKeys);
   const metadataIds = new Set(
@@ -258,30 +264,38 @@ export async function dbGetImportMetadata() {
   }
 
   // Self-heal metadata if an interrupted/older upgrade left it incomplete.
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(['imports', 'importMeta'], 'readwrite');
-    const importsStore = tx.objectStore('imports');
-    const metaStore = tx.objectStore('importMeta');
+  return withDbRetry((db) => new Promise((resolve, reject) => {
+    let tx;
+    let cursorRequest;
     const items = [];
-    const cursorRequest = importsStore.openCursor();
 
-    metaStore.clear();
+    try {
+      tx = db.transaction(['imports', 'importMeta'], 'readwrite');
+      const importsStore = tx.objectStore('imports');
+      const metaStore = tx.objectStore('importMeta');
+      cursorRequest = importsStore.openCursor();
+      metaStore.clear();
 
-    cursorRequest.onsuccess = () => {
-      const cursor = cursorRequest.result;
-      if (!cursor) return;
-      const metadata = importMetadata(cursor.value || {});
-      if (metadata.id) {
-        items.push(metadata);
-        metaStore.put(metadata);
-      }
-      cursor.continue();
-    };
+      cursorRequest.onsuccess = () => {
+        const cursor = cursorRequest.result;
+        if (!cursor) return;
+        const metadata = importMetadata(cursor.value || {});
+        if (metadata.id) {
+          items.push(metadata);
+          metaStore.put(metadata);
+        }
+        cursor.continue();
+      };
+    } catch (error) {
+      reject(error);
+      return;
+    }
+
     cursorRequest.onerror = () => reject(cursorRequest.error || new Error('IndexedDB import metadata rebuild failed'));
     tx.oncomplete = () => resolve(items);
     tx.onerror = () => reject(tx.error || new Error('IndexedDB import metadata rebuild failed'));
     tx.onabort = () => reject(tx.error || new Error('IndexedDB import metadata rebuild aborted'));
-  });
+  }));
 }
 
 export async function cacheArtwork(url) {
