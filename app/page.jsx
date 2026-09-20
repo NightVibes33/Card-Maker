@@ -3472,10 +3472,13 @@ export default function Page() {
     for (const snapshot of undoRef.current) addDesignRefs(snapshot);
     for (const snapshot of redoRef.current) addDesignRefs(snapshot);
 
-    let storedProjects = projects;
+    let storedProjects;
     try {
       storedProjects = await dbGetAll('projects');
-    } catch {}
+    } catch {
+      setMessage('Could not verify saved designs, so no imported images were removed.');
+      return;
+    }
     for (const project of storedProjects) addDesignRefs(project?.design);
 
     const unused = imports.filter((asset) => asset?.id && !referenced.has(asset.id));
