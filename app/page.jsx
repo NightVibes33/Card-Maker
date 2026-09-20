@@ -2451,6 +2451,7 @@ export default function Page() {
   const canvasRef = useRef(null);
   const fullPreviewCanvasRef = useRef(null);
   const uploadRef = useRef(null);
+  const uploadIntentRef = useRef('replace-artwork');
   const layerUploadRef = useRef(null);
   const presetImportRef = useRef(null);
   const loadMoreRef = useRef(null);
@@ -4238,6 +4239,8 @@ export default function Page() {
 
   async function uploadImage(event) {
     const file = event.target.files?.[0];
+    const uploadIntent = uploadIntentRef.current;
+    uploadIntentRef.current = 'replace-artwork';
     event.target.value = '';
     if (!file) return;
     await withImageImportLock(async (isCurrent) => {
@@ -4293,23 +4296,35 @@ export default function Page() {
 
     setImports((current) => [importListItem(asset), ...current.filter((entry) => entry.id !== id)]);
 
-    patch({
-      background: 'idb://imports/' + id,
-      backgroundLabel: asset.name,
-      sourceCrop: null,
-      originalSourceCrop: null,
-      zoom: 1,
-      x: 0,
-      y: 0,
-      rotate: 0,
-      flipX: false,
-      fit: 'cover'
-    });
-    setSelectedElement('artwork');
-    setShowOriginal(false);
-    setStudioTool('crop');
-    setTab('studio');
-    setMessage('Imported image ready to crop');
+    if (uploadIntent === 'new-project') {
+      startFreshWorkingProject(createDefaultProjectDesign({
+        background: 'idb://imports/' + id,
+        backgroundLabel: asset.name,
+        sourceCrop: null,
+        originalSourceCrop: null
+      }), {
+        studioTool: 'crop',
+        statusMessage: 'New project created from ' + asset.name
+      });
+    } else {
+      patch({
+        background: 'idb://imports/' + id,
+        backgroundLabel: asset.name,
+        sourceCrop: null,
+        originalSourceCrop: null,
+        zoom: 1,
+        x: 0,
+        y: 0,
+        rotate: 0,
+        flipX: false,
+        fit: 'cover'
+      });
+      setSelectedElement('artwork');
+      setShowOriginal(false);
+      setStudioTool('crop');
+      setTab('studio');
+      setMessage('Artwork replaced · existing card settings kept');
+    }
     });
   }
 
@@ -6497,7 +6512,15 @@ export default function Page() {
             <div ref={loadMoreRef} className="infiniteSentinel" aria-hidden="true" />
 
             <div className="discoverImportRow">
-              <button type="button" className="secondaryAction uploadAction" disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={() => uploadRef.current?.click()}>
+              <button
+                type="button"
+                className="secondaryAction uploadAction"
+                disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress}
+                onClick={() => {
+                  uploadIntentRef.current = 'new-project';
+                  uploadRef.current?.click();
+                }}
+              >
                 <IOSIcon name="photo" size={21} />
                 <span>Import Photo or File</span>
               </button>
@@ -6615,7 +6638,15 @@ export default function Page() {
                         <span>{design.flipX ? 'Unflip' : 'Flip'}</span>
                       </button>
                     </div>
-                    <button type="button" className="actionRow" disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={() => uploadRef.current?.click()}>
+                    <button
+                      type="button"
+                      className="actionRow"
+                      disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress}
+                      onClick={() => {
+                        uploadIntentRef.current = 'replace-artwork';
+                        uploadRef.current?.click();
+                      }}
+                    >
                       <span><strong>Replace Artwork</strong><small>Photos or Files</small></span>
                       <IOSIcon name="photo" size={19} />
                     </button>
