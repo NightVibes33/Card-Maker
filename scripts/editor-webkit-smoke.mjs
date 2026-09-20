@@ -162,6 +162,7 @@ try {
   assert.equal(await earlyMaskedNumberSwitch.getAttribute('aria-checked'), 'true', 'precondition: Masked Number must be enabled');
 
   await page.getByRole('tab', { name: 'Discover', exact: true }).click();
+  await page.getByRole('button', { name: 'New Arrivals', exact: true }).click();
   const earlyLibrarySkin = page.getByRole('button', { name: 'Use WebKit Library Skin', exact: true }).first();
   await earlyLibrarySkin.waitFor({ state: 'visible', timeout: 15000 });
   await earlyLibrarySkin.click();
@@ -1143,6 +1144,7 @@ try {
   if ((await dirtyMaskedNumber.getAttribute('aria-checked')) === 'false') await dirtyMaskedNumber.click();
 
   await page.getByRole('tab', { name: 'Discover', exact: true }).click();
+  await page.getByRole('button', { name: 'New Arrivals', exact: true }).click();
   const mainLibrarySkin = page.getByRole('button', { name: 'Use WebKit Library Skin', exact: true }).first();
   await mainLibrarySkin.waitFor({ state: 'visible', timeout: 15000 });
   await mainLibrarySkin.click();
