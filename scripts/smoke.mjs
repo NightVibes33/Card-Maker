@@ -33,7 +33,7 @@ async function checkHome() {
     if (!html.includes(text)) throw new Error('Home page missing V2 UI text: ' + text);
   }
 
-  if (/Blitz|Load More|Original ↗|Open the original/i.test(html)) {
+  if (/Blitz|Load More|Original ↗|Open the original|Design Studio/i.test(html)) {
     throw new Error('Home page contains removed or legacy catalog UI');
   }
 
