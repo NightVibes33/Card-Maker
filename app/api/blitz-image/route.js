@@ -50,7 +50,8 @@ async function resolveImage(productUrl) {
       headers: {
         Accept: 'application/json',
         'User-Agent': 'AirCard-Card-Studio/4.3'
-      }
+      },
+      next: { revalidate: 2592000 }
     },
     15000
   );
@@ -106,7 +107,8 @@ export async function GET(request) {
         headers: {
           Accept: 'image/avif,image/webp,image/apng,image/jpeg,image/png,*/*',
           'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 Version/18.6 Mobile/15E148 Safari/604.1'
-        }
+        },
+        next: { revalidate: 2592000 }
       },
       15000
     );
@@ -138,7 +140,9 @@ export async function GET(request) {
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000',
+        'Cache-Control': 'public, max-age=604800',
+        'CDN-Cache-Control': 'public, max-age=2592000, stale-while-revalidate=31536000',
+        'Vercel-CDN-Cache-Control': 'public, max-age=2592000, stale-while-revalidate=31536000',
         'X-Content-Type-Options': 'nosniff'
       }
     });
