@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 const base = process.env.SMOKE_BASE || 'http://127.0.0.1:3000';
 
 async function fetchJsonRetry(url, label, attempts = 4) {
@@ -222,17 +224,43 @@ async function checkBlitzCatalog() {
     throw new Error('Blitz catalog returned invalid item: ' + JSON.stringify(invalid));
   }
 
-  const imageResponse = await fetch(base + first.results[0].image);
-  if (!imageResponse.ok) {
-    throw new Error('Blitz image proxy returned ' + imageResponse.status);
+  const sample = first.results.slice(0, 6);
+  const hashes = [];
+  let type = '';
+
+  for (const item of sample) {
+    const imageResponse = await fetch(base + item.image);
+    if (!imageResponse.ok) {
+      continue;
+    }
+
+    type = imageResponse.headers.get('content-type') || '';
+    const blitzCache =
+      imageResponse.headers.get('cdn-cache-control') ||
+      imageResponse.headers.get('cache-control') ||
+      '';
+    const assetKind = imageResponse.headers.get('x-blitz-asset') || '';
+
+    if (!/2592000|604800/.test(blitzCache)) {
+      throw new Error('Blitz image is not long-lived cached: ' + blitzCache);
+    }
+    if (!type.startsWith('image/')) {
+      throw new Error('Blitz image proxy returned ' + type);
+    }
+    if (assetKind !== 'product-image') {
+      throw new Error('Blitz resolver did not mark product artwork: ' + assetKind);
+    }
+
+    const buffer = Buffer.from(await imageResponse.arrayBuffer());
+    hashes.push(createHash('sha256').update(buffer).digest('hex'));
   }
-  const type = imageResponse.headers.get('content-type') || '';
-  const blitzCache = imageResponse.headers.get('cdn-cache-control') || imageResponse.headers.get('cache-control') || '';
-  if (!/2592000|604800/.test(blitzCache)) {
-    throw new Error('Blitz image is not long-lived cached: ' + blitzCache);
+
+  if (hashes.length < 2) {
+    throw new Error('Blitz resolver returned fewer than 2 usable product images in first 6 cards');
   }
-  if (!type.startsWith('image/')) {
-    throw new Error('Blitz image proxy returned ' + type);
+
+  if (new Set(hashes).size < 2) {
+    throw new Error('Blitz resolver returned identical image bytes for multiple products (likely storefront logo)');
   }
 
   const totalPages = Number(first.totalPages) || Math.ceil(first.total / 24);
@@ -255,7 +283,9 @@ async function checkBlitzCatalog() {
     totalPages,
     'app pages | final page',
     last.results.length,
-    'products | resolved image',
+    'products | distinct resolved product images',
+    new Set(hashes).size,
+    '|',
     type
   );
 }
