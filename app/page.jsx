@@ -5888,8 +5888,15 @@ export default function Page() {
     </section>
   );
 
+  const blockingAssetOperation = cleanupInProgress || presetTransferInProgress;
+
   return (
-    <main className="studio">
+    <>
+      <main
+        className="studio"
+        inert={blockingAssetOperation ? '' : undefined}
+        aria-busy={blockingAssetOperation || undefined}
+      >
       <header className="largeTitleBar">
         <h1>Card Studio</h1>
       </header>
@@ -6844,13 +6851,6 @@ export default function Page() {
         )}
       </div>
 
-      {cleanupInProgress ? (
-        <div className="cleanupShield" role="status" aria-live="assertive" aria-busy="true">
-          <span className="spinner" aria-hidden="true" />
-          <strong>Cleaning unused imports…</strong>
-        </div>
-      ) : null}
-
       <nav className="tabBar" role="tablist" aria-label="Card Studio sections">
         {TAB_ITEMS.map(([value, label]) => (
           <button
@@ -6923,6 +6923,16 @@ export default function Page() {
           <button type="button" className="primaryAction" onClick={dismissInstallHelp}>Got It</button>
         </Modal>
       ) : null}
-    </main>
+      </main>
+
+      {blockingAssetOperation ? (
+        <div className="cleanupShield" role="status" aria-live="assertive" aria-busy="true">
+          <span className="spinner" aria-hidden="true" />
+          <strong>
+            {cleanupInProgress ? 'Cleaning unused imports…' : 'Working with design preset…'}
+          </strong>
+        </div>
+      ) : null}
+    </>
   );
 }
