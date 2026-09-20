@@ -152,6 +152,24 @@ try {
   const imageInputs = page.locator('input[type="file"][accept="image/*"]');
   assert.ok(await imageInputs.count() >= 2, 'background and image-layer file inputs must exist');
 
+  const unsafeSvg = Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><image href="https://example.com/remote.png" width="120" height="80"/></svg>'
+  );
+  await imageInputs.last().setInputFiles({
+    name: 'unsafe-remote.svg',
+    mimeType: 'image/svg+xml',
+    buffer: unsafeSvg
+  });
+  await page.getByText('SVG contains unsupported active or remote content.', { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 10000
+  });
+  assert.equal(
+    await page.getByLabel('Image Width').count(),
+    0,
+    'unsafe SVG must not create an image layer'
+  );
+
   const tinyPng = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mNk+M9QzwAEYBxVSFUAAGMABf4C/WQAAAAASUVORK5CYII=',
     'base64'
