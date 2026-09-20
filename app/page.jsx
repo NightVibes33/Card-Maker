@@ -340,6 +340,30 @@ function SliderRow({ label, value, min, max, step, onChange, suffix = '', disabl
   );
 }
 
+function NumericField({ label, value, min, max, step = 0.001, onChange, suffix = '' }) {
+  return (
+    <label className="numericRow">
+      <span>{label}</span>
+      <div className="numericInputWrap">
+        <input
+          type="number"
+          inputMode="decimal"
+          step={step}
+          min={min}
+          max={max}
+          value={Number(value)}
+          aria-label={label}
+          onChange={(event) => {
+            const next = clamp(Number(event.target.value), Number(min), Number(max));
+            if (Number.isFinite(next)) onChange(next);
+          }}
+        />
+        {suffix ? <small>{suffix}</small> : null}
+      </div>
+    </label>
+  );
+}
+
 function SwitchRow({ label, detail, value, onChange }) {
   return (
     <button
@@ -2208,6 +2232,7 @@ export default function Page() {
         {tab === 'studio' && guidesEnabled ? (
           <div className="cardGuides" aria-hidden="true">
             <i className="guide bleedEdge" />
+            <i className="guide cropBoundary" />
             <i className="guide safeEdge" />
             <i className="guide textSafe" />
             <i className="guide chipZone" />
@@ -2502,6 +2527,15 @@ export default function Page() {
             {studioTool === 'position' ? (
               <>
                 <Group title="POSITION" footer="Tap artwork, chip, contactless, or a custom layer on the card to select it. Drag to move. Two fingers scale and rotate.">
+                  <div className="groupRow segmentedRow">
+                    <div className="segmentedControl compact" role="tablist" aria-label="Artwork fit in Position">
+                      <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
+                      <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
+                    </div>
+                    <button type="button" className="iconTextButton" disabled={!design.background} onClick={() => patch({ flipX: !design.flipX })}>
+                      <span>{design.flipX ? 'Unflip' : 'Flip Horizontal'}</span>
+                    </button>
+                  </div>
                   <button type="button" className={'selectionRow ' + (selectedElement === 'artwork' ? 'selected' : '')} onClick={() => setSelectedElement('artwork')}>Artwork</button>
                   {design.chip ? <button type="button" className={'selectionRow ' + (selectedElement === 'chip' ? 'selected' : '')} onClick={() => setSelectedElement('chip')}>EMV Chip</button> : null}
                   {design.contactless ? <button type="button" className={'selectionRow ' + (selectedElement === 'contactless' ? 'selected' : '')} onClick={() => setSelectedElement('contactless')}>Contactless</button> : null}
@@ -2532,15 +2566,49 @@ export default function Page() {
                     </>
                   ) : null}
 
-                  <SwitchRow label="Alignment Guides" detail="Safe areas, snap lines, chip/contactless zones" value={guidesEnabled} onChange={setGuidesEnabled} />
+                  <SwitchRow label="Alignment Guides" detail="Bleed, rounded crop boundary, safe text, snap lines, chip/contactless zones" value={guidesEnabled} onChange={setGuidesEnabled} />
+                  <button type="button" className="settingsResetButton" disabled={!design.background} onClick={() => patch({ fit: 'cover', zoom: 1, x: 0, y: 0, rotate: 0, flipX: false })}>
+                    Reset Position
+                  </button>
                 </Group>
 
                 {expertMode ? (
-                  <Group title="EXPERT VALUES">
-                    <label className="numericRow"><span>Zoom</span><input type="number" step="0.001" value={design.zoom} onChange={(event) => patch({ zoom: clamp(Number(event.target.value), 0.5, 5) })} /></label>
-                    <label className="numericRow"><span>X</span><input type="number" step="0.001" value={design.x} onChange={(event) => patch({ x: clamp(Number(event.target.value), -1.5, 1.5) })} /></label>
-                    <label className="numericRow"><span>Y</span><input type="number" step="0.001" value={design.y} onChange={(event) => patch({ y: clamp(Number(event.target.value), -1.5, 1.5) })} /></label>
-                    <label className="numericRow"><span>Rotation</span><input type="number" step="0.1" value={design.rotate} onChange={(event) => patch({ rotate: clamp(Number(event.target.value), -180, 180) })} /></label>
+                  <Group title="EXPERT VALUES" footer="Exact numerical access to every global transform, adjustment, effect, and card-hardware parameter.">
+                    <NumericField label="Zoom" value={design.zoom} min={0.5} max={5} onChange={(value) => patch({ zoom: value })} />
+                    <NumericField label="Artwork X" value={design.x} min={-1.5} max={1.5} onChange={(value) => patch({ x: value })} />
+                    <NumericField label="Artwork Y" value={design.y} min={-1.5} max={1.5} onChange={(value) => patch({ y: value })} />
+                    <NumericField label="Artwork Rotation" value={design.rotate} min={-180} max={180} step={0.1} onChange={(value) => patch({ rotate: value })} suffix="°" />
+
+                    <NumericField label="Crop Left" value={design.sourceCrop?.x || 0} min={0} max={0.48} onChange={(value) => updateCropEdge('left', value)} />
+                    <NumericField label="Crop Right" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.x - design.sourceCrop.w) : 0} min={0} max={0.48} onChange={(value) => updateCropEdge('right', value)} />
+                    <NumericField label="Crop Top" value={design.sourceCrop?.y || 0} min={0} max={0.48} onChange={(value) => updateCropEdge('top', value)} />
+                    <NumericField label="Crop Bottom" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.y - design.sourceCrop.h) : 0} min={0} max={0.48} onChange={(value) => updateCropEdge('bottom', value)} />
+
+                    <NumericField label="Exposure" value={design.exposure} min={-1} max={1} onChange={(value) => patch({ exposure: value })} />
+                    <NumericField label="Brightness" value={design.brightness} min={0.4} max={1.7} onChange={(value) => patch({ brightness: value })} />
+                    <NumericField label="Contrast" value={design.contrast} min={0.45} max={1.8} onChange={(value) => patch({ contrast: value })} />
+                    <NumericField label="Saturation" value={design.saturation} min={0} max={2.4} onChange={(value) => patch({ saturation: value })} />
+                    <NumericField label="Highlights" value={design.highlights} min={-1} max={1} onChange={(value) => patch({ highlights: value })} />
+                    <NumericField label="Shadows" value={design.shadows} min={-1} max={1} onChange={(value) => patch({ shadows: value })} />
+                    <NumericField label="Temperature" value={design.temperature} min={-1} max={1} onChange={(value) => patch({ temperature: value })} />
+                    <NumericField label="Tint" value={design.tint} min={-1} max={1} onChange={(value) => patch({ tint: value })} />
+                    <NumericField label="Sharpness" value={design.sharpness} min={-1} max={1} onChange={(value) => patch({ sharpness: value })} />
+                    <NumericField label="Blur" value={design.blur} min={0} max={1} onChange={(value) => patch({ blur: value })} />
+
+                    <NumericField label="Vignette" value={design.vignette} min={0} max={0.8} onChange={(value) => patch({ vignette: value })} />
+                    <NumericField label="Grain" value={design.grain} min={0} max={0.22} onChange={(value) => patch({ grain: value })} />
+                    <NumericField label="Gloss" value={design.gloss} min={0} max={0.8} onChange={(value) => patch({ gloss: value })} />
+                    <NumericField label="Dark Overlay" value={design.overlay} min={0} max={0.75} onChange={(value) => patch({ overlay: value })} />
+                    <NumericField label="Fade" value={design.fade} min={0} max={1} onChange={(value) => patch({ fade: value })} />
+                    <NumericField label="Effect Tint Strength" value={design.effectTintStrength} min={0} max={1} onChange={(value) => patch({ effectTintStrength: value })} />
+
+                    <NumericField label="Chip Scale" value={design.chipScale} min={0.5} max={2} onChange={(value) => patch({ chipScale: value })} />
+                    <NumericField label="Chip X" value={design.chipX} min={0} max={0.82} onChange={(value) => patch({ chipX: value })} />
+                    <NumericField label="Chip Y" value={design.chipY} min={0} max={0.8} onChange={(value) => patch({ chipY: value })} />
+                    <NumericField label="Chip Rotation" value={design.chipRotation} min={-45} max={45} step={0.1} onChange={(value) => patch({ chipRotation: value })} suffix="°" />
+                    <NumericField label="Contactless Scale" value={design.contactlessScale} min={0.4} max={2.2} onChange={(value) => patch({ contactlessScale: value })} />
+                    <NumericField label="Contactless X" value={design.contactlessX} min={0.03} max={0.97} onChange={(value) => patch({ contactlessX: value })} />
+                    <NumericField label="Contactless Y" value={design.contactlessY} min={0.03} max={0.97} onChange={(value) => patch({ contactlessY: value })} />
                   </Group>
                 ) : null}
               </>
