@@ -733,6 +733,29 @@ function inspectSearchImage(img, preferDirectAsset = false) {
 }
 
 async function chooseCleanProductMedia(item) {
+  const inspectUrls = Array.isArray(item.inspectUrls) ? item.inspectUrls.slice(0, 3) : [];
+
+  // CUCU products use server-side, edge-cached pixel analysis. This keeps
+  // Discover thumbnail-only and makes crop/usability metadata reusable across users.
+  for (const inspectUrl of inspectUrls) {
+    try {
+      const response = await fetch(inspectUrl);
+      const meta = await response.json();
+      if (!response.ok || !meta?.usable || !meta?.full || !meta?.thumbnail) continue;
+
+      return {
+        ...item,
+        image: meta.full,
+        thumbnail: meta.thumbnail,
+        visualQuality: 'server-preprocessed',
+        visualScore: Number(meta.quality?.variance || 0),
+        sourceCrop: meta.crop || null,
+        mediaAspectRatio: meta.ratio || item.mediaAspectRatio || null
+      };
+    } catch {}
+  }
+
+  // Compatibility fallback for any non-CUCU provider still used internally.
   const candidates = [...new Set([item.image, ...(item.candidateImages || [])].filter(Boolean))].slice(0, 8);
   const preferDirectAsset = item.assetMode === 'direct-card-art';
   let best = null;
@@ -747,9 +770,6 @@ async function chooseCleanProductMedia(item) {
       }
 
       if (preferDirectAsset && quality.sourceCrop) break;
-
-      // A strong full-bleed candidate is good enough; avoid downloading every
-      // gallery image on mobile when the first useful one is already clean.
       if (quality.score > 17 && quality.edgeNeutralRatio < 0.16) break;
     } catch {}
   }
@@ -1433,7 +1453,7 @@ export default function Page() {
           const json = await response.json();
           if (!response.ok) return;
           const items = Array.isArray(json.results) ? json.results.slice(0, 8) : [];
-          next[label] = items;
+          next[label] = await prepareCleanResults(items, 8);
         } catch {}
       }));
 
@@ -2770,7 +2790,7 @@ export default function Page() {
                       className="actionRow"
                       key={asset.id}
                       onClick={() => {
-                        patch({ background: 'idb://imports/' + asset.id, backgroundLabel: asset.name, sourceCrop: null, zoom: 1, x: 0, y: 0, rotate: 0 });
+                        patch({ background: 'idb://imports/' + asset.id, backgroundLabel: asset.name, sourceCrop: null, originalSourceCrop: null, zoom: 1, x: 0, y: 0, rotate: 0 });
                         setTab('studio');
                         setStudioTool('crop');
                       }}
