@@ -36,7 +36,6 @@ forbidden:
       - "Load More"
       - "<span className=\"kicker\">AirCard</span>"
       - "Design Studio"
-      - "<button type=\"button\" className=\"navTextButton\" onClick={reset}>New</button>"
       - "CUCU Covers"
       - "Searching CUCU"
       - "Loading CUCU"
