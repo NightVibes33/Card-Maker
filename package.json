@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "verify:v2": "node scripts/verify-v2-contract.mjs"
+    "verify:v2": "node scripts/verify-v2-contract.mjs",
+    "verify:editor": "node scripts/verify-editor-contract.mjs"
   },
   "dependencies": {
     "next": "^16.0.0",
