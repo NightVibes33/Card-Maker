@@ -558,9 +558,7 @@ function inspectSearchImage(img, preferDirectAsset = false) {
 
 async function chooseCleanProductMedia(item) {
   const candidates = [...new Set([item.image, ...(item.candidateImages || [])].filter(Boolean))].slice(0, 8);
-  const preferDirectAsset =
-    item.assetMode === 'direct-card-art' ||
-    item.assetMode === 'resolved-product-art';
+  const preferDirectAsset = item.assetMode === 'direct-card-art';
   let best = null;
 
   for (const src of candidates) {
@@ -609,28 +607,16 @@ async function prepareCleanResults(items, maxItems = items.length) {
   return resolved.filter(Boolean);
 }
 
-async function prepareSearchResults(items) {
-  return (await prepareCleanResults(items, 18)).slice(0, 12);
-}
-
 function isPersistableBackground(src = '') {
-  return (
-    src.startsWith('/api/image?') ||
-    src.startsWith('/api/blitz-image?')
-  );
+  return src.startsWith('/api/image?');
 }
 
 export default function Page() {
   const [tab, setTab] = useState('browse');
   const [design, setDesign] = useState(DEFAULTS);
   const [image, setImage] = useState(null);
-  const [kind, setKind] = useState('cucu');
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
   const [recent, setRecent] = useState([]);
-  const [searching, setSearching] = useState(false);
   const [message, setMessage] = useState('Ready');
-  const [source, setSource] = useState('');
   const [cucuCategory, setCucuCategory] = useState('all');
   const [cucuCategoryLabel, setCucuCategoryLabel] = useState('All Card Skins');
   const [cucuItems, setCucuItems] = useState([]);
@@ -638,11 +624,6 @@ export default function Page() {
   const [cucuTotal, setCucuTotal] = useState(2225);
   const [cucuHasMore, setCucuHasMore] = useState(true);
   const [cucuLoading, setCucuLoading] = useState(false);
-  const [blitzItems, setBlitzItems] = useState([]);
-  const [blitzPage, setBlitzPage] = useState(0);
-  const [blitzTotal, setBlitzTotal] = useState(0);
-  const [blitzHasMore, setBlitzHasMore] = useState(true);
-  const [blitzLoading, setBlitzLoading] = useState(false);
   const canvasRef = useRef(null);
   const uploadRef = useRef(null);
   const pointers = useRef(new Map());
@@ -844,66 +825,6 @@ export default function Page() {
     renderCard(canvas.getContext('2d'), OUT_W, OUT_H);
   }, [renderCard]);
 
-  const runSearch = useCallback(async (searchQuery, searchKind, autoPick = false) => {
-    const clean = (searchQuery ?? query).trim();
-    const activeKind = searchKind ?? kind;
-    if (clean.length < 2 || searching) return;
-
-    setSearching(true);
-    setMessage('Searching…');
-    setSource('');
-
-    try {
-      const response = await fetch(
-        '/api/search?q=' + encodeURIComponent(clean) + '&kind=' + encodeURIComponent(activeKind),
-        { cache: 'no-store' }
-      );
-      const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Search failed');
-
-      const rawList = Array.isArray(json.results) ? json.results : [];
-      setSource(json.source || '');
-
-      if (!rawList.length) {
-        setResults([]);
-        setMessage('No premade card skins found');
-        return;
-      }
-
-      setMessage('Checking flat artwork…');
-      const list = await prepareSearchResults(rawList);
-      setResults(list);
-      setMessage(
-        list.length
-          ? list.length + ' clean card skins'
-          : 'No clean flat artwork found for this search'
-      );
-
-      if (autoPick && list[0]) {
-        const first = list[0];
-        patch({
-          background: first.image,
-          backgroundLabel: first.title,
-          sourceCrop: first.sourceCrop || null,
-          // Slight overscan removes tiny storefront edge artifacts and makes
-          // wide artwork sit naturally inside the AirCard aspect ratio.
-          zoom: first.sourceCrop ? 1 : 1.06,
-          x: 0,
-          y: 0,
-          rotate: 0,
-          fit: 'cover'
-        });
-        rememberArtwork(first);
-        setMessage(first.title + ' selected');
-      }
-    } catch (error) {
-      setResults([]);
-      setMessage(error?.message || 'Search failed');
-    } finally {
-      setSearching(false);
-    }
-  }, [kind, patch, query, rememberArtwork, searching]);
-
   const loadCucu = useCallback(async (nextPage = 1, replace = false, category = cucuCategory) => {
     if (cucuLoading) return;
 
@@ -949,58 +870,11 @@ export default function Page() {
     }
   }, [cucuCategory, cucuLoading]);
 
-  const loadBlitz = useCallback(async (nextPage = 1, replace = false) => {
-    if (blitzLoading) return;
-
-    setBlitzLoading(true);
-    setMessage('Loading Blitz Covers…');
-
-    try {
-      const response = await fetch(
-        '/api/blitz?page=' + encodeURIComponent(nextPage) + '&limit=24'
-      );
-      const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Blitz catalog failed');
-
-      const rawList = Array.isArray(json.results) ? json.results : [];
-      setBlitzTotal(Number(json.total) || 0);
-      setBlitzHasMore(Boolean(json.hasMore));
-
-      setMessage('Extracting Blitz card artwork…');
-      const cleanList = await prepareCleanResults(rawList);
-
-      setBlitzItems((current) => {
-        const base = replace ? [] : current;
-        const merged = [...base, ...cleanList];
-        const seen = new Set();
-        return merged.filter((item) => {
-          if (!item?.id || seen.has(item.id)) return false;
-          seen.add(item.id);
-          return true;
-        });
-      });
-
-      setBlitzPage(nextPage);
-      setMessage(
-        cleanList.length
-          ? cleanList.length + ' Blitz card covers loaded'
-          : 'This Blitz page had no usable card-art assets'
-      );
-    } catch (error) {
-      setMessage(error?.message || 'Blitz catalog failed');
-    } finally {
-      setBlitzLoading(false);
-    }
-  }, [blitzLoading]);
-
   useEffect(() => {
-    if (kind === 'cucu' && cucuPage === 0 && !cucuLoading) {
+    if (cucuPage === 0 && !cucuLoading) {
       loadCucu(1, true, cucuCategory);
     }
-    if (kind === 'blitz' && blitzPage === 0 && !blitzLoading) {
-      loadBlitz(1, true);
-    }
-  }, [kind, cucuCategory, cucuPage, cucuLoading, blitzPage, blitzLoading, loadCucu, loadBlitz]);
+  }, [cucuCategory, cucuPage, cucuLoading, loadCucu]);
 
   function useArtwork(item) {
     patch({
@@ -1015,12 +889,6 @@ export default function Page() {
     });
     rememberArtwork(item);
     setMessage(item.title + ' selected · auto-cropped');
-  }
-
-  async function useQuickPick(item) {
-    setKind(item.kind);
-    setQuery(item.query);
-    await runSearch(item.query, item.kind, true);
   }
 
   function uploadImage(event) {
@@ -1130,8 +998,6 @@ export default function Page() {
 
   function reset() {
     setDesign(DEFAULTS);
-    setResults([]);
-    setQuery('');
     setImage(null);
     setMessage('New card');
   }
@@ -1172,94 +1038,61 @@ export default function Page() {
       <div className="screenContent">
         {tab === 'browse' && (
           <div className="tabScreen">
-            <section className="searchSection sourceSection" aria-label="Card skin source">
-              <div className="sourceSegmented" role="tablist" aria-label="Card skin source">
-                {[
-                  ['cucu', 'CUCU'],
-                  ['blitz', 'Blitz']
-                ].map(([value, label]) => (
+            <section className="searchSection sourceSection" aria-label="CUCU card skins">
+              <div className="catalogCategoryIntro">
+                <div>
+                  <strong>CUCU Covers</strong>
+                  <span>
+                    {cucuTotal > 0
+                      ? cucuTotal.toLocaleString() + ' in this collection'
+                      : 'Real storefront collections'}
+                  </span>
+                </div>
+                <p>
+                  Card skins are loaded from CUCU’s real collections and served through Card Studio’s cache.
+                </p>
+              </div>
+            </section>
+
+            <section className="browseSection realCategorySection" aria-label="CUCU card skin collections">
+              <div className="browseHeading">
+                <h2>Collections</h2>
+                <span>CUCU</span>
+              </div>
+              <div className="categoryScroller" role="tablist" aria-label="CUCU collection">
+                {CUCU_CATEGORIES.map(([value, label]) => (
                   <button
                     type="button"
-                    key={value}
                     role="tab"
-                    aria-selected={kind === value}
-                    className={kind === value ? 'selected' : ''}
-                    onClick={() => setKind(value)}
+                    key={value}
+                    aria-selected={cucuCategory === value}
+                    className={cucuCategory === value ? 'categoryChip selected' : 'categoryChip'}
+                    onClick={() => {
+                      if (value === cucuCategory) return;
+                      setCucuCategory(value);
+                      setCucuCategoryLabel(label);
+                      setCucuItems([]);
+                      setCucuPage(0);
+                      setCucuTotal(0);
+                      setCucuHasMore(true);
+                    }}
                   >
                     {label}
                   </button>
                 ))}
               </div>
-
-              <div className="catalogCategoryIntro">
-                <div>
-                  <strong>{kind === 'cucu' ? 'CUCU Covers' : 'Blitz Covers'}</strong>
-                  <span>
-                    {kind === 'cucu'
-                      ? (cucuTotal > 0 ? cucuTotal.toLocaleString() + ' in this collection' : 'Real storefront collections')
-                      : (blitzTotal > 0 ? blitzTotal.toLocaleString() + ' indexed full-card skins' : 'Indexed full-card skins')}
-                  </span>
-                </div>
-                <p>
-                  Images are served through Card Studio’s cache. Selecting a design stays inside the app.
-                </p>
-              </div>
             </section>
 
-            {kind === 'cucu' ? (
-              <>
-                <section className="browseSection realCategorySection" aria-label="CUCU card skin collections">
-                  <div className="browseHeading">
-                    <h2>Collections</h2>
-                    <span>CUCU</span>
-                  </div>
-                  <div className="categoryScroller" role="tablist" aria-label="CUCU collection">
-                    {CUCU_CATEGORIES.map(([value, label]) => (
-                      <button
-                        type="button"
-                        role="tab"
-                        key={value}
-                        aria-selected={cucuCategory === value}
-                        className={cucuCategory === value ? 'categoryChip selected' : 'categoryChip'}
-                        onClick={() => {
-                          if (value === cucuCategory) return;
-                          setCucuCategory(value);
-                          setCucuCategoryLabel(label);
-                          setCucuItems([]);
-                          setCucuPage(0);
-                          setCucuTotal(0);
-                          setCucuHasMore(true);
-                        }}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                <StoreCatalog
-                  storeName="CUCU Covers"
-                  categoryLabel={cucuCategoryLabel}
-                  items={cucuItems}
-                  total={cucuTotal}
-                  loading={cucuLoading}
-                  hasMore={cucuHasMore}
-                  onPick={useArtwork}
-                  onLoadMore={() => loadCucu(cucuPage + 1, false, cucuCategory)}
-                />
-              </>
-            ) : (
-              <StoreCatalog
-                storeName="Blitz Covers"
-                categoryLabel="Full Card Skins"
-                items={blitzItems}
-                total={blitzTotal}
-                loading={blitzLoading}
-                hasMore={blitzHasMore}
-                onPick={useArtwork}
-                onLoadMore={() => loadBlitz(blitzPage + 1)}
-              />
-            )}
+            <StoreCatalog
+              storeName="CUCU Covers"
+              categoryLabel={cucuCategoryLabel}
+              items={cucuItems}
+              total={cucuTotal}
+              loading={cucuLoading}
+              hasMore={cucuHasMore}
+              onPick={useArtwork}
+              onLoadMore={() => loadCucu(cucuPage + 1, false, cucuCategory)}
+            />
 
             <ArtworkRail title="Recent" items={recent} onPick={useArtwork} />
 
@@ -1430,7 +1263,7 @@ export default function Page() {
               </button>
             </Group>
 
-            <p className="legalNote">Artwork rights remain with their respective owners. Search results come from premade card-skin storefront listings and are visually screened in-app for obvious mockup backgrounds before use.</p>
+            <p className="legalNote">Artwork rights remain with their respective owners. CUCU card-skin media is screened in-app for usable card artwork before export.</p>
           </div>
         )}
       </div>
