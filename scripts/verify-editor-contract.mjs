@@ -138,6 +138,11 @@ const touchChecks = [
 for (const [pattern, label] of touchChecks) {
   requireMatch(css, pattern, label + ' keep a 44px minimum touch height');
 }
+requireMatch(
+  css,
+  /\.physicalChipReflection\{[^}]*transform:rotate\(var\(--chip-rotation,0deg\)\)/s,
+  'physical chip reflection keeps its rotation when motion animation is disabled'
+);
 
 requireMatch(sw, /\[ART_CACHE\]:\s*40/, 'full artwork cache is bounded');
 requireMatch(sw, /\[THUMB_CACHE\]:\s*160/, 'thumbnail cache is bounded separately');
