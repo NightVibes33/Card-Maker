@@ -1797,6 +1797,7 @@ export default function Page() {
   const [projects, setProjects] = useState([]);
   const [projectName, setProjectName] = useState('');
   const [imports, setImports] = useState([]);
+  const [cleanupInProgress, setCleanupInProgress] = useState(false);
   const [exportHistory, setExportHistory] = useState([]);
   const [expertMode, setExpertMode] = useState(false);
   const [guidesEnabled, setGuidesEnabled] = useState(true);
@@ -3742,60 +3743,67 @@ export default function Page() {
   }
 
   async function cleanupUnusedImports() {
-    const referenced = new Set();
+    if (cleanupInProgress) return;
+    setCleanupInProgress(true);
 
-    const addDesignRefs = (value) => {
-      if (!value || typeof value !== 'object') return;
-      if (value.background?.startsWith('idb://imports/')) {
-        referenced.add(value.background.slice('idb://imports/'.length));
-      }
-      for (const layer of value.customLayers || []) {
-        if (layer?.src?.startsWith('idb://imports/')) {
-          referenced.add(layer.src.slice('idb://imports/'.length));
-        }
-      }
-    };
-
-    addDesignRefs(designRef.current);
-    for (const snapshot of undoRef.current) addDesignRefs(snapshot);
-    for (const snapshot of redoRef.current) addDesignRefs(snapshot);
-
-    let storedProjects;
     try {
-      storedProjects = await dbGetAll('projects');
-    } catch {
-      setMessage('Could not verify saved designs, so no imported images were removed.');
-      return;
-    }
-    for (const project of storedProjects) addDesignRefs(project?.design);
-
-    const unused = imports.filter((asset) => asset?.id && !referenced.has(asset.id));
-    if (!unused.length) {
-      setMessage('No unused imported images to clean up');
-      return;
-    }
-
-    if (!window.confirm(
-      'Permanently remove ' + unused.length + ' unused imported image' +
-      (unused.length === 1 ? '' : 's') + '?'
-    )) return;
-
-    const failed = [];
-    await Promise.all(unused.map(async (asset) => {
+      const referenced = new Set();
+  
+      const addDesignRefs = (value) => {
+        if (!value || typeof value !== 'object') return;
+        if (value.background?.startsWith('idb://imports/')) {
+          referenced.add(value.background.slice('idb://imports/'.length));
+        }
+        for (const layer of value.customLayers || []) {
+          if (layer?.src?.startsWith('idb://imports/')) {
+            referenced.add(layer.src.slice('idb://imports/'.length));
+          }
+        }
+      };
+  
+      addDesignRefs(designRef.current);
+      for (const snapshot of undoRef.current) addDesignRefs(snapshot);
+      for (const snapshot of redoRef.current) addDesignRefs(snapshot);
+  
+      let storedProjects;
       try {
-        await dbDelete('imports', asset.id);
+        storedProjects = await dbGetAll('projects');
       } catch {
-        failed.push(asset.id);
+        setMessage('Could not verify saved designs, so no imported images were removed.');
+        return;
       }
-    }));
-
-    const removed = new Set(unused.map((asset) => asset.id).filter((id) => !failed.includes(id)));
-    setImports((current) => current.filter((asset) => !removed.has(asset.id)));
-    setMessage(
-      failed.length
-        ? 'Removed ' + removed.size + ' unused imports; ' + failed.length + ' could not be removed'
-        : 'Removed ' + removed.size + ' unused imported image' + (removed.size === 1 ? '' : 's')
-    );
+      for (const project of storedProjects) addDesignRefs(project?.design);
+  
+      const unused = imports.filter((asset) => asset?.id && !referenced.has(asset.id));
+      if (!unused.length) {
+        setMessage('No unused imported images to clean up');
+        return;
+      }
+  
+      if (!window.confirm(
+        'Permanently remove ' + unused.length + ' unused imported image' +
+        (unused.length === 1 ? '' : 's') + '?'
+      )) return;
+  
+      const failed = [];
+      await Promise.all(unused.map(async (asset) => {
+        try {
+          await dbDelete('imports', asset.id);
+        } catch {
+          failed.push(asset.id);
+        }
+      }));
+  
+      const removed = new Set(unused.map((asset) => asset.id).filter((id) => !failed.includes(id)));
+      setImports((current) => current.filter((asset) => !removed.has(asset.id)));
+      setMessage(
+        failed.length
+          ? 'Removed ' + removed.size + ' unused imports; ' + failed.length + ' could not be removed'
+          : 'Removed ' + removed.size + ' unused imported image' + (removed.size === 1 ? '' : 's')
+      );
+    } finally {
+      setCleanupInProgress(false);
+    }
   }
 
   async function serializePreset() {
@@ -5435,6 +5443,7 @@ export default function Page() {
                       type="button"
                       className="actionRow"
                       key={asset.id}
+                      disabled={cleanupInProgress}
                       onClick={() => {
                         patch({
                           background: 'idb://imports/' + asset.id,
@@ -5481,8 +5490,8 @@ export default function Page() {
                 <span><strong>Install Card Studio</strong><small>Add the PWA to your iPhone Home Screen</small></span>
                 <IOSIcon name="chevron" size={17} />
               </button>
-              <button type="button" className="actionRow" onClick={cleanupUnusedImports}>
-                <span><strong>Clean Unused Imports</strong><small>Remove imported image blobs not used by this card or saved projects</small></span>
+              <button type="button" className="actionRow" disabled={cleanupInProgress} onClick={cleanupUnusedImports}>
+                <span><strong>{cleanupInProgress ? 'Cleaning Imports…' : 'Clean Unused Imports'}</strong><small>Remove imported image blobs not used by this card or saved projects</small></span>
                 <IOSIcon name="trash" size={17} />
               </button>
             </Group>
