@@ -1325,7 +1325,9 @@ async function prepareLocalImageBlob(blob) {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
 
-  const outputType = blob.type === 'image/png' ? 'image/png' : 'image/jpeg';
+  const outputType = /^image\/(?:jpe?g|heic|heif)$/i.test(blob.type || '')
+    ? 'image/jpeg'
+    : 'image/png';
   const optimizedBlob = await new Promise((resolve, reject) => {
     canvas.toBlob(
       (result) => result ? resolve(result) : reject(new Error('Image optimization failed')),
