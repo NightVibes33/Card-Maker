@@ -782,6 +782,10 @@ button:disabled{opacity:.38}
     flex:1 1 100%;
     width:100%;
   }
+  .studioModeRow{
+    position:relative;
+    top:auto;
+  }
   .studioToolBar button{
     padding:0 2px;
     font-size:10px;
