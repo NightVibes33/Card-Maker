@@ -235,18 +235,114 @@ function hexToRgb(hex = '#000000') {
   return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
 }
 
+function measureTrackedText(ctx, text, tracking = 0) {
+  const chars = Array.from(String(text || ''));
+  if (!chars.length) return 0;
+  return chars.reduce((width, char) => width + ctx.measureText(char).width, 0) +
+    Math.max(0, chars.length - 1) * Number(tracking || 0);
+}
+
 function drawTrackedText(ctx, text, x, y, tracking = 0) {
-  const chars = String(text || '').split('');
+  const chars = Array.from(String(text || ''));
   if (!tracking || chars.length < 2) {
     ctx.fillText(chars.join(''), x, y);
     return;
   }
 
+  const originalAlign = ctx.textAlign || 'start';
+  const totalWidth = measureTrackedText(ctx, chars.join(''), tracking);
   let cursor = x;
+  if (originalAlign === 'center') cursor -= totalWidth / 2;
+  else if (originalAlign === 'right' || originalAlign === 'end') cursor -= totalWidth;
+
+  ctx.save();
+  ctx.textAlign = 'left';
   for (const char of chars) {
     ctx.fillText(char, cursor, y);
     cursor += ctx.measureText(char).width + tracking;
   }
+  ctx.restore();
+}
+
+function customLayerBounds(layer, layerImage) {
+  if (!layer) return { left: -40, top: -40, right: 40, bottom: 40 };
+
+  if (layer.type === 'shape') {
+    const w = clamp(Number(layer.width ?? 280), 20, 1200);
+    const h = clamp(Number(layer.height ?? 120), 20, 800);
+    return { left: -w / 2, top: -h / 2, right: w / 2, bottom: h / 2 };
+  }
+
+  if (layer.type === 'image') {
+    const w = clamp(Number(layer.width ?? 640), 20, 1800);
+    let ratio = 1.6;
+    if (layerImage?.width && layerImage?.height) {
+      const crop = layer.crop;
+      const sw = crop ? clamp(crop.w, 0.01, 1) * layerImage.width : layerImage.width;
+      const sh = crop ? clamp(crop.h, 0.01, 1) * layerImage.height : layerImage.height;
+      ratio = sw / Math.max(1, sh);
+    }
+    const h = w / Math.max(0.1, ratio);
+    return { left: -w / 2, top: -h / 2, right: w / 2, bottom: h / 2 };
+  }
+
+  if (layer.type === 'chip') return { left: -127.5, top: -94, right: 127.5, bottom: 94 };
+  if (layer.type === 'contactless') return { left: -92, top: -92, right: 92, bottom: 92 };
+
+  const size = clamp(Number(layer.fontSize ?? 58), 10, 240);
+  const tracking = Number(layer.letterSpacing ?? 0);
+  const chars = Array.from(String(layer.text || 'Text'));
+  const estimatedWidth = Math.max(
+    size * 0.5,
+    chars.reduce(
+      (width, char) => width + size * (char === ' ' ? 0.34 : /[ilI1|]/.test(char) ? 0.3 : /[MW@#]/.test(char) ? 0.82 : 0.58),
+      0
+    ) + Math.max(0, chars.length - 1) * tracking
+  );
+  const align = layer.align || 'center';
+  const left = align === 'left' ? 0 : align === 'right' ? -estimatedWidth : -estimatedWidth / 2;
+  return { left, top: -size * 0.9, right: left + estimatedWidth, bottom: size * 0.28 };
+}
+
+function pointInRotatedBounds(px, py, cx, cy, rotation, scale, bounds, padding = 0) {
+  const radians = (Number(rotation || 0) * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const dx = px - cx;
+  const dy = py - cy;
+  const safeScale = Math.max(0.0001, Number(scale || 1));
+  const localX = (dx * cos + dy * sin) / safeScale;
+  const localY = (-dx * sin + dy * cos) / safeScale;
+  return (
+    localX >= bounds.left - padding &&
+    localX <= bounds.right + padding &&
+    localY >= bounds.top - padding &&
+    localY <= bounds.bottom + padding
+  );
+}
+
+function customLayerSelectionStyle(layer, layerImage) {
+  const bounds = customLayerBounds(layer, layerImage);
+  const scale = clamp(Number(layer?.scale ?? 1), 0.1, 6);
+  const rotation = Number(layer?.rotation || 0);
+  const radians = (rotation * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const centerLocalX = ((bounds.left + bounds.right) / 2) * scale;
+  const centerLocalY = ((bounds.top + bounds.bottom) / 2) * scale;
+  const originX = Number(layer?.x ?? 0.5) * OUT_W;
+  const originY = Number(layer?.y ?? 0.5) * OUT_H;
+  const centerX = originX + centerLocalX * cos - centerLocalY * sin;
+  const centerY = originY + centerLocalX * sin + centerLocalY * cos;
+  const width = Math.max(18, (bounds.right - bounds.left) * scale);
+  const height = Math.max(18, (bounds.bottom - bounds.top) * scale);
+  return {
+    left: (centerX / OUT_W) * 100 + '%',
+    top: (centerY / OUT_H) * 100 + '%',
+    width: (width / OUT_W) * 100 + '%',
+    height: (height / OUT_H) * 100 + '%',
+    transform: 'translate(-50%, -50%) rotate(' + rotation + 'deg)'
+  };
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -482,6 +578,27 @@ function SliderRow({ label, value, min, max, step, onChange, suffix = '', disabl
 }
 
 function NumericField({ label, value, min, max, step = 0.001, onChange, suffix = '' }) {
+  const [draft, setDraft] = useState(String(Number(value)));
+
+  useEffect(() => {
+    setDraft(String(Number(value)));
+  }, [value]);
+
+  const commit = () => {
+    if (draft.trim() === '') {
+      setDraft(String(Number(value)));
+      return;
+    }
+    const parsed = Number(draft);
+    if (!Number.isFinite(parsed)) {
+      setDraft(String(Number(value)));
+      return;
+    }
+    const next = clamp(parsed, Number(min), Number(max));
+    setDraft(String(next));
+    onChange(next);
+  };
+
   return (
     <label className="numericRow">
       <span>{label}</span>
@@ -492,11 +609,16 @@ function NumericField({ label, value, min, max, step = 0.001, onChange, suffix =
           step={step}
           min={min}
           max={max}
-          value={Number(value)}
+          value={draft}
           aria-label={label}
-          onChange={(event) => {
-            const next = clamp(Number(event.target.value), Number(min), Number(max));
-            if (Number.isFinite(next)) onChange(next);
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') event.currentTarget.blur();
+            else if (event.key === 'Escape') {
+              setDraft(String(Number(value)));
+              event.currentTarget.blur();
+            }
           }}
         />
         {suffix ? <small>{suffix}</small> : null}
@@ -1024,6 +1146,9 @@ export default function Page() {
   const undoRef = useRef([]);
   const redoRef = useRef([]);
   const applyingHistory = useRef(false);
+  const gestureTarget = useRef('artwork');
+  const gestureStartDesign = useRef(null);
+  const gestureHistoryRecorded = useRef(false);
 
   const gradient = useMemo(
     () => GRADIENTS.find((item) => item.id === design.gradient) || GRADIENTS[0],
@@ -1523,7 +1648,7 @@ export default function Page() {
           ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
           ctx.fill();
         } else {
-          roundRect(ctx, -w / 2, -h / 2, w, h, clamp(Number(layer.radius || 26), 0, 120));
+          roundRect(ctx, -w / 2, -h / 2, w, h, clamp(Number(layer.radius ?? 26), 0, Math.min(w, h) / 2));
           ctx.fill();
         }
       } else if (layer.type === 'image') {
@@ -2130,8 +2255,8 @@ export default function Page() {
         ...source,
         id: makeId('layer'),
         name: (source.name || source.type) + ' Copy',
-        x: clamp(Number(source.x || 0.5) + 0.03, 0, 1),
-        y: clamp(Number(source.y || 0.5) + 0.03, 0, 1)
+        x: clamp(Number(source.x ?? 0.5) + 0.03, 0, 1),
+        y: clamp(Number(source.y ?? 0.5) + 0.03, 0, 1)
       };
       const order = normalizeLayerOrder(current);
       const sourceIndex = order.indexOf(id);
