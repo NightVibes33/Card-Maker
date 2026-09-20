@@ -98,7 +98,16 @@ async function networkFirst(request, cacheName) {
 
   try {
     const response = await fetch(request, { cache: 'no-store' });
-    if (response.ok) cacheResponse(cacheName, request, response).catch(() => {});
+    if (response.ok) {
+      cacheResponse(cacheName, request, response).catch(() => {});
+      return response;
+    }
+
+    if (response.status >= 500) {
+      const hit = await cache.match(request);
+      if (hit) return hit;
+    }
+
     return response;
   } catch {
     const hit = await cache.match(request);
