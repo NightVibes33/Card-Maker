@@ -156,7 +156,7 @@ if (/for \(let i = 0; i < (?:3600|900); i \+= 1\)/.test(page)) {
 }
 
 requireMatch(css, /scroll-padding-bottom:calc\(88px \+ var\(--safe-bottom\)\)/, 'focused controls stay clear of the fixed bottom tab bar');
-requireMatch(css, /scroll-padding-top:calc\(var\(--safe-top\) \+ 390px\)/, 'focused controls stay clear of the sticky editor preview');
+requireMatch(css, /#panel-studio input,[\s\S]{0,160}scroll-margin-top:calc\(var\(--safe-top\) \+ 170px \+ min\(63vw,315px\)\)/, 'Studio controls stay clear of the sticky editor preview');
 
 const touchChecks = [
   [/\.studioToolBar button\{[^}]*min-height:44px/s, 'Studio tool buttons'],
