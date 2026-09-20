@@ -1,13 +1,30 @@
 const base = process.env.SMOKE_BASE || 'http://127.0.0.1:3000';
 
-async function check(query, titlePattern) {
-  const response = await fetch(base + '/api/search?q=' + encodeURIComponent(query) + '&kind=anime');
-  if (!response.ok) throw new Error(query + ' search returned ' + response.status);
+async function fetchSearch(query) {
+  let last = null;
 
-  const json = await response.json();
-  if (!Array.isArray(json.results) || json.results.length < 1) {
-    throw new Error(query + ' returned no premade card skins');
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const response = await fetch(base + '/api/search?q=' + encodeURIComponent(query) + '&kind=anime');
+    const json = await response.json().catch(() => ({}));
+    last = { response, json };
+
+    if (response.ok && Array.isArray(json.results) && json.results.length > 0) {
+      return json;
+    }
+
+    if (attempt < 3) {
+      await new Promise((resolve) => setTimeout(resolve, 700 * attempt));
+    }
   }
+
+  if (!last?.response?.ok) {
+    throw new Error(query + ' search returned ' + (last?.response?.status || 'unknown status'));
+  }
+  throw new Error(query + ' returned no premade card skins after 3 attempts');
+}
+
+async function check(query, titlePattern) {
+  const json = await fetchSearch(query);
 
   if (json.policy?.postersAllowed !== false) {
     throw new Error(query + ' did not enforce poster rejection');
