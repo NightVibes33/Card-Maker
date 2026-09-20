@@ -1982,6 +1982,9 @@ export default function Page() {
 
   const renderCard = useCallback((ctx, width, height, options = {}) => {
     if (!ctx) return;
+    const renderDesign = options.design || design;
+    const renderGradient =
+      GRADIENTS.find((item) => item.id === renderDesign.gradient) || GRADIENTS[0];
     const originalTarget = options.originalTarget || (options.original ? 'all' : null);
     const artworkOriginal = originalTarget === 'all' || originalTarget === 'artwork';
     ctx.save();
@@ -1989,14 +1992,14 @@ export default function Page() {
     ctx.scale(width / OUT_W, height / OUT_H);
 
     const base = ctx.createLinearGradient(0, 0, OUT_W, OUT_H);
-    base.addColorStop(0, gradient.a);
-    base.addColorStop(0.5, gradient.b);
-    base.addColorStop(1, gradient.c);
+    base.addColorStop(0, renderGradient.a);
+    base.addColorStop(0.5, renderGradient.b);
+    base.addColorStop(1, renderGradient.c);
     ctx.fillStyle = base;
     ctx.fillRect(0, 0, OUT_W, OUT_H);
 
-    if (image && loadedBackgroundKey === design.background) {
-      const crop = design.sourceCrop;
+    if (image && loadedBackgroundKey === renderDesign.background) {
+      const crop = renderDesign.sourceCrop;
       const sx = crop ? clamp(crop.x, 0, 1) * image.width : 0;
       const sy = crop ? clamp(crop.y, 0, 1) * image.height : 0;
       const sw = crop ? clamp(crop.w, 0.01, 1) * image.width : image.width;
@@ -2005,7 +2008,7 @@ export default function Page() {
       let iw;
       let ih;
 
-      if ((design.fit === 'cover' && ratio > CARD_RATIO) || (design.fit === 'contain' && ratio < CARD_RATIO)) {
+      if ((renderDesign.fit === 'cover' && ratio > CARD_RATIO) || (renderDesign.fit === 'contain' && ratio < CARD_RATIO)) {
         ih = OUT_H;
         iw = ih * ratio;
       } else {
@@ -2013,26 +2016,26 @@ export default function Page() {
         ih = iw / ratio;
       }
 
-      iw *= design.zoom;
-      ih *= design.zoom;
+      iw *= renderDesign.zoom;
+      ih *= renderDesign.zoom;
 
-      const x = (OUT_W - iw) / 2 + design.x * OUT_W;
-      const y = (OUT_H - ih) / 2 + design.y * OUT_H;
-      const exposureFactor = artworkOriginal ? 1 : Math.pow(2, Number(design.exposure || 0));
-      const brightness = artworkOriginal ? 1 : clamp(design.brightness * exposureFactor, 0.2, 3);
-      const saturation = artworkOriginal ? 1 : clamp(design.saturation, 0, 3);
-      const sharpBoost = artworkOriginal ? 0 : Math.max(0, Number(design.sharpness || 0));
+      const x = (OUT_W - iw) / 2 + renderDesign.x * OUT_W;
+      const y = (OUT_H - ih) / 2 + renderDesign.y * OUT_H;
+      const exposureFactor = artworkOriginal ? 1 : Math.pow(2, Number(renderDesign.exposure || 0));
+      const brightness = artworkOriginal ? 1 : clamp(renderDesign.brightness * exposureFactor, 0.2, 3);
+      const saturation = artworkOriginal ? 1 : clamp(renderDesign.saturation, 0, 3);
+      const sharpBoost = artworkOriginal ? 0 : Math.max(0, Number(renderDesign.sharpness || 0));
       const contrast = artworkOriginal
         ? 1
-        : clamp(design.contrast + sharpBoost * 0.22, 0.3, 2.5);
+        : clamp(renderDesign.contrast + sharpBoost * 0.22, 0.3, 2.5);
       const blur = artworkOriginal
         ? 0
-        : Math.max(0, design.blur + Math.max(0, -Number(design.sharpness || 0)) * 0.09);
+        : Math.max(0, renderDesign.blur + Math.max(0, -Number(renderDesign.sharpness || 0)) * 0.09);
 
       ctx.save();
       ctx.translate(x + iw / 2, y + ih / 2);
-      ctx.rotate((design.rotate * Math.PI) / 180);
-      ctx.scale(design.flipX ? -1 : 1, 1);
+      ctx.rotate((renderDesign.rotate * Math.PI) / 180);
+      ctx.scale(renderDesign.flipX ? -1 : 1, 1);
       ctx.filter =
         'brightness(' + brightness + ')' +
         ' saturate(' + saturation + ')' +
@@ -2043,7 +2046,7 @@ export default function Page() {
       ctx.filter = 'none';
 
       if (!artworkOriginal) {
-        const shadows = Number(design.shadows || 0);
+        const shadows = Number(renderDesign.shadows || 0);
         if (shadows !== 0) {
           ctx.save();
           ctx.globalCompositeOperation = shadows > 0 ? 'screen' : 'multiply';
@@ -2053,7 +2056,7 @@ export default function Page() {
           ctx.restore();
         }
 
-        const highlights = Number(design.highlights || 0);
+        const highlights = Number(renderDesign.highlights || 0);
         if (highlights !== 0) {
           ctx.save();
           ctx.globalCompositeOperation = highlights > 0 ? 'screen' : 'multiply';
@@ -2063,7 +2066,7 @@ export default function Page() {
           ctx.restore();
         }
 
-        const temperature = Number(design.temperature || 0);
+        const temperature = Number(renderDesign.temperature || 0);
         if (temperature !== 0) {
           ctx.save();
           ctx.globalCompositeOperation = 'soft-light';
@@ -2073,7 +2076,7 @@ export default function Page() {
           ctx.restore();
         }
 
-        const tint = Number(design.tint || 0);
+        const tint = Number(renderDesign.tint || 0);
         if (tint !== 0) {
           ctx.save();
           ctx.globalCompositeOperation = 'soft-light';
@@ -2085,16 +2088,16 @@ export default function Page() {
       }
     }
 
-    if (!artworkOriginal && design.overlay > 0) {
+    if (!artworkOriginal && renderDesign.overlay > 0) {
       const overlay = ctx.createLinearGradient(0, 0, OUT_W, OUT_H);
-      overlay.addColorStop(0, 'rgba(0,0,0,' + design.overlay * 0.55 + ')');
+      overlay.addColorStop(0, 'rgba(0,0,0,' + renderDesign.overlay * 0.55 + ')');
       overlay.addColorStop(0.55, 'rgba(0,0,0,0)');
-      overlay.addColorStop(1, 'rgba(0,0,0,' + design.overlay + ')');
+      overlay.addColorStop(1, 'rgba(0,0,0,' + renderDesign.overlay + ')');
       ctx.fillStyle = overlay;
       ctx.fillRect(0, 0, OUT_W, OUT_H);
     }
 
-    if (!artworkOriginal && design.vignette > 0) {
+    if (!artworkOriginal && renderDesign.vignette > 0) {
       const vignette = ctx.createRadialGradient(
         OUT_W / 2,
         OUT_H / 2,
@@ -2104,22 +2107,22 @@ export default function Page() {
         OUT_W * 0.72
       );
       vignette.addColorStop(0, 'rgba(0,0,0,0)');
-      vignette.addColorStop(1, 'rgba(0,0,0,' + design.vignette + ')');
+      vignette.addColorStop(1, 'rgba(0,0,0,' + renderDesign.vignette + ')');
       ctx.fillStyle = vignette;
       ctx.fillRect(0, 0, OUT_W, OUT_H);
     }
 
-    if (!artworkOriginal && design.gloss > 0) {
+    if (!artworkOriginal && renderDesign.gloss > 0) {
       const gloss = ctx.createLinearGradient(0, 0, OUT_W, OUT_H);
-      gloss.addColorStop(0, 'rgba(255,255,255,' + design.gloss * 0.42 + ')');
-      gloss.addColorStop(0.22, 'rgba(255,255,255,' + design.gloss * 0.08 + ')');
+      gloss.addColorStop(0, 'rgba(255,255,255,' + renderDesign.gloss * 0.42 + ')');
+      gloss.addColorStop(0.22, 'rgba(255,255,255,' + renderDesign.gloss * 0.08 + ')');
       gloss.addColorStop(0.5, 'rgba(255,255,255,0)');
       ctx.fillStyle = gloss;
       ctx.fillRect(0, 0, OUT_W, OUT_H);
     }
 
-    if (!artworkOriginal && design.grain > 0) {
-      ctx.globalAlpha = design.grain;
+    if (!artworkOriginal && renderDesign.grain > 0) {
+      ctx.globalAlpha = renderDesign.grain;
       for (let i = 0; i < 3600; i += 1) {
         ctx.fillStyle = i % 3 ? '#000' : '#fff';
         ctx.fillRect((i * 331) % OUT_W, (i * 197) % OUT_H, 2, 2);
@@ -2127,65 +2130,65 @@ export default function Page() {
       ctx.globalAlpha = 1;
     }
 
-    if (!artworkOriginal && design.fade > 0) {
+    if (!artworkOriginal && renderDesign.fade > 0) {
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
-      ctx.globalAlpha = clamp(design.fade, 0, 1) * 0.34;
+      ctx.globalAlpha = clamp(renderDesign.fade, 0, 1) * 0.34;
       ctx.fillStyle = '#f6efe6';
       ctx.fillRect(0, 0, OUT_W, OUT_H);
       ctx.restore();
     }
 
-    if (!artworkOriginal && design.effectTintStrength > 0) {
-      const [r, g, b] = hexToRgb(design.effectTint);
+    if (!artworkOriginal && renderDesign.effectTintStrength > 0) {
+      const [r, g, b] = hexToRgb(renderDesign.effectTint);
       ctx.save();
       ctx.globalCompositeOperation = 'soft-light';
-      ctx.globalAlpha = clamp(design.effectTintStrength, 0, 1) * 0.52;
+      ctx.globalAlpha = clamp(renderDesign.effectTintStrength, 0, 1) * 0.52;
       ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
       ctx.fillRect(0, 0, OUT_W, OUT_H);
       ctx.restore();
     }
 
-    const customLayerMap = new Map((design.customLayers || []).map((layer) => [layer.id, layer]));
-    const stackOrder = normalizeLayerOrder(design);
+    const customLayerMap = new Map((renderDesign.customLayers || []).map((layer) => [layer.id, layer]));
+    const stackOrder = normalizeLayerOrder(renderDesign);
 
     const drawBuiltinText = () => {
       ctx.save();
-      ctx.fillStyle = design.textColor;
-      ctx.shadowColor = design.shadow ? 'rgba(0,0,0,.55)' : 'transparent';
-      ctx.shadowBlur = design.shadow ? 16 : 0;
+      ctx.fillStyle = renderDesign.textColor;
+      ctx.shadowColor = renderDesign.shadow ? 'rgba(0,0,0,.55)' : 'transparent';
+      ctx.shadowBlur = renderDesign.shadow ? 16 : 0;
 
-      if (design.badge) {
+      if (renderDesign.badge) {
         ctx.textAlign = 'right';
         ctx.font = '800 66px -apple-system, BlinkMacSystemFont, sans-serif';
-        ctx.fillText(design.badgeText ?? 'CARD', OUT_W - 105, 130);
+        ctx.fillText(renderDesign.badgeText ?? 'CARD', OUT_W - 105, 130);
       }
-      if (design.number) {
+      if (renderDesign.number) {
         ctx.textAlign = 'left';
         ctx.font = '600 64px ui-monospace, SFMono-Regular, Menlo, monospace';
-        ctx.fillText(design.numberText, 120, 700);
+        ctx.fillText(renderDesign.numberText, 120, 700);
       }
 
       ctx.font = '650 34px -apple-system, BlinkMacSystemFont, sans-serif';
-      if (design.holder) {
+      if (renderDesign.holder) {
         ctx.textAlign = 'left';
-        ctx.fillText(design.holderText, 122, 815);
+        ctx.fillText(renderDesign.holderText, 122, 815);
       }
-      if (design.expiry) {
+      if (renderDesign.expiry) {
         ctx.textAlign = 'right';
-        ctx.fillText(design.expiryText, OUT_W - 122, 815);
+        ctx.fillText(renderDesign.expiryText, OUT_W - 122, 815);
       }
       ctx.restore();
     };
 
     for (const stackId of stackOrder) {
       if (stackId === 'builtin-chip') {
-        if (design.chip) drawChip(ctx, design);
+        if (renderDesign.chip) drawChip(ctx, renderDesign);
         continue;
       }
 
       if (stackId === 'builtin-contactless') {
-        if (design.contactless) drawContactless(ctx, design);
+        if (renderDesign.contactless) drawContactless(ctx, renderDesign);
         continue;
       }
 
@@ -3570,7 +3573,10 @@ export default function Page() {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
-    renderCard(canvas.getContext('2d'), width, height, { original: false });
+    renderCard(canvas.getContext('2d'), width, height, {
+      original: false,
+      design: designRef.current
+    });
     return canvas;
   }
 
@@ -3581,7 +3587,7 @@ export default function Page() {
       width,
       height,
       action,
-      designName: design.backgroundLabel || 'Untitled Card',
+      designName: designRef.current.backgroundLabel || 'Untitled Card',
       createdAt: Date.now()
     };
     await dbPut('exports', record).catch(() => {});
