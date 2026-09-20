@@ -375,8 +375,8 @@ try {
   );
   await page.getByRole('tab', { name: 'Position', exact: true }).click();
 
-  const layerScale = page.getByLabel('Layer Scale');
-  const layerRotation = page.getByLabel('Layer Rotation');
+  const layerScale = page.getByLabel('Layer scale', { exact: true });
+  const layerRotation = page.getByLabel('Layer rotation', { exact: true });
   const gestureCenterX = Number(await layerX.inputValue());
 
   await editorCanvas.evaluate((node, normalizedX) => {
@@ -413,8 +413,8 @@ try {
   }, gestureCenterX);
 
   await page.waitForFunction(() => {
-    const scale = document.querySelector('input[aria-label="Layer Scale"]');
-    const rotation = document.querySelector('input[aria-label="Layer Rotation"]');
+    const scale = document.querySelector('input[aria-label="Layer scale"]');
+    const rotation = document.querySelector('input[aria-label="Layer rotation"]');
     return scale && rotation && Number(scale.value) > 1.2 && Math.abs(Number(rotation.value)) > 5;
   });
   assert.ok(Number(await layerScale.inputValue()) > 1.2, 'two-finger gesture must scale the selected shape');
@@ -422,8 +422,8 @@ try {
 
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await page.waitForFunction(() => {
-    const scale = document.querySelector('input[aria-label="Layer Scale"]');
-    const rotation = document.querySelector('input[aria-label="Layer Rotation"]');
+    const scale = document.querySelector('input[aria-label="Layer scale"]');
+    const rotation = document.querySelector('input[aria-label="Layer rotation"]');
     return scale && rotation &&
       Math.abs(Number(scale.value) - 1) < 0.001 &&
       Math.abs(Number(rotation.value)) < 0.001;
