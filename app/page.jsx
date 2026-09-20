@@ -22,6 +22,7 @@ const CARD_RATIO = OUT_W / OUT_H;
 const MAX_IMAGE_IMPORT_BYTES = 30 * 1024 * 1024;
 const MAX_SVG_IMPORT_BYTES = 2 * 1024 * 1024;
 const MAX_IMAGE_PROBE_BYTES = 1024 * 1024;
+const MAX_UNPROBED_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_PRESET_IMPORT_BYTES = 48 * 1024 * 1024;
 const MAX_PRESET_EMBEDDED_BYTES = 30 * 1024 * 1024;
 const MAX_CUSTOM_LAYERS = 200;
@@ -1841,7 +1842,13 @@ async function validateSafeSvgBlob(blob) {
 
 async function prepareLocalImageBlob(blob, limits = {}) {
   await validateSafeSvgBlob(blob);
-  assertSafeSourceDimensions(await probeLocalImageDimensions(blob));
+  const probedDimensions = await probeLocalImageDimensions(blob);
+  assertSafeSourceDimensions(probedDimensions);
+
+  if (!probedDimensions && Number(blob?.size || 0) > MAX_UNPROBED_IMAGE_BYTES) {
+    throw new Error('Image dimensions could not be verified safely');
+  }
+
   const decoded = await decodeLocalImageBlob(blob);
   const { image, width, height } = decoded;
   const maxPixels = Math.max(
@@ -3852,11 +3859,13 @@ export default function Page() {
       setMessage(
         error?.message === 'Image dimensions are too large'
           ? 'Image resolution is too large for reliable iPhone editing.'
-          : error?.message === 'Image remains too large after optimization'
-            ? 'Image is still too large after optimization. Choose a smaller file.'
-            : String(error?.message || '').startsWith('SVG')
-              ? error.message
-              : 'This image could not be decoded on this device.'
+          : error?.message === 'Image dimensions could not be verified safely'
+            ? 'This large image could not be verified safely before decoding.'
+            : error?.message === 'Image remains too large after optimization'
+              ? 'Image is still too large after optimization. Choose a smaller file.'
+              : String(error?.message || '').startsWith('SVG')
+                ? error.message
+                : 'This image could not be decoded on this device.'
       );
       return;
     }
@@ -3942,11 +3951,13 @@ export default function Page() {
       setMessage(
         error?.message === 'Image dimensions are too large'
           ? 'Image resolution is too large for reliable iPhone editing.'
-          : error?.message === 'Image remains too large after optimization'
-            ? 'Image is still too large after optimization. Choose a smaller file.'
-            : String(error?.message || '').startsWith('SVG')
-              ? error.message
-              : 'This image could not be decoded on this device.'
+          : error?.message === 'Image dimensions could not be verified safely'
+            ? 'This large image could not be verified safely before decoding.'
+            : error?.message === 'Image remains too large after optimization'
+              ? 'Image is still too large after optimization. Choose a smaller file.'
+              : String(error?.message || '').startsWith('SVG')
+                ? error.message
+                : 'This image could not be decoded on this device.'
       );
       return;
     }
