@@ -34,6 +34,12 @@ forbidden:
       - "['edit', 'Edit']"
       - "['layers', 'Layers']"
       - "Load More"
+      - "<span className=\"kicker\">AirCard</span>"
+      - "CUCU Covers"
+      - "Searching CUCU"
+      - "Loading CUCU"
+      - "Search all CUCU card skins"
+      - "Load some CUCU card skins first"
   - file: app/layout.js
     tokens:
       - "maximumScale"
