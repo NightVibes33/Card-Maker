@@ -77,6 +77,15 @@ try {
     (await cardTextLayerRow.getAttribute('class'))?.includes('selected'),
     'Card Text row must visibly highlight when its built-in text controls are selected'
   );
+
+  await page.getByRole('tab', { name: 'Position', exact: true }).click();
+  assert.equal(
+    await page.getByRole('button', { name: 'Done', exact: true }).count(),
+    0,
+    'leaving Card tools must release the Card Text pseudo-selection'
+  );
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+
   await topBadge.click();
 
   // Direct chip drag must target the chip rather than nearby contactless art.
