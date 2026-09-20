@@ -65,6 +65,9 @@ for (const [pattern, label] of touchChecks) {
 requireMatch(sw, /\[ART_CACHE\]:\s*40/, 'full artwork cache is bounded');
 requireMatch(sw, /\[THUMB_CACHE\]:\s*160/, 'thumbnail cache is bounded separately');
 requireMatch(sw, /async function trimCache\(/, 'service-worker cache eviction exists');
+requireMatch(sw, /requestedWidth > 0 && requestedWidth <= 800/, 'thumbnail cache routing is width-bounded');
+requireMatch(page, /proxyImageWidth\(item\.image, 3072\)/, 'editor artwork uses a bounded high-resolution working copy');
+
 requireMatch(storage, /const DB_VERSION = 2;/, 'IndexedDB schema includes import metadata migration');
 requireMatch(storage, /'importMeta'/, 'import metadata store exists');
 requireMatch(storage, /export async function dbGetImportMetadata\(/, 'metadata-only import listing exists');
@@ -78,6 +81,8 @@ if (/dbGetAll\('imports'\)/.test(page)) {
 
 console.log('PASS editor regression contract');
 
+
+requireMatch(imageRoute, /Math\.min\(3072, Math\.floor\(requestedWidth\)\)/, 'image proxy bounds working artwork width');
 
 const proxySecurityChecks = [
   [imageRoute, /redirect:\s*'manual'/, 'image proxy validates redirects before following them'],
