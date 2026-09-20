@@ -1185,12 +1185,28 @@ function Modal({ title, children, onClose, className = '' }) {
   );
 }
 
-function loadSearchImage(src) {
+function loadSearchImage(src, timeoutMs = 12000) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.decoding = 'async';
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('Artwork image failed'));
+    let settled = false;
+
+    const finish = (callback) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      img.onload = null;
+      img.onerror = null;
+      callback();
+    };
+
+    const timer = window.setTimeout(() => {
+      img.src = '';
+      finish(() => reject(new Error('Artwork image timed out')));
+    }, timeoutMs);
+
+    img.onload = () => finish(() => resolve(img));
+    img.onerror = () => finish(() => reject(new Error('Artwork image failed')));
     img.src = src;
   });
 }
@@ -1834,23 +1850,20 @@ export default function Page() {
         src = objectUrl;
       }
 
-      const img = new Image();
-      img.decoding = 'async';
-      img.onload = () => {
+      try {
+        const img = await loadSearchImage(src, 15000);
         if (cancelled) return;
         setImage(img);
         setLoadedBackgroundKey(backgroundKey);
         setBackgroundLoadError('');
         setMessage('Artwork loaded');
-      };
-      img.onerror = () => {
+      } catch {
         if (cancelled) return;
         setImage(null);
         setLoadedBackgroundKey('');
         setBackgroundLoadError('Artwork could not load.');
         setMessage('Artwork could not load');
-      };
-      img.src = src;
+      }
     }
 
     loadBackground();
