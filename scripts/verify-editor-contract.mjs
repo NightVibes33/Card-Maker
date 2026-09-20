@@ -56,7 +56,8 @@ for (const [pattern, label] of touchChecks) {
   requireMatch(css, pattern, label + ' keep a 44px minimum touch height');
 }
 
-requireMatch(sw, /\[ART_CACHE\]:\s*180/, 'art cache is bounded');
+requireMatch(sw, /\[ART_CACHE\]:\s*40/, 'full artwork cache is bounded');
+requireMatch(sw, /\[THUMB_CACHE\]:\s*160/, 'thumbnail cache is bounded separately');
 requireMatch(sw, /async function trimCache\(/, 'service-worker cache eviction exists');
 
 console.log('PASS editor regression contract');
