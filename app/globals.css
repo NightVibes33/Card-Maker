@@ -1079,11 +1079,33 @@ button:disabled{opacity:.38}
   color:var(--label);
   box-shadow:0 1px 5px rgba(0,0,0,.12),inset 0 0 0 .5px var(--separator);
 }
+.studioModeActions{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-top:7px;
+}
+.studioNewCardButton{
+  min-height:44px;
+  border:0;
+  border-radius:10px;
+  padding:0 12px;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  background:var(--secondary-bg);
+  color:var(--label);
+  font-size:12px;
+  font-weight:750;
+  box-shadow:inset 0 0 0 .5px var(--separator);
+}
+.studioNewCardButton:disabled{opacity:.45}
 .previewModeToggle{
   display:flex;
   justify-content:flex-end;
   gap:4px;
-  margin-top:7px;
+  margin-top:0;
 }
 .previewModeToggle button{
   min-height:44px;
