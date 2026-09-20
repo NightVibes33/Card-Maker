@@ -89,7 +89,7 @@ const pageChecks = [
   [/name: safeDisplayText\(asset\.name, 'Preset asset', 160\)/, 'preset image metadata is bounded before persistence'],
   [/async function withImageImportLock\(/, 'image imports are serialized'],
   [/const imageImportInFlightRef = useRef\(false\)/, 'image import concurrency has an authoritative lock'],
-  [/disabled=\{imageImportInProgress\} onClick=\{\(\) => layerUploadRef\.current\?\.click\(\)\}/, 'image-layer import entry point is disabled while processing'],
+  [/disabled=\{imageImportInProgress \|\| presetTransferInProgress \|\| cleanupInProgress\} onClick=\{\(\) => layerUploadRef\.current\?\.click\(\)\}/, 'image-layer import entry point is disabled during conflicting asset operations'],
   [/favoriteOpsRef\.current\.has\(itemId\)/, 'favorite writes are serialized per card'],
   [/projectSaveInFlightRef\.current/, 'project saves reject overlapping double taps'],
   [/const historySaved = await recordExport/, 'export history status reflects durable storage writes'],
