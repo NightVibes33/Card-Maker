@@ -9,12 +9,56 @@ const ALLOWED_HOSTS = new Set([
   'www.cucucovers.com'
 ]);
 
+const SAFE_IMAGE_TYPES = new Set([
+  'image/avif',
+  'image/webp',
+  'image/apng',
+  'image/jpeg',
+  'image/png',
+  'image/gif'
+]);
+const MAX_ANALYSIS_BYTES = 8 * 1024 * 1024;
+
 function allowed(url) {
   return url.protocol === 'https:' && ALLOWED_HOSTS.has(url.hostname.toLowerCase());
 }
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const MAX_REDIRECTS = 4;
+
+async function readLimitedBody(response, maxBytes) {
+  const declaredLength = Number(response.headers.get('content-length') || 0);
+  if (declaredLength > maxBytes) throw new Error('CUCU artwork too large');
+
+  if (!response.body) {
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.byteLength > maxBytes) throw new Error('CUCU artwork too large');
+    return buffer;
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value?.byteLength) continue;
+
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel('CUCU artwork too large').catch(() => {});
+        throw new Error('CUCU artwork too large');
+      }
+      chunks.push(Buffer.from(value));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return Buffer.concat(chunks, total);
+}
 
 async function fetchAllowedArtwork(startUrl, options) {
   let current = new URL(startUrl);
@@ -97,15 +141,15 @@ export async function GET(request) {
       throw new Error('CUCU artwork returned ' + response.status);
     }
 
-    const type = response.headers.get('content-type') || '';
-    if (!type.startsWith('image/')) throw new Error('CUCU artwork was not an image');
+    const type = (response.headers.get('content-type') || '')
+      .split(';', 1)[0]
+      .trim()
+      .toLowerCase();
+    if (!SAFE_IMAGE_TYPES.has(type)) {
+      throw new Error('CUCU artwork format is not supported');
+    }
 
-    const declaredLength = Number(response.headers.get('content-length') || 0);
-    if (declaredLength > 8 * 1024 * 1024) throw new Error('CUCU artwork too large');
-
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.byteLength > 8 * 1024 * 1024) throw new Error('CUCU artwork too large');
-
+    const buffer = await readLimitedBody(response, MAX_ANALYSIS_BYTES);
     const metadata = await sharp(buffer).metadata();
     const naturalWidth = Number(metadata.width || 0);
     const naturalHeight = Number(metadata.height || 0);
