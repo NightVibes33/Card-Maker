@@ -1445,3 +1445,41 @@ button:disabled{opacity:.38}
   position:relative;
   box-shadow:inset 3px 0 0 var(--blue);
 }
+
+.editingTargetBar{
+  min-height:58px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:9px 12px;
+  margin-bottom:10px;
+  border-radius:13px;
+  background:color-mix(in srgb,var(--blue) 8%,var(--secondary-bg));
+  box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--blue) 32%,var(--separator));
+}
+.editingTargetBar span{min-width:0}
+.editingTargetBar strong,.editingTargetBar small{display:block}
+.editingTargetBar strong{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:14px;
+}
+.editingTargetBar small{
+  margin-top:2px;
+  color:var(--secondary-label);
+  font-size:11px;
+}
+.editingTargetBar button{
+  flex:0 0 auto;
+  min-height:36px;
+  border:0;
+  border-radius:10px;
+  padding:0 10px;
+  background:var(--blue);
+  color:#fff;
+  font-size:11px;
+  font-weight:750;
+}
+.disabledRow{opacity:.45}
