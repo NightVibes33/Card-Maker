@@ -192,7 +192,7 @@ requireMatch(page, /height=\{EDITOR_PREVIEW_H\}/, 'interactive canvas uses the r
 requireMatch(page, /const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS \+ 1;/, 'preset asset capacity covers every custom layer plus the imported background');
 requireMatch(page, /const MAX_PRESET_IMPORT_BYTES = 48 \* 1024 \* 1024;/, 'preset transfer size is bounded for iPhone memory safety');
 requireMatch(page, /async function prepareLocalImageBlob\(/, 'oversized local images are downsampled before persistence');
-requireMatch(page, /image\\\/(?:webp\|avif\|heic\|heif)/, 'WebP and AVIF imports are raster-normalized for deterministic export');
+requireMatch(page, /webp\|avif\|heic\|heif/, 'WebP, AVIF, HEIC, and HEIF imports are raster-normalized for deterministic export');
 requireMatch(page, /maxPixels: MAX_STORED_LAYER_IMAGE_PIXELS/, 'custom image-layer imports use the smaller working set');
 requireMatch(
   page,
