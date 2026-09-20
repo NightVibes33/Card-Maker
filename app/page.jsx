@@ -2427,6 +2427,43 @@ export default function Page() {
   }, [autosaveReady, design, hydrated, persistDraftSnapshot]);
 
   useEffect(() => {
+    if (!hydrated || !autosaveReady) return undefined;
+
+    let lastFlushAt = 0;
+    const flushDraftBeforeSuspend = () => {
+      const now = Date.now();
+      if (now - lastFlushAt < 200) return;
+      lastFlushAt = now;
+
+      const snapshot = JSON.parse(JSON.stringify(designRef.current));
+      if (snapshot.background && !isPersistableBackground(snapshot.background)) {
+        snapshot.background = '';
+      }
+
+      // localStorage is synchronous, so this survives iOS suspending the page
+      // before an IndexedDB transaction or debounced autosave can finish.
+      try {
+        localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(snapshot));
+        localStorage.setItem('aircard-sticker-fvp-v3-updated-at', String(now));
+      } catch {}
+
+      persistDraftSnapshot(snapshot).catch(() => {});
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushDraftBeforeSuspend();
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pagehide', flushDraftBeforeSuspend);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pagehide', flushDraftBeforeSuspend);
+    };
+  }, [autosaveReady, hydrated, persistDraftSnapshot]);
+
+  useEffect(() => {
     try {
       localStorage.setItem('aircard-expert-v2', expertMode ? '1' : '0');
     } catch {}
