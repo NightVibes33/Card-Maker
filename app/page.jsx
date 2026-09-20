@@ -2590,6 +2590,28 @@ export default function Page() {
     };
   }, []);
 
+  useEffect(() => {
+    if (tab === 'studio' && previewMode === 'flat') return;
+
+    if (gestureHistoryRecorded.current) {
+      replaceDesign(designRef.current);
+    }
+
+    pointers.current.clear();
+    lastPoint.current = null;
+    lastDistance.current = null;
+    lastAngle.current = null;
+    gestureTarget.current = 'artwork';
+    gestureStartDesign.current = null;
+    gestureHistoryRecorded.current = false;
+    setActiveGuides({ x: null, y: null });
+
+    if (gesturePreviewFrameRef.current) {
+      window.cancelAnimationFrame(gesturePreviewFrameRef.current);
+      gesturePreviewFrameRef.current = 0;
+    }
+  }, [previewMode, replaceDesign, tab]);
+
   const undo = useCallback(() => {
     if (cleanupInFlightRef.current) {
       setMessage('Finish cleaning imported images before using Undo.');
