@@ -3121,14 +3121,17 @@ export default function Page() {
     }
 
     const key = 'layer:' + id + ':' + Object.keys(delta || {}).sort().join('|');
-    patch((current) => ({
-      customLayers: (current.customLayers || []).map((layer) => {
+    patch((current) => {
+      const layers = current.customLayers || [];
+      let changed = false;
+      const nextLayers = layers.map((layer) => {
         if (layer.id !== id) return layer;
+
         const deltaKeys = Object.keys(delta || {});
         const lockedSafeChange = deltaKeys.every((keyName) => keyName === 'locked' || keyName === 'hidden');
         if (layer.locked && !lockedSafeChange) return layer;
-        const updated = { ...layer, ...delta };
 
+        const updated = { ...layer, ...delta };
         if (updated.type === 'shape') {
           const width = clamp(Number(updated.width ?? 280), 20, 1200);
           const height = clamp(Number(updated.height ?? 120), 20, 800);
@@ -3137,9 +3140,23 @@ export default function Page() {
           updated.radius = clamp(Number(updated.radius ?? 28), 0, Math.min(width, height) / 2);
         }
 
+        const relevantKeys = new Set(Object.keys(delta || {}));
+        if (updated.type === 'shape') {
+          relevantKeys.add('width');
+          relevantKeys.add('height');
+          relevantKeys.add('radius');
+        }
+
+        if ([...relevantKeys].every((keyName) => Object.is(layer[keyName], updated[keyName]))) {
+          return layer;
+        }
+
+        changed = true;
         return updated;
-      })
-    }), true, key);
+      });
+
+      return changed ? { customLayers: nextLayers } : {};
+    }, true, key);
   }
 
   function deleteLayer(id) {
