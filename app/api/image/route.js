@@ -132,11 +132,12 @@ export async function GET(request) {
 
   const requestedWidth = Number(request.nextUrl.searchParams.get('w') || 0);
   const width = Number.isFinite(requestedWidth)
-    ? Math.max(0, Math.min(1600, Math.floor(requestedWidth)))
+    ? Math.max(0, Math.min(3072, Math.floor(requestedWidth)))
     : 0;
 
   // Shopify's CDN can resize source artwork before it reaches our function.
-  // Browse thumbnails use this; Studio/export continue to request the original.
+  // Browse thumbnails use small widths; Studio/export can request a bounded
+  // high-resolution working copy without decoding arbitrarily large originals.
   if (width >= 160 && (/^cdn\.shopify\.com$/i.test(url.hostname) || /(^|\.)cucucovers\.com$/i.test(url.hostname))) {
     url.searchParams.set('width', String(width));
   }
