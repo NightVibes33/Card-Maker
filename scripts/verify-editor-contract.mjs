@@ -119,6 +119,10 @@ const proxySecurityChecks = [
   [imageRoute, /redirect:\s*'manual'/, 'image proxy validates redirects before following them'],
   [imageRoute, /SAFE_IMAGE_TYPES/, 'image proxy rejects unsafe image formats'],
   [imageRoute, /readLimitedBody\(/, 'image proxy stream-limits response bodies'],
+  [imageRoute, /import sharp from 'sharp'/, 'image proxy can resize non-CDN artwork server-side'],
+  [imageRoute, /limitInputPixels: MAX_DECODED_IMAGE_PIXELS/, 'proxy decoding has a pixel safety bound'],
+  [imageRoute, /\.resize\(\{[\s\S]*width,[\s\S]*withoutEnlargement: true/s, 'proxy width requests are enforced server-side when needed'],
+  [imageRoute, /responseType = 'image\/webp'/, 'normalized proxy images return a deterministic web format'],
   [inspectRoute, /redirect:\s*'manual'/, 'artwork inspector validates redirects before following them'],
   [inspectRoute, /SAFE_IMAGE_TYPES/, 'artwork inspector rejects unsafe image formats'],
   [inspectRoute, /readLimitedBody\(/, 'artwork inspector stream-limits response bodies']
