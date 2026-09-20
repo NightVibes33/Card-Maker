@@ -601,6 +601,44 @@ function drawTrackedText(ctx, text, x, y, tracking = 0) {
   ctx.restore();
 }
 
+function pointInBuiltinText(px, py, design, padding = 0) {
+  if (typeof document === 'undefined') return false;
+
+  textMeasureCanvas ||= document.createElement('canvas');
+  const ctx = textMeasureCanvas.getContext('2d');
+  if (!ctx) return false;
+
+  const hit = (enabled, text, font, x, baseline, align = 'left') => {
+    const value = String(text ?? '');
+    if (!enabled || !value.trim()) return false;
+
+    ctx.font = font;
+    const metrics = ctx.measureText(value);
+    const width = Math.max(1, Number(metrics.width || 0));
+    const fontSize = Number(font.match(/(\d+(?:\.\d+)?)px/)?.[1] || 34);
+    const ascent = Math.max(fontSize * 0.7, Number(metrics.actualBoundingBoxAscent || 0));
+    const descent = Math.max(fontSize * 0.18, Number(metrics.actualBoundingBoxDescent || 0));
+
+    let left = x;
+    if (align === 'right') left -= width;
+    else if (align === 'center') left -= width / 2;
+
+    return (
+      px >= left - padding &&
+      px <= left + width + padding &&
+      py >= baseline - ascent - padding &&
+      py <= baseline + descent + padding
+    );
+  };
+
+  return (
+    hit(design.badge, design.badgeText ?? 'CARD', '800 66px -apple-system, BlinkMacSystemFont, sans-serif', OUT_W - 105, 130, 'right') ||
+    hit(design.number, design.numberText, '600 64px ui-monospace, SFMono-Regular, Menlo, monospace', 120, 700, 'left') ||
+    hit(design.holder, design.holderText, '650 34px -apple-system, BlinkMacSystemFont, sans-serif', 122, 815, 'left') ||
+    hit(design.expiry, design.expiryText, '650 34px -apple-system, BlinkMacSystemFont, sans-serif', OUT_W - 122, 815, 'right')
+  );
+}
+
 function customLayerBounds(layer, layerImage) {
   if (!layer) return { left: -40, top: -40, right: 40, bottom: 40 };
 
@@ -4341,6 +4379,13 @@ export default function Page() {
         continue;
       }
 
+      if (stackId === 'builtin-text') {
+        if (pointInBuiltinText(px, py, currentDesign, hitPadding)) {
+          return 'card-text';
+        }
+        continue;
+      }
+
       if (BUILTIN_LAYER_IDS.includes(stackId)) continue;
 
       const layer = customLayerMap.get(stackId);
@@ -4443,7 +4488,14 @@ export default function Page() {
       gestureTarget.current = target;
       gestureStartDesign.current = designRef.current;
       gestureHistoryRecorded.current = false;
-      setSelectedElement(target);
+
+      if (target === 'card-text') {
+        setSelectedElement('artwork');
+        setStudioTool('card');
+        setMessage('Card text controls ready');
+      } else {
+        setSelectedElement(target);
+      }
     }
 
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -4539,6 +4591,7 @@ export default function Page() {
         ? (designRef.current.customLayers || []).find((layer) => layer.id === target)
         : null;
       const transformBlocked = Boolean(
+        target === 'card-text' ||
         gestureLayer?.locked ||
         (target === 'artwork' && !designRef.current.background)
       );
