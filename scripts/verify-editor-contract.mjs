@@ -187,6 +187,11 @@ requireMatch(storage, /if \(settled\) \{[\s\S]{0,80}db\.close\(\);/, 'late Index
 requireMatch(storage, /const CACHE_ARTWORK_TIMEOUT_MS = 12000;/, 'offline artwork caching has a mobile-network timeout');
 requireMatch(storage, /signal: controller\.signal/, 'offline artwork cache fetches are abortable');
 requireMatch(page, /dbGetImportMetadata\(\)/, 'Library hydrates import metadata instead of blobs');
+requireMatch(page, /const MAX_SVG_IMPORT_BYTES = 2 \* 1024 \* 1024;/, 'SVG imports have a strict source-size ceiling');
+requireMatch(page, /async function validateSafeSvgBlob\(/, 'SVG imports are inspected before rasterization');
+requireMatch(page, /<\\s\*script\\b/, 'SVG active script content is rejected');
+requireMatch(page, /<\\s\*foreignObject\\b/, 'SVG foreignObject content is rejected');
+requireMatch(page, /unsupported active or remote content/, 'SVG remote or active content fails closed');
 requireMatch(page, /const MAX_STORED_IMAGE_PIXELS = 12_000_000;/, 'local image working-set pixels are bounded');
 requireMatch(page, /const MAX_STORED_IMAGE_DIMENSION = 4096;/, 'local image working-set dimensions are bounded');
 requireMatch(page, /const MAX_STORED_LAYER_IMAGE_PIXELS = 4_000_000;/, 'custom image-layer working-set pixels are bounded separately');
