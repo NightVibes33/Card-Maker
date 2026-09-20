@@ -2072,6 +2072,10 @@ export default function Page() {
   }, []);
 
   const patch = useCallback((next, recordHistory = true, historyKey = '') => {
+    if (presetImportActiveRef.current) {
+      presetImportGenerationRef.current += 1;
+    }
+
     const current = designRef.current;
     const delta = typeof next === 'function' ? next(current) : next;
     const deltaKeys = Object.keys(delta || {});
@@ -2118,6 +2122,7 @@ export default function Page() {
   }, [replaceDesign]);
 
   const undo = useCallback(() => {
+    invalidatePendingPresetImport();
     historyGroupRef.current = { key: '', at: 0 };
     const previous = undoRef.current.pop();
     if (!previous) return;
@@ -2130,6 +2135,7 @@ export default function Page() {
   }, [replaceDesign]);
 
   const redo = useCallback(() => {
+    invalidatePendingPresetImport();
     historyGroupRef.current = { key: '', at: 0 };
     const next = redoRef.current.pop();
     if (!next) return;
@@ -4587,6 +4593,7 @@ export default function Page() {
 
       const nextImports = await dbGetImportMetadata();
       ensureCurrentPresetImport();
+      presetImportActiveRef.current = false;
       patch({ ...DEFAULTS, ...imported });
       presetApplied = true;
       setSelectedElement('artwork');
