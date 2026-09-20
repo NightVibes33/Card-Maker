@@ -3612,10 +3612,14 @@ export default function Page() {
       const layer = customLayerMap.get(stackId);
       if (!layer || layer.hidden || Number(layer.opacity ?? 1) <= 0.01) continue;
       if (layer.type === 'text' && !String(layer.text ?? '').trim()) continue;
-      const bounds = customLayerBounds(
-        layer,
-        loadedImageLayerSourceKey === imageLayerSourceKey ? layerImages[layer.id] : null
-      );
+
+      const exactLayerImage =
+        loadedImageLayerSourceKey === imageLayerSourceKey
+          ? layerImages[layer.id]
+          : null;
+      if (layer.type === 'image' && !exactLayerImage) continue;
+
+      const bounds = customLayerBounds(layer, exactLayerImage);
       if (
         pointInRotatedBounds(
           px,
@@ -4117,13 +4121,18 @@ export default function Page() {
           />
         ) : null}
 
-        {tab === 'studio' && previewMode === 'flat' && selectedLayer && !selectedLayer.hidden ? (
+        {tab === 'studio' &&
+        previewMode === 'flat' &&
+        selectedLayer &&
+        !selectedLayer.hidden &&
+        (selectedLayer.type !== 'image' ||
+          (loadedImageLayerSourceKey === imageLayerSourceKey && Boolean(layerImages[selectedLayer.id]))) ? (
           <div
             className="selectionOutline layerSelection"
             aria-hidden="true"
             style={customLayerSelectionStyle(
               selectedLayer,
-              loadedImageLayerSourceKey === imageLayerSourceKey ? layerImages[selectedLayer.id] : null
+              selectedLayer.type === 'image' ? layerImages[selectedLayer.id] : null
             )}
           />
         ) : null}
