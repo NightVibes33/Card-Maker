@@ -3040,7 +3040,12 @@ export default function Page() {
     };
 
     addDesignRefs(designRef.current);
-    for (const project of projects) addDesignRefs(project?.design);
+
+    let storedProjects = projects;
+    try {
+      storedProjects = await dbGetAll('projects');
+    } catch {}
+    for (const project of storedProjects) addDesignRefs(project?.design);
 
     const unused = imports.filter((asset) => asset?.id && !referenced.has(asset.id));
     if (!unused.length) {
