@@ -1,3 +1,5 @@
+export const IMAGE_PROXY_VERSION = '2';
+
 export const ALLOWED_IMAGE_HOSTS = Object.freeze([
   'cdn.shopify.com',
   'www.animetowncreations.com',
