@@ -2281,6 +2281,7 @@ export default function Page() {
               ...entry,
               id: safeDisplayText(entry.id, '', 160),
               name: safeDisplayText(entry.name, 'Design', 160),
+              design: normalizeDesignState(entry.design),
               preview:
                 typeof entry.preview === 'string' &&
                 entry.preview.length <= 2_000_000 &&
