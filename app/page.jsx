@@ -6525,7 +6525,7 @@ export default function Page() {
                 <button
                   type="button"
                   className="primaryAction librarySaveButton"
-                  disabled={projectSaveInProgress}
+                  disabled={projectSaveInProgress || imageImportInProgress || presetTransferInProgress || cleanupInProgress}
                   onClick={async () => {
                     const saved = await saveProject(projectName);
                     if (saved) setProjectName('');
@@ -6722,7 +6722,7 @@ export default function Page() {
               </button>
             </Group>
 
-            <button type="button" className="secondaryAction bigAction" disabled={projectSaveInProgress} onClick={() => saveProject()}>
+            <button type="button" className="secondaryAction bigAction" disabled={projectSaveInProgress || imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={() => saveProject()}>
               {projectSaveInProgress ? 'Saving Design…' : 'Save Design to Library'}
             </button>
 
