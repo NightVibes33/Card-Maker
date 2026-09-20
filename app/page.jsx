@@ -4496,12 +4496,13 @@ export default function Page() {
         throw new Error('Preset contains too many embedded assets');
       }
       const presetAssetMap = new Map(presetAssets);
+      const normalizedIncomingDesign = normalizeDesignState(payload.design);
       const referencedPresetAssetIds = new Set();
-      const rawBackground = String(payload.design.background || '');
+      const rawBackground = String(normalizedIncomingDesign.background || '');
       if (rawBackground.startsWith('idb://imports/')) {
         referencedPresetAssetIds.add(rawBackground.slice('idb://imports/'.length));
       }
-      for (const layer of Array.isArray(payload.design.customLayers) ? payload.design.customLayers : []) {
+      for (const layer of normalizedIncomingDesign.customLayers || []) {
         const src = String(layer?.src || '');
         if (layer?.type === 'image' && src.startsWith('idb://imports/')) {
           referencedPresetAssetIds.add(src.slice('idb://imports/'.length));
@@ -4522,8 +4523,8 @@ export default function Page() {
         throw new Error('Preset contains too many visible image layers');
       }
 
-      const presetBackgroundAssetId = String(payload.design.background || '').startsWith('idb://imports/')
-        ? String(payload.design.background).slice('idb://imports/'.length)
+      const presetBackgroundAssetId = rawBackground.startsWith('idb://imports/')
+        ? rawBackground.slice('idb://imports/'.length)
         : '';
       let estimatedEmbeddedBytes = 0;
 
@@ -4574,7 +4575,7 @@ export default function Page() {
         ensureCurrentPresetImport();
       }
 
-      const imported = JSON.parse(JSON.stringify(payload.design));
+      const imported = JSON.parse(JSON.stringify(normalizedIncomingDesign));
       if (imported.background?.startsWith('idb://imports/')) {
         const oldId = imported.background.slice('idb://imports/'.length);
         imported.background = idMap[oldId] ? 'idb://imports/' + idMap[oldId] : '';
