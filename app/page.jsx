@@ -326,49 +326,18 @@ function Group({ title, footer, children }) {
   );
 }
 
-function ArtworkRail({ title, items, onPick }) {
-  if (!items.length) return null;
-  return (
-    <section className="browseSection">
-      <div className="browseHeading">
-        <h2>{title}</h2>
-        <span>{items.length} card skins</span>
-      </div>
-      <div className="artRail cardSkinRail" role="list">
-        {items.map((item) => (
-          <article className="artSkinItem" role="listitem" key={item.id}>
-            <button
-              type="button"
-              className="artSkinPreview"
-              onClick={() => onPick(item)}
-              aria-label={'Use premade card skin ' + item.title}
-            >
-              <CatalogArtwork item={item} alt={item.mediaAlt || item.title} />
-            </button>
-            <div className="artSkinMeta">
-              <div>
-                <strong>{item.title}</strong>
-                <small>{item.source || item.subtitle}</small>
-              </div>
-
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function CatalogArtwork({ item, alt }) {
+function CatalogArtwork({ item, alt, useThumbnail = true }) {
   const crop = item?.sourceCrop;
+  const src = useThumbnail ? (item.thumbnail || item.image) : item.image;
 
   if (crop && crop.w > 0 && crop.h > 0) {
     return (
       <img
         className="croppedCatalogImage"
-        src={item.image}
+        src={src}
         alt={alt}
         loading="lazy"
+        decoding="async"
         style={{
           width: (100 / crop.w) + '%',
           height: (100 / crop.h) + '%',
@@ -379,7 +348,88 @@ function CatalogArtwork({ item, alt }) {
     );
   }
 
-  return <img src={item.image} alt={alt} loading="lazy" />;
+  return <img src={src} alt={alt} loading="lazy" decoding="async" />;
+}
+
+function SkinActions({ item, isFavorite, onPick, onFavorite, onMenu }) {
+  return (
+    <div className="skinActions">
+      <button
+        type="button"
+        className={'favoriteButton ' + (isFavorite ? 'isFavorite' : '')}
+        aria-label={(isFavorite ? 'Remove ' : 'Add ') + item.title + (isFavorite ? ' from favorites' : ' to favorites')}
+        aria-pressed={isFavorite}
+        onClick={(event) => {
+          event.stopPropagation();
+          onFavorite(item);
+        }}
+      >
+        {isFavorite ? '♥' : '♡'}
+      </button>
+      <button
+        type="button"
+        className="moreButton"
+        aria-label={'More actions for ' + item.title}
+        onClick={(event) => {
+          event.stopPropagation();
+          onMenu(item);
+        }}
+      >
+        •••
+      </button>
+    </div>
+  );
+}
+
+function ArtworkRail({ title, items, onPick, favoriteIds = new Set(), onFavorite = () => {}, onMenu = () => {} }) {
+  if (!items.length) return null;
+  return (
+    <section className="browseSection">
+      <div className="browseHeading">
+        <h2>{title}</h2>
+        <span>{items.length}</span>
+      </div>
+      <div className="artRail cardSkinRail" role="list">
+        {items.map((item) => (
+          <article className="artSkinItem" role="listitem" key={item.id}>
+            <div className="skinCardMedia">
+              <button
+                type="button"
+                className="artSkinPreview"
+                onClick={() => onPick(item)}
+                aria-label={'Use card skin ' + item.title}
+              >
+                <CatalogArtwork item={item} alt={item.mediaAlt || item.title} />
+              </button>
+              <SkinActions
+                item={item}
+                isFavorite={favoriteIds.has(item.id)}
+                onPick={onPick}
+                onFavorite={onFavorite}
+                onMenu={onMenu}
+              />
+            </div>
+            <div className="artSkinMeta">
+              <strong>{item.title}</strong>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SkeletonGrid({ count = 8 }) {
+  return (
+    <div className="storeCatalogGrid skeletonGrid" aria-label="Loading card skins" aria-busy="true">
+      {Array.from({ length: count }, (_, index) => (
+        <div className="skeletonCard" key={index}>
+          <div className="skeletonMedia" />
+          <div className="skeletonLine" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function StoreCatalog({
@@ -388,9 +438,12 @@ function StoreCatalog({
   items,
   total,
   loading,
-  hasMore,
+  error,
+  onRetry,
   onPick,
-  onLoadMore
+  favoriteIds,
+  onFavorite,
+  onMenu
 }) {
   const countLabel = total > 0
     ? items.length.toLocaleString() + ' of ' + total.toLocaleString()
@@ -406,43 +459,72 @@ function StoreCatalog({
         <span>{countLabel}</span>
       </div>
 
+      {error && !items.length ? (
+        <div className="stateCard" role="alert">
+          <strong>Could not load card skins</strong>
+          <span>{error}</span>
+          <button type="button" className="secondaryAction" onClick={onRetry}>Retry</button>
+        </div>
+      ) : null}
+
+      {loading && !items.length ? <SkeletonGrid /> : null}
+
       {items.length ? (
         <div className="storeCatalogGrid" role="list">
           {items.map((item) => (
             <article className="storeCatalogItem" role="listitem" key={item.id}>
-              <button
-                type="button"
-                className="storeCatalogPreview"
-                onClick={() => onPick(item)}
-                aria-label={'Use ' + item.title}
-              >
-                <CatalogArtwork item={item} alt={item.mediaAlt || item.title} />
-              </button>
+              <div className="skinCardMedia">
+                <button
+                  type="button"
+                  className="storeCatalogPreview"
+                  onClick={() => onPick(item)}
+                  aria-label={'Use ' + item.title}
+                >
+                  <CatalogArtwork item={item} alt={item.mediaAlt || item.title} />
+                </button>
+                <SkinActions
+                  item={item}
+                  isFavorite={favoriteIds.has(item.id)}
+                  onPick={onPick}
+                  onFavorite={onFavorite}
+                  onMenu={onMenu}
+                />
+              </div>
               <div className="storeCatalogMeta">
                 <strong>{item.title}</strong>
               </div>
             </article>
           ))}
         </div>
-      ) : (
-        <div className="catalogEmpty">
-          {loading ? <span className="spinner" aria-hidden="true" /> : null}
-          <span>{loading ? 'Loading card skins…' : 'No usable card skins loaded yet.'}</span>
-        </div>
-      )}
+      ) : null}
 
-      {hasMore ? (
-        <button
-          type="button"
-          className="secondaryAction catalogLoadMore"
-          disabled={loading}
-          onClick={onLoadMore}
-        >
-          {loading ? <span className="spinner" aria-hidden="true" /> : null}
-          <span>{loading ? 'Loading' : 'Load More'}</span>
-        </button>
+      {loading && items.length ? (
+        <div className="inlineLoading"><span className="spinner" aria-hidden="true" />Loading more…</div>
+      ) : null}
+
+      {!loading && !error && !items.length ? (
+        <div className="stateCard">
+          <strong>No card skins found</strong>
+          <span>Try another CUCU collection or search term.</span>
+        </div>
       ) : null}
     </section>
+  );
+}
+
+function Modal({ title, children, onClose, className = '' }) {
+  return (
+    <div className="modalBackdrop" role="presentation" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose();
+    }}>
+      <section className={'modalSheet ' + className} role="dialog" aria-modal="true" aria-label={title}>
+        <div className="modalHeader">
+          <h2>{title}</h2>
+          <button type="button" className="modalClose" onClick={onClose} aria-label={'Close ' + title}>×</button>
+        </div>
+        {children}
+      </section>
+    </div>
   );
 }
 
