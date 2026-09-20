@@ -161,6 +161,13 @@ function clamp(v, a, b) {
   return Math.max(a, Math.min(b, v));
 }
 
+function normalizeAngleDelta(degrees) {
+  let value = Number(degrees || 0);
+  while (value > 180) value -= 360;
+  while (value < -180) value += 360;
+  return value;
+}
+
 function snapValue(value, targets, threshold = 0.018) {
   let best = value;
   let distance = Infinity;
@@ -2796,7 +2803,9 @@ export default function Page() {
       const distance = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
       const angle = Math.atan2(p[1].y - p[0].y, p[1].x - p[0].x);
       const factor = lastDistance.current ? distance / Math.max(1, lastDistance.current) : 1;
-      const angleDelta = lastAngle.current == null ? 0 : ((angle - lastAngle.current) * 180) / Math.PI;
+      const angleDelta = lastAngle.current == null
+        ? 0
+        : normalizeAngleDelta(((angle - lastAngle.current) * 180) / Math.PI);
       const transformed = Math.abs(factor - 1) > 0.0005 || Math.abs(angleDelta) > 0.02;
       const gestureLayer = target !== 'artwork' && target !== 'chip' && target !== 'contactless'
         ? (designRef.current.customLayers || []).find((layer) => layer.id === target)
