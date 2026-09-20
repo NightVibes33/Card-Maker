@@ -2332,6 +2332,7 @@ export default function Page() {
   const favoriteOpsRef = useRef(new Set());
   const projectSaveInFlightRef = useRef(false);
   const projectOpsRef = useRef(new Set());
+  const projectCountRef = useRef(0);
   const presetTransferInFlightRef = useRef(false);
   const presetImportGenerationRef = useRef(0);
   const presetImportActiveRef = useRef(false);
@@ -2643,26 +2644,26 @@ export default function Page() {
           .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
         setFavorites(validFavorites.map((entry) => entry.item));
         setFavoriteIds(new Set(validFavorites.map((entry) => entry.item.id)));
-        setProjects(
-          storedProjects
-            .filter((entry) => entry?.design && typeof entry.design === 'object')
-            .map((entry) => ({
-              ...entry,
-              id: safeDisplayText(entry.id, '', 160),
-              name: safeDisplayText(entry.name, 'Design', 160),
-              design: normalizeDesignState(entry.design),
-              preview:
-                typeof entry.preview === 'string' &&
-                entry.preview.length <= 2_000_000 &&
-                /^data:image\/(?:jpeg|png|webp);base64,/i.test(entry.preview)
-                  ? entry.preview
-                  : '',
-              createdAt: finiteNumber(entry.createdAt, 0),
-              updatedAt: finiteNumber(entry.updatedAt, finiteNumber(entry.createdAt, 0))
-            }))
-            .filter((entry) => entry.id)
-            .sort((a, b) => b.updatedAt - a.updatedAt)
-        );
+        const hydratedProjects = storedProjects
+          .filter((entry) => entry?.design && typeof entry.design === 'object')
+          .map((entry) => ({
+            ...entry,
+            id: safeDisplayText(entry.id, '', 160),
+            name: safeDisplayText(entry.name, 'Design', 160),
+            design: normalizeDesignState(entry.design),
+            preview:
+              typeof entry.preview === 'string' &&
+              entry.preview.length <= 2_000_000 &&
+              /^data:image\/(?:jpeg|png|webp);base64,/i.test(entry.preview)
+                ? entry.preview
+                : '',
+            createdAt: finiteNumber(entry.createdAt, 0),
+            updatedAt: finiteNumber(entry.updatedAt, finiteNumber(entry.createdAt, 0))
+          }))
+          .filter((entry) => entry.id)
+          .sort((a, b) => b.updatedAt - a.updatedAt);
+        projectCountRef.current = hydratedProjects.length;
+        setProjects(hydratedProjects);
         setImports(
           storedImports
             .map(importListItem)
@@ -4494,7 +4495,7 @@ export default function Page() {
   }
 
   async function saveProject(nameOverride = '') {
-    if (projects.length + projectOpsRef.current.size >= MAX_SAVED_PROJECTS) {
+    if (projectCountRef.current + projectOpsRef.current.size >= MAX_SAVED_PROJECTS) {
       setMessage('Project limit reached. Delete an older saved design before saving another.');
       return null;
     }
@@ -4542,6 +4543,7 @@ export default function Page() {
       setMessage('Could not save this design. Device storage may be full.');
       return null;
     }
+    projectCountRef.current += 1;
     setProjects((current) => [project, ...current]);
 
     const remoteArtwork = new Set();
@@ -4654,7 +4656,7 @@ export default function Page() {
     await withProjectOperation(project?.id, async () => {
     const pendingOtherProjectOps = Math.max(0, projectOpsRef.current.size - 1);
     const pendingNamedSave = projectSaveInFlightRef.current ? 1 : 0;
-    if (projects.length + pendingOtherProjectOps + pendingNamedSave >= MAX_SAVED_PROJECTS) {
+    if (projectCountRef.current + pendingOtherProjectOps + pendingNamedSave >= MAX_SAVED_PROJECTS) {
       setMessage('Project limit reached. Delete an older saved design before duplicating.');
       return;
     }
@@ -4673,6 +4675,7 @@ export default function Page() {
       setMessage('Could not duplicate this design. Device storage may be full.');
       return;
     }
+    projectCountRef.current += 1;
     setProjects((current) => [copy, ...current]);
     setMessage('Design duplicated');
     });
@@ -4690,6 +4693,7 @@ export default function Page() {
       setMessage('Could not delete this design.');
       return;
     }
+    projectCountRef.current = Math.max(0, projectCountRef.current - 1);
     setProjects((current) => current.filter((entry) => entry.id !== project.id));
     setMessage('Design deleted');
     });
