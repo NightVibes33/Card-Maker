@@ -2564,6 +2564,7 @@ export default function Page() {
         const validFavorites = storedFavorites
           .map((entry) => ({
             ...entry,
+            updatedAt: finiteNumber(entry?.updatedAt, 0),
             item: normalizeStoredArtworkItem(entry?.item)
           }))
           .filter((entry) => entry.item?.id)
