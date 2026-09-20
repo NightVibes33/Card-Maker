@@ -469,8 +469,8 @@ try {
   const duplicateShape = page.getByRole('button', { name: 'Duplicate', exact: true });
   await duplicateShape.click();
   await page.waitForFunction(() => {
-    return [...document.querySelectorAll('button')].filter(
-      (node) => /^Shape shape /i.test(node.getAttribute('aria-label') || '')
+    return [...document.querySelectorAll('button[aria-label]')].filter(
+      (node) => / shape (?:selected|edit|locked|hidden)$/i.test(node.getAttribute('aria-label') || '')
     ).length >= 2;
   });
 
