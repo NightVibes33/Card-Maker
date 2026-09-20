@@ -2228,7 +2228,7 @@ export default function Page() {
               : null;
           const indexedUpdatedAt = Number(draft?.updatedAt || 0);
           const preferredDraft =
-            localDraft && (!indexedDraft || localUpdatedAt > indexedUpdatedAt)
+            localDraft && (!indexedDraft || localUpdatedAt >= indexedUpdatedAt)
               ? localDraft
               : indexedDraft;
 
