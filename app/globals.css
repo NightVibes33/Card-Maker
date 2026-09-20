@@ -772,6 +772,21 @@ button:disabled{opacity:.38}
     top:auto;
   }
 }
+@media (max-width:360px){
+  .studioFloatingBar{
+    flex-wrap:wrap;
+    justify-content:flex-start;
+  }
+  .savePill{margin-left:auto}
+  .beforeAfterButton{
+    flex:1 1 100%;
+    width:100%;
+  }
+  .studioToolBar button{
+    padding:0 2px;
+    font-size:10px;
+  }
+}
 @media (prefers-reduced-transparency:reduce){
   :root{--glass:var(--secondary-bg);--glass-strong:var(--secondary-bg)}
   .editingPreview,.tabBar{-webkit-backdrop-filter:none;backdrop-filter:none}
