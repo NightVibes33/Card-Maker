@@ -134,6 +134,12 @@ try {
   });
   await page.getByRole('button', { name: '+ Text', exact: true }).click();
   await page.getByLabel('Layer text').fill('MUST BE CLEARED');
+  await page.getByRole('button', { name: '+ Contactless', exact: true }).click();
+  await page.getByLabel('Contactless Color').evaluate((node) => {
+    node.value = '#00ff66';
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+    node.dispatchEvent(new Event('change', { bubbles: true }));
+  });
 
   await page.getByRole('button', { name: /^EMV Chip Built-in hardware /i }).click();
   await page.getByRole('tab', { name: 'Position', exact: true }).click();
@@ -290,6 +296,81 @@ try {
     );
   }
   console.log('PASS main Card Library hard reset => chip, color, layers, history restored to defaults');
+
+  // Main-menu local file import must have the exact same new-project semantics.
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  await page.getByRole('button', { name: 'Black Metal', exact: true }).click();
+  await page.getByRole('button', { name: '+ Contactless', exact: true }).click();
+  await page.getByLabel('Contactless Color').evaluate((node) => {
+    node.value = '#ff00aa';
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+    node.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.getByRole('tab', { name: 'Discover', exact: true }).click();
+  const discoverUploadInput = page.locator('input[type="file"][accept="image/*"]').first();
+  await discoverUploadInput.setInputFiles({
+    name: 'fresh-main-menu-import.png',
+    mimeType: 'image/png',
+    buffer: imageLayerUpload
+  });
+  await page.getByText('New project created from fresh-main-menu-import.png', { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 10000
+  });
+  const freshMainMenuImportDraft = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('aircard-sticker-fvp-v3') || '{}')
+  );
+  for (const [key, expected] of Object.entries(earlyDefaultState)) {
+    assert.deepEqual(
+      freshMainMenuImportDraft[key],
+      expected,
+      `main-menu local import must hard-reset ${key} to the original default`
+    );
+  }
+  assert.deepEqual(
+    freshMainMenuImportDraft.customLayers,
+    [],
+    'main-menu local import must remove customized chip/contactless/text/image layers'
+  );
+  assert.deepEqual(
+    freshMainMenuImportDraft.layerOrder,
+    ['builtin-chip', 'builtin-contactless', 'builtin-text'],
+    'main-menu local import must restore original built-in layer order'
+  );
+  console.log('PASS main-menu local import => full project reset');
+
+  // Studio Replace Artwork is intentionally edit-in-place, not a new project.
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  await page.getByRole('button', { name: 'Black Metal', exact: true }).click();
+  await page.getByRole('button', { name: '+ Contactless', exact: true }).click();
+  await page.getByLabel('Contactless Color').evaluate((node) => {
+    node.value = '#4455ff';
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+    node.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.getByRole('tab', { name: 'Crop', exact: true }).click();
+  const replaceUploadInput = page.locator('input[type="file"][accept="image/*"]').first();
+  await replaceUploadInput.setInputFiles({
+    name: 'replacement-artwork.png',
+    mimeType: 'image/png',
+    buffer: catalogSkinPng
+  });
+  await page.getByText('Artwork replaced · existing card settings kept', { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 10000
+  });
+  const replaceArtworkDraft = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('aircard-sticker-fvp-v3') || '{}')
+  );
+  assert.equal(replaceArtworkDraft.chipTone, 'black', 'Replace Artwork must preserve chip customization');
+  assert.equal(
+    replaceArtworkDraft.customLayers?.some(
+      (layer) => layer.type === 'contactless' && layer.color === '#4455ff'
+    ),
+    true,
+    'Replace Artwork must preserve custom contactless layers/colors'
+  );
+  console.log('PASS Studio Replace Artwork => existing project settings preserved');
 
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
 
