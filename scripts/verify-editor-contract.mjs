@@ -37,6 +37,11 @@ const pageChecks = [
 
 for (const [pattern, label] of pageChecks) requireMatch(page, pattern, label);
 
+requireMatch(page, /onChange=\{emit\}/, 'range sliders use React controlled onChange');
+if (/onInput=\{emit\}/.test(page)) {
+  throw new Error('Editor contract failed: range sliders must not use raw onInput');
+}
+
 const touchChecks = [
   [/\.studioToolBar button\{[^}]*min-height:44px/s, 'Studio tool buttons'],
   [/\.previewModeToggle button\{[^}]*min-height:44px/s, 'Preview mode buttons'],
