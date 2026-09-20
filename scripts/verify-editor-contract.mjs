@@ -102,6 +102,7 @@ requireMatch(page, /const MAX_STORED_LAYER_IMAGE_DIMENSION = 2560;/, 'custom ima
 requireMatch(page, /const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS \+ 1;/, 'preset asset capacity covers every custom layer plus the imported background');
 requireMatch(page, /async function prepareLocalImageBlob\(/, 'oversized local images are downsampled before persistence');
 requireMatch(page, /maxPixels: MAX_STORED_LAYER_IMAGE_PIXELS/, 'custom image-layer imports use the smaller working set');
+requireMatch(page, /source\.startsWith\('\/api\/image\?'\) \|\| \^https:/, 'restored proxied artwork is normalized back to working resolution');
 requireMatch(page, /const decodedBySource = new Map\(\);/, 'duplicate image layers share decoded sources');
 requireMatch(page, /const animatedOrVectorSource =/, 'animated and vector imports are normalized');
 requireMatch(page, /gif\|apng\|svg\\\+xml/, 'APNG, GIF, and SVG imports use deterministic rasterization');
