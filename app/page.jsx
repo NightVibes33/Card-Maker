@@ -4132,11 +4132,11 @@ export default function Page() {
       return false;
     }
     const workingImage = proxyImageWidth(item.image, 3072);
-    beginArtworkReplacement(workingImage);
     if (!workingImage) {
       setMessage('This artwork source is unavailable or unsupported.');
       return false;
     }
+    beginArtworkReplacement(workingImage);
     patch({
       background: workingImage,
       backgroundLabel: item.title,
