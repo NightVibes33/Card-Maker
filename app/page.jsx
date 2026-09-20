@@ -3054,7 +3054,7 @@ export default function Page() {
           ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
           ctx.fill();
         } else {
-          roundRect(ctx, -w / 2, -h / 2, w, h, clamp(Number(layer.radius ?? 26), 0, Math.min(w, h) / 2));
+          roundRect(ctx, -w / 2, -h / 2, w, h, clamp(Number(layer.radius ?? 28), 0, Math.min(w, h) / 2));
           ctx.fill();
         }
       } else if (layer.type === 'image') {
@@ -4801,7 +4801,7 @@ export default function Page() {
             layerScale,
             shapeWidth,
             shapeHeight,
-            clamp(Number(layer.radius ?? 26), 0, Math.min(shapeWidth, shapeHeight) / 2),
+            clamp(Number(layer.radius ?? 28), 0, Math.min(shapeWidth, shapeHeight) / 2),
             hitPadding
           )
         ) {
