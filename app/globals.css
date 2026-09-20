@@ -818,7 +818,10 @@ button:disabled{opacity:.38}
 }
 @media (prefers-reduced-transparency:reduce){
   :root{--glass:var(--secondary-bg);--glass-strong:var(--secondary-bg)}
-  .editingPreview,.tabBar{-webkit-backdrop-filter:none;backdrop-filter:none}
+  .editingPreview,.tabBar,.studioModeRow,.studioFloatingBar,.modalBackdrop,.modalSheet{
+    -webkit-backdrop-filter:none;
+    backdrop-filter:none
+  }
 }
 @media (prefers-contrast:more){
   :root{--separator:rgba(60,60,67,.42)}
@@ -1319,7 +1322,8 @@ button:disabled{opacity:.38}
 .installModal .primaryAction{width:100%}
 .infiniteSentinel{width:100%;height:2px}
 @media (prefers-reduced-transparency:reduce){
-  .studioFloatingBar,.modalSheet{background:var(--secondary-bg);-webkit-backdrop-filter:none;backdrop-filter:none}
+  .studioFloatingBar,.modalSheet,.studioModeRow{background:var(--secondary-bg)}
+  .modalBackdrop{background:rgba(0,0,0,.68)}
 }
 
 .bleedEdge{
