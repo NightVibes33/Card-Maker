@@ -89,6 +89,7 @@ const pageChecks = [
   [/for \(const snapshot of undoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves undo history assets'],
   [/for \(const snapshot of redoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves redo history assets'],
   [/const pendingNamedSave = projectSaveInFlightRef\.current \? 1 : 0;/, 'project duplication counts an in-flight named save against the project cap'],
+  [/if \(projectOpsRef\.current\.size\) \{[\s\S]{0,180}before cleaning imported images/, 'import cleanup waits for active project transactions'],
   [/const imageImportGenerationRef = useRef\(0\)/, 'image imports use a generation token'],
   [/function invalidatePendingImageImport\(\)/, 'newer card actions can invalidate stale image imports'],
   [/await dbDelete\('imports', id\)\.catch/, 'stale background imports remove orphaned blobs'],
