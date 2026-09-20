@@ -117,66 +117,106 @@ function openDb() {
   return dbPromise;
 }
 
+function isRetriableDbError(error) {
+  return ['InvalidStateError', 'TransactionInactiveError', 'AbortError', 'UnknownError']
+    .includes(String(error?.name || ''));
+}
+
+async function withDbRetry(operation) {
+  let lastError = null;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let db = null;
+    try {
+      db = await openDb();
+      if (!db) throw new Error('IndexedDB unavailable');
+      return await operation(db);
+    } catch (error) {
+      lastError = error;
+      if (attempt > 0 || !isRetriableDbError(error)) throw error;
+
+      try {
+        db?.close();
+      } catch {}
+      dbPromise = null;
+    }
+  }
+
+  throw lastError || new Error('IndexedDB operation failed');
+}
+
 export async function dbPut(store, value) {
-  const db = await openDb();
-  if (!db) throw new Error('IndexedDB unavailable');
+  return withDbRetry((db) => new Promise((resolve, reject) => {
+    let tx;
+    try {
+      const stores = store === 'imports' ? ['imports', 'importMeta'] : [store];
+      tx = db.transaction(stores, 'readwrite');
+      tx.objectStore(store).put(value);
 
-  return new Promise((resolve, reject) => {
-    const stores = store === 'imports' ? ['imports', 'importMeta'] : [store];
-    const tx = db.transaction(stores, 'readwrite');
-    tx.objectStore(store).put(value);
-
-    if (store === 'imports' && value?.id) {
-      tx.objectStore('importMeta').put(importMetadata(value));
+      if (store === 'imports' && value?.id) {
+        tx.objectStore('importMeta').put(importMetadata(value));
+      }
+    } catch (error) {
+      reject(error);
+      return;
     }
 
     tx.oncomplete = () => resolve(value);
     tx.onerror = () => reject(tx.error || new Error('IndexedDB write failed'));
     tx.onabort = () => reject(tx.error || new Error('IndexedDB write aborted'));
-  });
+  }));
 }
 
 export async function dbGet(store, id) {
-  const db = await openDb();
-  if (!db) return null;
-
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, 'readonly');
-    const request = tx.objectStore(store).get(id);
+  return withDbRetry((db) => new Promise((resolve, reject) => {
+    let request;
+    try {
+      const tx = db.transaction(store, 'readonly');
+      request = tx.objectStore(store).get(id);
+    } catch (error) {
+      reject(error);
+      return;
+    }
     request.onsuccess = () => resolve(request.result || null);
     request.onerror = () => reject(request.error || new Error('IndexedDB read failed'));
-  });
+  }));
 }
 
 export async function dbGetAll(store) {
-  const db = await openDb();
-  if (!db) return [];
-
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, 'readonly');
-    const request = tx.objectStore(store).getAll();
+  return withDbRetry((db) => new Promise((resolve, reject) => {
+    let request;
+    try {
+      const tx = db.transaction(store, 'readonly');
+      request = tx.objectStore(store).getAll();
+    } catch (error) {
+      reject(error);
+      return;
+    }
     request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
     request.onerror = () => reject(request.error || new Error('IndexedDB list failed'));
-  });
+  }));
 }
 
 export async function dbDelete(store, id) {
-  const db = await openDb();
-  if (!db) throw new Error('IndexedDB unavailable');
+  return withDbRetry((db) => new Promise((resolve, reject) => {
+    let tx;
+    try {
+      const stores = store === 'imports' ? ['imports', 'importMeta'] : [store];
+      tx = db.transaction(stores, 'readwrite');
+      tx.objectStore(store).delete(id);
 
-  return new Promise((resolve, reject) => {
-    const stores = store === 'imports' ? ['imports', 'importMeta'] : [store];
-    const tx = db.transaction(stores, 'readwrite');
-    tx.objectStore(store).delete(id);
-
-    if (store === 'imports') {
-      tx.objectStore('importMeta').delete(id);
+      if (store === 'imports') {
+        tx.objectStore('importMeta').delete(id);
+      }
+    } catch (error) {
+      reject(error);
+      return;
     }
 
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error || new Error('IndexedDB delete failed'));
     tx.onabort = () => reject(tx.error || new Error('IndexedDB delete aborted'));
-  });
+  }));
 }
 
 export async function dbGetImportMetadata() {
