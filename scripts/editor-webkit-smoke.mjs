@@ -238,6 +238,33 @@ try {
   await restoredTextRow.click();
   assert.equal(await page.getByLabel('Layer text').inputValue(), 'AVATAR\nWA');
 
+  // Exercise the named-project Library independently of autosave. Save this
+  // exact state, mutate the text, then reopen the project and confirm the
+  // saved snapshot wins without losing imported-asset references.
+  await page.getByRole('tab', { name: 'Library', exact: true }).click();
+  await page.getByLabel('Project name').fill('WebKit Project');
+  await page.getByRole('button', { name: 'Save Current Design', exact: true }).click();
+  const savedProject = page.locator('article.projectCard').filter({ hasText: 'WebKit Project' }).first();
+  await savedProject.waitFor({ state: 'visible', timeout: 15000 });
+
+  await page.getByRole('tab', { name: 'Studio', exact: true }).click();
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  await page.getByRole('button', { name: /^Text text /i }).first().click();
+  await page.getByLabel('Layer text').fill('MUTATED');
+  assert.equal(await page.getByLabel('Layer text').inputValue(), 'MUTATED');
+
+  await page.getByRole('tab', { name: 'Library', exact: true }).click();
+  const savedProjectAgain = page.locator('article.projectCard').filter({ hasText: 'WebKit Project' }).first();
+  await savedProjectAgain.getByRole('button', { name: 'Open', exact: true }).click();
+
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  await page.getByRole('button', { name: /^Text text /i }).first().click();
+  assert.equal(
+    await page.getByLabel('Layer text').inputValue(),
+    'AVATAR\nWA',
+    'opening a named project must restore its saved design snapshot'
+  );
+
   await page.getByRole('tab', { name: 'Export', exact: true }).click();
   const save2x = page.getByRole('button', { name: /Save 2× Image/ }).first();
   await save2x.waitFor({ state: 'visible' });
