@@ -15,6 +15,8 @@ import {
 const OUT_W = 1536;
 const OUT_H = 969;
 const CARD_RATIO = OUT_W / OUT_H;
+const MAX_IMAGE_IMPORT_BYTES = 30 * 1024 * 1024;
+const MAX_PRESET_IMPORT_BYTES = 64 * 1024 * 1024;
 
 const CUCU_CATEGORIES = [
   ['all', 'All Card Skins'],
@@ -2373,6 +2375,14 @@ export default function Page() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    if (file.type && !file.type.startsWith('image/')) {
+      setMessage('Choose an image file.');
+      return;
+    }
+    if (file.size > MAX_IMAGE_IMPORT_BYTES) {
+      setMessage('Image is too large. Choose a file under 30 MB.');
+      return;
+    }
 
     const id = makeId('import');
     const asset = {
@@ -2409,6 +2419,14 @@ export default function Page() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    if (file.type && !file.type.startsWith('image/')) {
+      setMessage('Choose an image file.');
+      return;
+    }
+    if (file.size > MAX_IMAGE_IMPORT_BYTES) {
+      setMessage('Image is too large. Choose a file under 30 MB.');
+      return;
+    }
 
     const assetId = makeId('import');
     const layerId = makeId('layer');
@@ -2855,6 +2873,10 @@ export default function Page() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    if (file.size > MAX_PRESET_IMPORT_BYTES) {
+      setMessage('Design preset is too large to import safely.');
+      return;
+    }
 
     try {
       const payload = JSON.parse(await file.text());
@@ -2863,6 +2885,10 @@ export default function Page() {
       const idMap = {};
       for (const [oldId, asset] of Object.entries(payload.assets || {})) {
         if (!asset?.data) continue;
+        const assetType = String(asset.type || '');
+        if ((assetType && !assetType.startsWith('image/')) || !String(asset.data).startsWith('data:image/')) {
+          throw new Error('Preset contains a non-image asset');
+        }
         const newId = makeId('import');
         idMap[oldId] = newId;
         await dbPut('imports', {
