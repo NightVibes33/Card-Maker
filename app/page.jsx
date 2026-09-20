@@ -6648,6 +6648,7 @@ export default function Page() {
                       <span><strong>Replace Artwork</strong><small>Photos or Files</small></span>
                       <IOSIcon name="photo" size={19} />
                     </button>
+                    <input ref={uploadRef} type="file" accept="image/*" hidden onChange={uploadImage} />
                     <div className="cropControlBlock">
                       <SliderRow label="Crop Left" value={design.sourceCrop?.x || 0} min={0} max={0.9} step={0.005} disabled={!activeImageEditable} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('left', value)} />
                       <SliderRow label="Crop Right" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.x - design.sourceCrop.w) : 0} min={0} max={0.9} step={0.005} disabled={!activeImageEditable} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('right', value)} />
