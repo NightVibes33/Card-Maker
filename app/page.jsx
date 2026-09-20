@@ -1232,7 +1232,7 @@ function proxyImageWidth(src = '', width = 1600) {
     }
   }
 
-  if (!source.startsWith('/api/image?')) return source;
+  if (!source.startsWith('/api/image?')) return '';
 
   const params = new URLSearchParams(source.slice('/api/image?'.length));
   const rawUrl = params.get('url');
@@ -3747,6 +3747,10 @@ export default function Page() {
     invalidatePendingImageImport();
     invalidatePendingPresetImport();
     const workingImage = proxyImageWidth(item.image, 3072);
+    if (!workingImage) {
+      setMessage('This artwork source is unavailable or unsupported.');
+      return;
+    }
     patch({
       background: workingImage,
       backgroundLabel: item.title,
