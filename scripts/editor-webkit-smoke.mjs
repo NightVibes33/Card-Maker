@@ -505,7 +505,7 @@ try {
   );
 
   // New Card is destructive-looking UI but must remain one-step undoable.
-  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByRole('button', { name: /New Card/ }).click();
   await page.getByText('New card · Undo is available', { exact: true }).waitFor({
     state: 'visible',
     timeout: 5000
