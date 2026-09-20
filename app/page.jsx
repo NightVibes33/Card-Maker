@@ -2166,10 +2166,33 @@ export default function Page() {
     });
   }
 
+  function patchImageTarget(delta) {
+    patch((current) => {
+      const layer = (current.customLayers || []).find((entry) => entry.id === selectedElement);
+      if (layer?.type === 'image') {
+        return {
+          customLayers: (current.customLayers || []).map((entry) =>
+            entry.id === layer.id
+              ? {
+                  ...entry,
+                  adjustments: {
+                    ...IMAGE_LAYER_DEFAULTS,
+                    ...(entry.adjustments || {}),
+                    ...delta
+                  }
+                }
+              : entry
+          )
+        };
+      }
+      return delta;
+    });
+  }
+
   function applyAdjustmentPreset(name) {
     const preset = ADJUSTMENT_PRESETS[name];
     if (!preset) return;
-    patch(preset);
+    patchImageTarget(preset);
     setMessage(name + ' preset applied');
   }
 
@@ -2609,6 +2632,17 @@ export default function Page() {
     [design.customLayers, selectedElement]
   );
 
+  const selectedImageLayer = selectedLayer?.type === 'image' ? selectedLayer : null;
+  const activeImageSettings = selectedImageLayer
+    ? { ...IMAGE_LAYER_DEFAULTS, ...(selectedImageLayer.adjustments || {}) }
+    : design;
+  const activeImageAvailable = selectedImageLayer
+    ? Boolean(selectedImageLayer.src)
+    : Boolean(design.background);
+  const activeImageLabel = selectedImageLayer
+    ? (selectedImageLayer.name || 'Image Layer')
+    : 'Artwork';
+
   const visualLayerStack = useMemo(() => {
     const custom = new Map((design.customLayers || []).map((layer) => [layer.id, layer]));
     return normalizeLayerOrder(design)
@@ -2656,7 +2690,7 @@ export default function Page() {
         <button
           type="button"
           className="beforeAfterButton"
-          disabled={!design.background}
+          disabled={!activeImageAvailable}
           onPointerDown={() => setShowOriginal(true)}
           onPointerUp={() => setShowOriginal(false)}
           onPointerCancel={() => setShowOriginal(false)}
