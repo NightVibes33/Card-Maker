@@ -4322,8 +4322,13 @@ export default function Page() {
       const blob = new Blob([json], { type: 'application/json' });
       url = URL.createObjectURL(blob);
       anchor = document.createElement('a');
+      const presetFileBase =
+        (payload.design.backgroundLabel || 'aircard-design')
+          .replace(/[^a-z0-9_-]+/gi, '-')
+          .replace(/^-+|-+$/g, '') ||
+        'aircard-design';
       anchor.href = url;
-      anchor.download = (payload.design.backgroundLabel || 'aircard-design').replace(/[^a-z0-9_-]+/gi, '-') + '.aircard.json';
+      anchor.download = presetFileBase + '.aircard.json';
       anchor.style.display = 'none';
       document.body.appendChild(anchor);
       anchor.click();
