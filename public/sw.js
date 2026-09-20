@@ -106,7 +106,10 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
 
   if (url.pathname === '/api/image') {
-    const cacheName = url.searchParams.has('w') ? THUMB_CACHE : ART_CACHE;
+    const requestedWidth = Number(url.searchParams.get('w') || 0);
+    const cacheName = requestedWidth > 0 && requestedWidth <= 800
+      ? THUMB_CACHE
+      : ART_CACHE;
     event.respondWith(cacheFirst(event.request, cacheName));
     return;
   }
