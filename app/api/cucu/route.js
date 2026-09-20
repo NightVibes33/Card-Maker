@@ -32,6 +32,33 @@ function imageProxy(url) {
   return '/api/image?url=' + encodeURIComponent(url);
 }
 
+function assetScore(raw, image = {}) {
+  const url = String(raw || '').toLowerCase();
+  const alt = cleanText(image?.alt || '').toLowerCase();
+  const filename = url.split('/').pop()?.split('?')[0] || '';
+  let score = 0;
+
+  if (/\.png$/i.test(filename)) score += 8;
+  else if (/\.(webp|jpe?g)$/i.test(filename)) score += 3;
+
+  if (/\/cdn\/shop\/(files|products)\//i.test(url)) score += 5;
+
+  // CUCU's flat card artwork commonly uses SKU-style filenames such as
+  // 002536a-4.png / 000230c-1.png. Prefer those over lifestyle/mockup media.
+  if (/^\d{5,}[a-z]?[-_]\d+\.(png|webp|jpe?g)$/i.test(filename)) score += 30;
+  if (/^\d{5,}[a-z]?\.(png|webp|jpe?g)$/i.test(filename)) score += 22;
+
+  if (/(mockup|lifestyle|customer|review|package|packaging|install|instruction|size[-_ ]?guide|material)/i.test(filename + ' ' + alt)) {
+    score -= 40;
+  }
+
+  const width = Number(image?.width || 0);
+  if (width >= 1000) score += 4;
+  else if (width >= 700) score += 2;
+
+  return score;
+}
+
 async function fetchWithTimeout(url, options = {}, timeout = 10000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
@@ -149,18 +176,39 @@ function flattenProduct(product) {
   if (!handle) return null;
 
   const images = Array.isArray(product?.images) ? product.images : [];
-  const candidates = [];
+  const ranked = [];
 
   for (const image of images) {
     const src = normalizeImageUrl(
       typeof image === 'string' ? image : image?.src || image?.url || ''
     );
-    if (src && !candidates.includes(src)) candidates.push(src);
-    if (candidates.length >= 8) break;
+    if (!src) continue;
+    ranked.push({
+      src,
+      score: assetScore(src, typeof image === 'string' ? {} : image),
+      alt: cleanText(typeof image === 'string' ? '' : image?.alt || '')
+    });
   }
 
-  const featured = normalizeImageUrl(product?.image?.src || product?.image || '');
-  if (featured && !candidates.includes(featured)) candidates.unshift(featured);
+  const featuredRaw = product?.image?.src || product?.image || '';
+  const featured = normalizeImageUrl(featuredRaw);
+  if (featured) {
+    ranked.push({
+      src: featured,
+      score: assetScore(featured, typeof product?.image === 'object' ? product.image : {}),
+      alt: cleanText(product?.image?.alt || '')
+    });
+  }
+
+  const seenAssets = new Set();
+  const candidates = ranked
+    .sort((a, b) => b.score - a.score)
+    .filter((asset) => {
+      if (!asset.src || seenAssets.has(asset.src)) return false;
+      seenAssets.add(asset.src);
+      return true;
+    })
+    .slice(0, 8);
 
   if (!candidates.length) return null;
 
@@ -171,13 +219,15 @@ function flattenProduct(product) {
     id: 'cucu-' + handle,
     title,
     subtitle: 'CUCU Covers',
-    image: imageProxy(candidates[0]),
-    candidateImages: candidates.slice(0, 8).map(imageProxy),
+    image: imageProxy(candidates[0].src),
+    candidateImages: candidates.map((asset) => imageProxy(asset.src)),
+    directAssetUrls: candidates.map((asset) => asset.src),
     source: 'CUCU Covers',
     sourceUrl: ORIGIN + '/products/' + handle,
     mediaType: 'premade-card-skin',
-    cleanFilter: 'collection-source-media',
-    mediaAlt: cleanText(images[0]?.alt || title),
+    cleanFilter: 'direct-shopify-card-art',
+    assetMode: 'direct-card-art',
+    mediaAlt: candidates[0].alt || title,
     collection: COLLECTION,
     tags
   };
