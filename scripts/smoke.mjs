@@ -77,7 +77,9 @@ async function checkCatalog() {
     item.assetMode !== 'direct-card-art' ||
     !item.image?.startsWith('/api/image?') ||
     !item.thumbnail?.startsWith('/api/image?') ||
+    !item.image.includes('v=2') ||
     !item.thumbnail.includes('w=560') ||
+    !item.thumbnail.includes('v=2') ||
     !Array.isArray(item.inspectUrls) ||
     item.inspectUrls.length < 1 ||
     !item.inspectUrls.every((url) => url.startsWith('/api/cucu/inspect?'))
