@@ -99,6 +99,7 @@ const pageChecks = [
   [/for \(const layer of currentDesign\.customLayers \|\| \[\]\)/, 'project saving scans custom layers for remote artwork'],
   [/some remote art is not cached offline/, 'project saving reports incomplete offline artwork caching'],
   [/const referencedPresetAssetIds = new Set\(\)/, 'preset import tracks only referenced embedded assets'],
+  [/const stored = await dbGet\('imports', asset\.id\)/, 'preset export re-reads one image blob at a time instead of retaining all blobs'],
   [/Preset is missing a referenced image asset/, 'preset import rejects missing referenced image blobs'],
   [/Undo returns to your previous card/, 'opening a saved project remains reversible'],
   [/const undo = useCallback\(\(\) => \{[\s\S]{0,260}invalidatePendingImageImport\(\);[\s\S]{0,120}invalidatePendingPresetImport\(\);/, 'Undo cancels in-flight image and preset imports'],
