@@ -425,6 +425,7 @@ try {
   const chipYBefore = Number(await builtinChipY.inputValue());
   const chipScaleBefore = Number(await builtinChipScale.inputValue());
 
+  await editorCanvas.scrollIntoViewIfNeeded();
   const chipCanvasBox = await editorCanvas.boundingBox();
   assert.ok(chipCanvasBox, 'built-in chip test requires a visible editor canvas');
 
