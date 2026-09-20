@@ -417,6 +417,7 @@ try {
     mimeType: 'image/png',
     buffer: imageLayerUpload
   });
+  await discoverUploadInput.dispatchEvent('change');
 
   await page.waitForFunction(
     () => {
@@ -471,6 +472,7 @@ try {
     mimeType: 'image/png',
     buffer: catalogSkinPng
   });
+  await replaceUploadInput.dispatchEvent('change');
   await page.waitForFunction(
     () => {
       try {
