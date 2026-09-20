@@ -3633,6 +3633,10 @@ export default function Page() {
                     >
                       Done Editing Layer
                     </button>
+                    {selectedLayer.locked ? (
+                      <div className="lockedLayerNotice" role="status">Locked · unlock this layer to edit its content or transform.</div>
+                    ) : null}
+                    <fieldset className="layerEditorFieldset" disabled={Boolean(selectedLayer.locked)}>
                     {selectedLayer.type === 'text' ? (
                       <>
                         <input className="iosTextField" aria-label="Layer text" value={selectedLayer.text ?? ''} onChange={(event) => updateLayer(selectedLayer.id, { text: event.target.value })} />
@@ -3736,6 +3740,7 @@ export default function Page() {
                         ) : null}
                       </div>
                     ) : null}
+                    </fieldset>
                     <SwitchRow label="Lock Layer" value={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id, { locked: value })} />
                     <div className="layerActionGrid">
                       <button type="button" onClick={() => moveLayer(selectedLayer.id, 1)}>Bring Forward</button>
