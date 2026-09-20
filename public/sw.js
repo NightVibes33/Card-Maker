@@ -151,13 +151,13 @@ async function networkFirst(request, cacheName) {
     }
 
     if (response.status >= 500) {
-      const hit = await cache.match(request);
+      const hit = await cache.match(request) || await cache.match('/');
       if (hit) return hit;
     }
 
     return response;
   } catch {
-    const hit = await cache.match(request);
+    const hit = await cache.match(request) || await cache.match('/');
     return hit || new Response('Offline', { status: 503 });
   }
 }
