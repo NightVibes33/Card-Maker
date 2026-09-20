@@ -13,6 +13,7 @@ function requireMatch(source, pattern, label) {
 const page = read('app/page.jsx');
 const css = read('app/globals.css');
 const sw = read('public/sw.js');
+const storage = read('app/lib/storage.js');
 const imageRoute = read('app/api/image/route.js');
 const inspectRoute = read('app/api/cucu/inspect/route.js');
 
@@ -59,6 +60,13 @@ for (const [pattern, label] of touchChecks) {
 requireMatch(sw, /\[ART_CACHE\]:\s*40/, 'full artwork cache is bounded');
 requireMatch(sw, /\[THUMB_CACHE\]:\s*160/, 'thumbnail cache is bounded separately');
 requireMatch(sw, /async function trimCache\(/, 'service-worker cache eviction exists');
+requireMatch(storage, /const DB_VERSION = 2;/, 'IndexedDB schema includes import metadata migration');
+requireMatch(storage, /'importMeta'/, 'import metadata store exists');
+requireMatch(storage, /export async function dbGetImportMetadata\(/, 'metadata-only import listing exists');
+requireMatch(page, /dbGetImportMetadata\(\)/, 'Library hydrates import metadata instead of blobs');
+if (/dbGetAll\('imports'\)/.test(page)) {
+  throw new Error('Editor contract failed: Library must not hydrate full import blobs into React state');
+}
 
 console.log('PASS editor regression contract');
 
