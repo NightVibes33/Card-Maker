@@ -1721,6 +1721,13 @@ async function probeLocalImageDimensions(blob) {
   ) {
     for (let i = 4; i + 16 <= probe.length; i += 1) {
       if (readAscii(probe, i, 4) !== 'ispe') continue;
+
+      // 'ispe' is a FullBox: size + type + version/flags + width + height.
+      // Validate the enclosing box before trusting dimension-looking bytes.
+      const boxStart = i - 4;
+      const boxSize = view.getUint32(boxStart, false);
+      if (boxSize < 20 || boxStart + boxSize > probe.length) continue;
+
       const width = view.getUint32(i + 8, false);
       const height = view.getUint32(i + 12, false);
       if (plausibleImageDimensions(width, height)) return { width, height };
