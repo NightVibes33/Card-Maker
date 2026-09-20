@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 const ORIGIN = 'https://cucucovers.com';
 const COLLECTION = 'all-card-covers';
 const SHOPIFY_PAGE_SIZE = 250;
-const FALLBACK_TOTAL = 2199;
+const FALLBACK_TOTAL = 2225;
 
 const pageCache = new Map();
 let countCache = null;
