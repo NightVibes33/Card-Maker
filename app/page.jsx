@@ -5806,9 +5806,6 @@ export default function Page() {
   const activeImageSettings = selectedImageLayer
     ? { ...IMAGE_LAYER_DEFAULTS, ...(selectedImageLayer.adjustments || {}) }
     : design;
-  const activeImageAvailable = selectedImageLayer
-    ? Boolean(selectedImageLayer.src)
-    : Boolean(design.background);
   const activeImageRenderable = selectedImageLayer
     ? Boolean(
         selectedImageLayer.src &&
