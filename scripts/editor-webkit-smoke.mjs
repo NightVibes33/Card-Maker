@@ -550,7 +550,7 @@ try {
 
   await editorCanvas.evaluate((node, normalizedX) => {
     const rect = node.getBoundingClientRect();
-    const cx = rect.left + rect.width * normalizedX;
+    const cx = rect.left + rect.width * (normalizedX + 100 / 1536);
     const cy = rect.top + rect.height * 0.5;
     const originalSetPointerCapture = node.setPointerCapture;
     node.setPointerCapture = () => {};
@@ -623,9 +623,18 @@ try {
   );
 
   // A duplicate at the right edge must not clamp directly on top of its
-  // source. Move the source to x=1, duplicate it, and require an inward
-  // offset for the newly selected copy.
-  await layerX.evaluate((node) => {
+  // source. Explicitly reselect the shape first so this test cannot inherit a
+  // different selection from prior canvas gestures.
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  const shapeForDuplicate = page.getByRole('button', { name: /^Shape shape /i }).first();
+  await shapeForDuplicate.waitFor({ state: 'visible', timeout: 5000 });
+  if (!/selected/i.test(await shapeForDuplicate.getAttribute('aria-label') || '')) {
+    await shapeForDuplicate.click();
+  }
+
+  await page.getByRole('tab', { name: 'Position', exact: true }).click();
+  const duplicateSourceX = page.getByLabel('Layer horizontal position');
+  await duplicateSourceX.evaluate((node) => {
     node.value = '1';
     node.dispatchEvent(new Event('input', { bubbles: true }));
   });
@@ -635,13 +644,9 @@ try {
   });
 
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
-  const duplicateShape = page.getByRole('button', { name: 'Duplicate', exact: true });
-  await duplicateShape.click();
-  await page.waitForFunction(() => {
-    return [...document.querySelectorAll('button[aria-label]')].filter(
-      (node) => / shape (?:selected|edit|locked|hidden)$/i.test(node.getAttribute('aria-label') || '')
-    ).length >= 2;
-  });
+  await page.getByRole('button', { name: 'Duplicate', exact: true }).click();
+  const duplicatedShapeRow = page.getByRole('button', { name: /^Shape Copy shape selected/i }).first();
+  await duplicatedShapeRow.waitFor({ state: 'visible', timeout: 5000 });
 
   await page.getByRole('tab', { name: 'Position', exact: true }).click();
   const duplicateLayerX = page.getByLabel('Layer horizontal position');
@@ -656,14 +661,10 @@ try {
   );
 
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
-  const deleteShape = page.getByRole('button', { name: 'Delete', exact: true });
-  await deleteShape.click();
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await page.waitForFunction(() => {
-    return [...document.querySelectorAll('button')].filter(
-      (node) => /^Shape shape /i.test(node.getAttribute('aria-label') || '')
-    ).length >= 2;
-  });
+  await page.getByRole('button', { name: /^Shape Copy shape selected/i }).first()
+    .waitFor({ state: 'visible', timeout: 5000 });
 
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
 
