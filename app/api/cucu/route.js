@@ -103,16 +103,35 @@ async function getShopifyPage(page) {
       '&page=' +
       page;
 
-    const response = await fetchWithTimeout(url, {
-      headers: { Accept: 'application/json' }
-    });
+    let lastStatus = 0;
 
-    if (!response.ok) {
-      throw new Error('CUCU collection page ' + page + ' returned ' + response.status);
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      try {
+        const response = await fetchWithTimeout(
+          url,
+          { headers: { Accept: 'application/json' } },
+          12000
+        );
+        lastStatus = response.status;
+
+        if (response.ok) {
+          const json = await response.json();
+          return Array.isArray(json?.products) ? json.products : [];
+        }
+
+        if (response.status < 500 && response.status !== 429) {
+          throw new Error('CUCU collection page ' + page + ' returned ' + response.status);
+        }
+      } catch (error) {
+        if (attempt >= 4) throw error;
+      }
+
+      if (attempt < 4) {
+        await new Promise((resolve) => setTimeout(resolve, 450 * attempt));
+      }
     }
 
-    const json = await response.json();
-    return Array.isArray(json?.products) ? json.products : [];
+    throw new Error('CUCU collection page ' + page + ' returned ' + lastStatus);
   })();
 
   pageCache.set(key, { promise, expires: now + 30 * 60 * 1000 });
