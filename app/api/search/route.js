@@ -46,6 +46,25 @@ const QUERY_ALIASES = new Map([
   ['wednesday', ['Wednesday Dance', 'Wednesday and Enid']]
 ]);
 
+const SEEDED_PRODUCTS = new Map([
+  ['spongebob', [
+    { store: 'CUCU Covers', handle: 'bikini-bottom-dollar-card-cover', term: 'Bikini Bottom' },
+    { store: 'Stickyink Designs', handle: 'bikini-bottom-dollar-c', term: 'Bikini Bottom' }
+  ]],
+  ['spongebob squarepants', [
+    { store: 'CUCU Covers', handle: 'bikini-bottom-dollar-card-cover', term: 'Bikini Bottom' },
+    { store: 'Stickyink Designs', handle: 'bikini-bottom-dollar-c', term: 'Bikini Bottom' }
+  ]],
+  ['rick and morty', [
+    { store: 'Anime Town Creations', handle: 'credit-card-rick-and-morty-fam-skin', term: 'Rick and Morty' },
+    { store: 'Anime Town Creations', handle: 'credit-card-rick-and-morty-portal-skin', term: 'Rick and Morty' }
+  ]],
+  ['wednesday', [
+    { store: 'CUCU Covers', handle: 'wednesday-dance-card-cover', term: 'Wednesday Dance' },
+    { store: 'CUCU Covers', handle: 'wednesday-and-enid-card-cover', term: 'Wednesday and Enid' }
+  ]]
+]);
+
 const REJECT_MEDIA = [
   'size guide',
   'chip guide',
@@ -543,7 +562,23 @@ export async function GET(request) {
       }
     }
 
-    const products = (await Promise.all(productJobs)).filter(Boolean);
+    const seedJobs = [];
+    const seedKey = normalizeComparable(q);
+    for (const seed of SEEDED_PRODUCTS.get(seedKey) || []) {
+      const store = STORES.find((entry) => entry.name === seed.store);
+      if (!store) continue;
+      const productUrl = store.origin + '/products/' + seed.handle;
+      seedJobs.push(
+        fetchProduct(
+          store,
+          { title: seed.term, url: productUrl, image: '' },
+          seed.term,
+          q
+        )
+      );
+    }
+
+    const products = (await Promise.all([...seedJobs, ...productJobs])).filter(Boolean);
 
     const queryTokens = q.toLowerCase().split(/\s+/).filter(Boolean);
     products.sort((a, b) => {
