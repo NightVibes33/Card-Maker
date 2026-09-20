@@ -84,13 +84,23 @@ function cleanText(value = '') {
     .trim();
 }
 
-function isCardSkinTitle(title = '') {
-  const text = title.toLowerCase();
-  if (/(poster|mouse ?pad|phone case|shirt|hoodie|metal print|sticker sheet|design your own|custom card skin|custom credit card)/i.test(text)) return false;
+function isCardSkinProduct(evidence = '', title = '') {
+  const titleText = title.toLowerCase();
+  const text = cleanText(evidence).toLowerCase();
+
+  if (/(poster|mouse ?pad|phone case|shirt|hoodie|metal print|sticker sheet|design your own|custom card skin|custom credit card)/i.test(titleText)) {
+    return false;
+  }
+
+  if (/(poster|mouse ?pad|phone case|shirt|hoodie|metal print)/i.test(text) && !/(credit card skin|debit card skin|card skin|card cover)/i.test(text)) {
+    return false;
+  }
+
   return (
-    /(credit|debit|bank|card).{0,24}(skin|cover|sticker)/i.test(text) ||
-    /(skin|cover|sticker).{0,24}(credit|debit|bank|card)/i.test(text) ||
-    /card skin/i.test(text)
+    /(credit|debit|bank).{0,30}(skin|cover|sticker)/i.test(text) ||
+    /(skin|cover|sticker).{0,30}(credit|debit|bank)/i.test(text) ||
+    /card skin/i.test(text) ||
+    /skin sticker.{0,30}card/i.test(text)
   );
 }
 
@@ -181,6 +191,72 @@ async function htmlSearch(store, term) {
   }));
 }
 
+function slugify(value = '') {
+  return normalizeComparable(value).replace(/\s+/g, '-');
+}
+
+const COLLECTION_HINTS = new Map([
+  ['naruto', ['naruto-skins']],
+  ['one piece', ['one-piece']],
+  ['demon slayer', ['demon-slayer-skins']],
+  ['dragon ball', ['dragon-ball-z']],
+  ['dragon ball z', ['dragon-ball-z']]
+]);
+
+async function collectionSearch(store, term) {
+  if (store.name !== 'Anime Town Creations') return [];
+
+  const key = normalizeComparable(term);
+  const generic = slugify(term);
+  const slugs = [
+    ...(COLLECTION_HINTS.get(key) || []),
+    generic,
+    generic + '-skins'
+  ].filter(Boolean);
+
+  const seenSlug = new Set();
+  const results = [];
+
+  for (const slug of slugs) {
+    if (seenSlug.has(slug)) continue;
+    seenSlug.add(slug);
+
+    try {
+      const endpoint = store.origin + '/collections/' + slug + '/products.json?limit=250';
+      const response = await fetchWithTimeout(endpoint, {
+        headers: { Accept: 'application/json' }
+      });
+
+      if (!response.ok) continue;
+      const json = await response.json();
+
+      for (const product of json?.products || []) {
+        const title = cleanText(product.title || '');
+        const searchable = [
+          title,
+          product.handle || '',
+          product.product_type || '',
+          cleanText(product.body_html || ''),
+          Array.isArray(product.tags) ? product.tags.join(' ') : product.tags || ''
+        ].join(' ');
+
+        if (!isCardSkinProduct(searchable, title)) continue;
+        if (!isRelevantToTerm(searchable, term)) continue;
+
+        results.push({
+          title,
+          url: store.origin + '/products/' + product.handle,
+          image: normalizeImageUrl(product.image?.src || product.images?.[0]?.src || '', store.origin)
+        });
+      }
+
+      if (results.length) break;
+    } catch {}
+  }
+
+  return results.slice(0, 24);
+}
+
 async function catalogSearch(store, term) {
   try {
     const endpoint = store.origin + '/products.json?limit=250';
@@ -198,13 +274,14 @@ async function catalogSearch(store, term) {
     return (json?.products || [])
       .filter((product) => {
         const title = cleanText(product.title || '');
-        if (!isCardSkinTitle(title)) return false;
         const searchable = [
           title,
           product.handle || '',
+          product.product_type || '',
           cleanText(product.body_html || ''),
           Array.isArray(product.tags) ? product.tags.join(' ') : product.tags || ''
         ].join(' ');
+        if (!isCardSkinProduct(searchable, title)) return false;
         return isRelevantToTerm(searchable, term);
       })
       .slice(0, 24)
@@ -219,16 +296,17 @@ async function catalogSearch(store, term) {
 }
 
 async function searchStore(store, term) {
-  const [predictive, html, catalog] = await Promise.all([
+  const [predictive, html, collection, catalog] = await Promise.all([
     predictiveSearch(store, term).catch(() => []),
     htmlSearch(store, term).catch(() => []),
+    collectionSearch(store, term),
     catalogSearch(store, term)
   ]);
 
   const merged = [];
   const seen = new Set();
 
-  for (const hit of [...predictive, ...html, ...catalog]) {
+  for (const hit of [...collection, ...predictive, ...html, ...catalog]) {
     const handle = extractHandle(hit.url);
     if (!handle || seen.has(handle)) continue;
     seen.add(handle);
@@ -316,16 +394,18 @@ async function fetchProduct(store, hit, matchedTerm, originalQuery) {
   } catch {}
 
   const title = cleanText(details?.title || hit.title || handle.replace(/[-_]+/g, ' '));
-  if (!isCardSkinTitle(title)) return null;
 
   const descriptiveText = [
     title,
+    details?.type || '',
+    details?.product_type || '',
     details?.description || '',
     Array.isArray(details?.tags) ? details.tags.join(' ') : details?.tags || '',
     details?.vendor || '',
     ...(details?.media || []).map((media) => media?.alt || media?.preview_image?.alt || '')
   ].join(' ');
 
+  if (!isCardSkinProduct(descriptiveText, title)) return null;
   if (!isRelevantToTerm(descriptiveText, matchedTerm)) return null;
 
   const queryRelevant = isRelevantToTerm(descriptiveText, originalQuery);
