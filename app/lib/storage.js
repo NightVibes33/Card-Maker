@@ -143,23 +143,35 @@ export async function dbGetImportMetadata() {
 
   const snapshot = await new Promise((resolve, reject) => {
     const tx = db.transaction(['imports', 'importMeta'], 'readonly');
-    const importsCountRequest = tx.objectStore('imports').count();
+    const importKeysRequest = tx.objectStore('imports').getAllKeys();
     const metaRequest = tx.objectStore('importMeta').getAll();
-    let importCount = 0;
+    let importKeys = [];
     let metadata = [];
 
-    importsCountRequest.onsuccess = () => {
-      importCount = Number(importsCountRequest.result || 0);
+    importKeysRequest.onsuccess = () => {
+      importKeys = Array.isArray(importKeysRequest.result)
+        ? importKeysRequest.result.map((key) => String(key))
+        : [];
     };
     metaRequest.onsuccess = () => {
       metadata = Array.isArray(metaRequest.result) ? metaRequest.result : [];
     };
-    tx.oncomplete = () => resolve({ importCount, metadata });
+    tx.oncomplete = () => resolve({ importKeys, metadata });
     tx.onerror = () => reject(tx.error || new Error('IndexedDB import metadata read failed'));
     tx.onabort = () => reject(tx.error || new Error('IndexedDB import metadata read aborted'));
   });
 
-  if (snapshot.metadata.length === snapshot.importCount) {
+  const importIds = new Set(snapshot.importKeys);
+  const metadataIds = new Set(
+    snapshot.metadata
+      .map((entry) => String(entry?.id || ''))
+      .filter(Boolean)
+  );
+  const metadataMatchesImports =
+    importIds.size === metadataIds.size &&
+    [...importIds].every((id) => metadataIds.has(id));
+
+  if (metadataMatchesImports) {
     return snapshot.metadata;
   }
 
