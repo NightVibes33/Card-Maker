@@ -1302,25 +1302,39 @@ export default function Page() {
     }
   }, [renderCard, showOriginal, showExportPreview]);
 
-  const loadCucu = useCallback(async (nextPage = 1, replace = false, category = cucuCategory) => {
+  const loadCucu = useCallback(async (
+    nextPage = 1,
+    replace = false,
+    category = cucuCategory,
+    search = query
+  ) => {
     if (cucuLoading) return;
 
     setCucuLoading(true);
-    setMessage('Loading CUCU Covers…');
+    setCatalogError('');
+    setMessage(search ? 'Searching CUCU…' : 'Loading CUCU Covers…');
 
     try {
-      const response = await fetch(
-        '/api/cucu?category=' + encodeURIComponent(category) + '&page=' + encodeURIComponent(nextPage) + '&limit=24'
-      );
+      const params = new URLSearchParams({
+        category,
+        page: String(nextPage),
+        limit: '24'
+      });
+      if (search.trim()) params.set('q', search.trim());
+
+      const response = await fetch('/api/cucu?' + params.toString());
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'CUCU catalog failed');
 
       const rawList = Array.isArray(json.results) ? json.results : [];
       setCucuTotal(Number(json.total) || 0);
       setCucuHasMore(Boolean(json.hasMore));
-      setCucuCategoryLabel(json.categoryLabel || CUCU_CATEGORIES.find(([key]) => key === category)?.[1] || 'Card Skins');
+      setCucuCategoryLabel(
+        search.trim()
+          ? 'Search Results'
+          : json.categoryLabel || CUCU_CATEGORIES.find(([key]) => key === category)?.[1] || 'Card Skins'
+      );
 
-      setMessage('Checking CUCU artwork…');
       const cleanList = await prepareCleanResults(rawList);
 
       setCucuItems((current) => {
@@ -1337,21 +1351,117 @@ export default function Page() {
       setCucuPage(nextPage);
       setMessage(
         cleanList.length
-          ? cleanList.length + ' CUCU covers loaded'
-          : 'This CUCU page had no clean flat previews'
+          ? cleanList.length + (search.trim() ? ' search results loaded' : ' card skins loaded')
+          : 'No usable card skins on this page'
       );
     } catch (error) {
-      setMessage(error?.message || 'CUCU catalog failed');
+      const text = error?.message || 'CUCU catalog failed';
+      setCatalogError(text);
+      setMessage(text);
     } finally {
       setCucuLoading(false);
     }
-  }, [cucuCategory, cucuLoading]);
+  }, [cucuCategory, cucuLoading, query]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const next = searchInput.trim();
+      if (next === query) return;
+      setQuery(next);
+      setCucuItems([]);
+      setCucuPage(0);
+      setCucuTotal(0);
+      setCucuHasMore(true);
+    }, 320);
+    return () => clearTimeout(timer);
+  }, [searchInput, query]);
 
   useEffect(() => {
     if (cucuPage === 0 && !cucuLoading) {
-      loadCucu(1, true, cucuCategory);
+      loadCucu(1, true, cucuCategory, query);
     }
-  }, [cucuCategory, cucuPage, cucuLoading, loadCucu]);
+  }, [cucuCategory, cucuPage, cucuLoading, query, loadCucu]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFeatured() {
+      const shelves = [
+        ['new', 'Recently Added'],
+        ['best', 'Best Sellers'],
+        ['anime', 'Anime'],
+        ['cars', 'Cars'],
+        ['cute', 'Cute & Kawaii'],
+        ['memes', 'Memes']
+      ];
+
+      const next = {};
+      await Promise.all(shelves.map(async ([category, label]) => {
+        try {
+          const response = await fetch('/api/cucu?category=' + encodeURIComponent(category) + '&page=1&limit=8');
+          const json = await response.json();
+          if (!response.ok) return;
+          const items = Array.isArray(json.results) ? json.results.slice(0, 8) : [];
+          next[label] = items;
+        } catch {}
+      }));
+
+      if (!cancelled) setFeatured(next);
+    }
+
+    loadFeatured();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || !cucuHasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && !cucuLoading && cucuHasMore) {
+          loadCucu(cucuPage + 1, false, cucuCategory, query);
+        }
+      },
+      { rootMargin: '500px 0px' }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [cucuHasMore, cucuLoading, cucuPage, cucuCategory, query, loadCucu]);
+
+  async function toggleFavorite(item) {
+    if (!item?.id) return;
+
+    const already = favoriteIds.has(item.id);
+    if (already) {
+      await dbDelete('favorites', item.id).catch(() => {});
+      setFavoriteIds((current) => {
+        const next = new Set(current);
+        next.delete(item.id);
+        return next;
+      });
+      setFavorites((current) => current.filter((entry) => entry.id !== item.id));
+      setMessage('Removed from Favorites');
+      return;
+    }
+
+    const stored = { ...item };
+    await dbPut('favorites', {
+      id: item.id,
+      item: stored,
+      updatedAt: Date.now()
+    }).catch(() => {});
+
+    cacheArtwork(item.image);
+    if (item.thumbnail) cacheArtwork(item.thumbnail);
+
+    setFavoriteIds((current) => new Set([...current, item.id]));
+    setFavorites((current) => [stored, ...current.filter((entry) => entry.id !== item.id)]);
+    setMessage('Added to Favorites');
+  }
 
   function useArtwork(item) {
     patch({
@@ -1362,26 +1472,365 @@ export default function Page() {
       x: 0,
       y: 0,
       rotate: 0,
+      flipX: false,
       fit: 'cover'
     });
     rememberArtwork(item);
-    setMessage(item.title + ' selected · auto-cropped');
+    cacheArtwork(item.image);
+    setSelectedElement('artwork');
+    setStudioTool('position');
+    setTab('studio');
+    setMenuItem(null);
+    setMessage(item.title + ' selected');
   }
 
-  function uploadImage(event) {
+  async function uploadImage(event) {
     const file = event.target.files?.[0];
+    event.target.value = '';
     if (!file) return;
-    const objectUrl = URL.createObjectURL(file);
+
+    const id = makeId('import');
+    const asset = {
+      id,
+      name: file.name || 'Imported image',
+      type: file.type || 'image/*',
+      blob: file,
+      createdAt: Date.now()
+    };
+
+    await dbPut('imports', asset);
+    setImports((current) => [asset, ...current.filter((entry) => entry.id !== id)]);
+
     patch({
-      background: objectUrl,
-      backgroundLabel: file.name,
+      background: 'idb://imports/' + id,
+      backgroundLabel: asset.name,
       sourceCrop: null,
       zoom: 1,
       x: 0,
       y: 0,
-      rotate: 0
+      rotate: 0,
+      flipX: false,
+      fit: 'cover'
     });
-    setMessage('Photo selected');
+    setStudioTool('crop');
+    setTab('studio');
+    setMessage('Imported image ready to crop');
+  }
+
+  async function uploadLayerImage(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    const assetId = makeId('import');
+    const layerId = makeId('layer');
+    const asset = {
+      id: assetId,
+      name: file.name || 'Image layer',
+      type: file.type || 'image/*',
+      blob: file,
+      createdAt: Date.now()
+    };
+
+    await dbPut('imports', asset);
+    setImports((current) => [asset, ...current.filter((entry) => entry.id !== assetId)]);
+    patch((current) => ({
+      customLayers: [
+        ...(current.customLayers || []),
+        {
+          id: layerId,
+          type: 'image',
+          name: asset.name,
+          src: 'idb://imports/' + assetId,
+          x: 0.5,
+          y: 0.5,
+          scale: 1,
+          rotation: 0,
+          opacity: 1,
+          width: 320,
+          locked: false
+        }
+      ]
+    }));
+    setSelectedElement(layerId);
+    setMessage('Image layer added');
+  }
+
+  function addTextLayer() {
+    const id = makeId('layer');
+    patch((current) => ({
+      customLayers: [
+        ...(current.customLayers || []),
+        {
+          id,
+          type: 'text',
+          name: 'Text',
+          text: 'TEXT',
+          x: 0.5,
+          y: 0.5,
+          scale: 1,
+          rotation: 0,
+          opacity: 1,
+          color: '#ffffff',
+          fontSize: 58,
+          weight: 700,
+          letterSpacing: 0,
+          align: 'center',
+          shadow: true,
+          locked: false
+        }
+      ]
+    }));
+    setSelectedElement(id);
+    setMessage('Text layer added');
+  }
+
+  function addShapeLayer() {
+    const id = makeId('layer');
+    patch((current) => ({
+      customLayers: [
+        ...(current.customLayers || []),
+        {
+          id,
+          type: 'shape',
+          name: 'Shape',
+          shape: 'rectangle',
+          x: 0.5,
+          y: 0.5,
+          scale: 1,
+          rotation: 0,
+          opacity: 0.8,
+          color: '#ffffff',
+          width: 280,
+          height: 120,
+          radius: 28,
+          locked: false
+        }
+      ]
+    }));
+    setSelectedElement(id);
+    setMessage('Shape layer added');
+  }
+
+  function updateLayer(id, delta) {
+    patch((current) => ({
+      customLayers: (current.customLayers || []).map((layer) =>
+        layer.id === id ? { ...layer, ...delta } : layer
+      )
+    }));
+  }
+
+  function deleteLayer(id) {
+    patch((current) => ({
+      customLayers: (current.customLayers || []).filter((layer) => layer.id !== id)
+    }));
+    setSelectedElement('artwork');
+  }
+
+  function duplicateLayer(id) {
+    patch((current) => {
+      const source = (current.customLayers || []).find((layer) => layer.id === id);
+      if (!source) return {};
+      const copy = {
+        ...source,
+        id: makeId('layer'),
+        name: (source.name || source.type) + ' Copy',
+        x: clamp(Number(source.x || 0.5) + 0.03, 0, 1),
+        y: clamp(Number(source.y || 0.5) + 0.03, 0, 1)
+      };
+      setSelectedElement(copy.id);
+      return { customLayers: [...(current.customLayers || []), copy] };
+    });
+  }
+
+  function moveLayer(id, direction) {
+    patch((current) => {
+      const layers = [...(current.customLayers || [])];
+      const index = layers.findIndex((layer) => layer.id === id);
+      if (index < 0) return {};
+      const target = clamp(index + direction, 0, layers.length - 1);
+      if (target === index) return {};
+      const [layer] = layers.splice(index, 1);
+      layers.splice(target, 0, layer);
+      return { customLayers: layers };
+    });
+  }
+
+  function applyAdjustmentPreset(name) {
+    const preset = ADJUSTMENT_PRESETS[name];
+    if (!preset) return;
+    patch(preset);
+    setMessage(name + ' preset applied');
+  }
+
+  function applyCardPreset(name) {
+    const preset = CARD_PRESETS[name];
+    if (!preset) return;
+    patch(preset);
+    setMessage(name + ' card preset applied');
+  }
+
+  function surpriseMe() {
+    const pool = [
+      ...cucuItems,
+      ...Object.values(featured).flat()
+    ].filter((item, index, all) => item?.id && all.findIndex((other) => other.id === item.id) === index);
+
+    if (!pool.length) {
+      setMessage('Load some CUCU card skins first');
+      return;
+    }
+
+    const item = pool[Math.floor(Math.random() * pool.length)];
+    useArtwork(item);
+  }
+
+  async function saveProject(nameOverride = '') {
+    const now = Date.now();
+    const id = makeId('project');
+    const name = nameOverride.trim() || design.backgroundLabel || 'Untitled Card';
+    const preview = makeCanvas(384, 242).toDataURL('image/jpeg', 0.78);
+    const project = {
+      id,
+      name,
+      design: { ...design },
+      preview,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    await dbPut('projects', project);
+    setProjects((current) => [project, ...current]);
+    if (design.background.startsWith('/api/image?')) cacheArtwork(design.background);
+    setMessage('Saved to Library');
+    return project;
+  }
+
+  function openProject(project) {
+    if (!project?.design) return;
+    undoRef.current = [];
+    redoRef.current = [];
+    setHistoryVersion((value) => value + 1);
+    setDesign({ ...DEFAULTS, ...project.design });
+    setTab('studio');
+    setMessage(project.name + ' opened');
+  }
+
+  async function duplicateProject(project) {
+    const copy = {
+      ...project,
+      id: makeId('project'),
+      name: (project.name || 'Design') + ' Copy',
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    await dbPut('projects', copy);
+    setProjects((current) => [copy, ...current]);
+    setMessage('Design duplicated');
+  }
+
+  async function removeProject(project) {
+    await dbDelete('projects', project.id);
+    setProjects((current) => current.filter((entry) => entry.id !== project.id));
+    setMessage('Design deleted');
+  }
+
+  async function serializePreset() {
+    const payload = {
+      version: 2,
+      app: 'AirCard Card Studio',
+      exportedAt: new Date().toISOString(),
+      design: JSON.parse(JSON.stringify(design)),
+      assets: {}
+    };
+
+    const refs = new Set();
+    if (design.background?.startsWith('idb://imports/')) {
+      refs.add(design.background.slice('idb://imports/'.length));
+    }
+    for (const layer of design.customLayers || []) {
+      if (layer.src?.startsWith('idb://imports/')) {
+        refs.add(layer.src.slice('idb://imports/'.length));
+      }
+    }
+
+    for (const id of refs) {
+      const asset = await dbGet('imports', id);
+      if (asset?.blob) {
+        payload.assets[id] = {
+          name: asset.name,
+          type: asset.type,
+          data: await blobToDataUrl(asset.blob)
+        };
+      }
+    }
+
+    return payload;
+  }
+
+  async function exportPresetJson() {
+    const payload = await serializePreset();
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = (design.backgroundLabel || 'aircard-design').replace(/[^a-z0-9_-]+/gi, '-') + '.aircard.json';
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1200);
+    setMessage('Design preset exported');
+  }
+
+  async function importPresetJson(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      const payload = JSON.parse(await file.text());
+      if (!payload?.design || Number(payload.version) < 2) throw new Error('Unsupported preset');
+
+      const idMap = {};
+      for (const [oldId, asset] of Object.entries(payload.assets || {})) {
+        if (!asset?.data) continue;
+        const newId = makeId('import');
+        idMap[oldId] = newId;
+        await dbPut('imports', {
+          id: newId,
+          name: asset.name || 'Preset asset',
+          type: asset.type || 'image/*',
+          blob: dataUrlToBlob(asset.data),
+          createdAt: Date.now()
+        });
+      }
+
+      const imported = JSON.parse(JSON.stringify(payload.design));
+      if (imported.background?.startsWith('idb://imports/')) {
+        const oldId = imported.background.slice('idb://imports/'.length);
+        if (idMap[oldId]) imported.background = 'idb://imports/' + idMap[oldId];
+      }
+      imported.customLayers = (imported.customLayers || []).map((layer) => {
+        if (!layer.src?.startsWith('idb://imports/')) return layer;
+        const oldId = layer.src.slice('idb://imports/'.length);
+        return idMap[oldId] ? { ...layer, src: 'idb://imports/' + idMap[oldId] } : layer;
+      });
+
+      patch({ ...DEFAULTS, ...imported });
+      setImports(await dbGetAll('imports'));
+      setTab('studio');
+      setMessage('Design preset imported');
+    } catch {
+      setMessage('Preset could not be imported');
+    }
+  }
+
+  function reset() {
+    undoRef.current = [];
+    redoRef.current = [];
+    setHistoryVersion((value) => value + 1);
+    setDesign(DEFAULTS);
+    setImage(null);
+    setSelectedElement('artwork');
+    setMessage('New card');
   }
 
   function pointerDown(event) {
