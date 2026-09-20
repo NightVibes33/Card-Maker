@@ -189,6 +189,18 @@ try {
     'an exact zero layer coordinate must remain zero'
   );
 
+  // A duplicate at the right edge must not clamp directly on top of its
+  // source. Move the source to x=1, duplicate it, and require an inward
+  // offset for the newly selected copy.
+  await layerX.evaluate((node) => {
+    node.value = '1';
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Layer horizontal position"]');
+    return input && Number(input.value) === 1;
+  });
+
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
   const duplicateShape = page.getByRole('button', { name: 'Duplicate', exact: true });
   await duplicateShape.click();
@@ -198,6 +210,19 @@ try {
     ).length >= 2;
   });
 
+  await page.getByRole('tab', { name: 'Position', exact: true }).click();
+  const duplicateLayerX = page.getByLabel('Layer horizontal position');
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Layer horizontal position"]');
+    const value = Number(input?.value);
+    return Number.isFinite(value) && value < 1 && value > 0.9;
+  });
+  assert.ok(
+    Number(await duplicateLayerX.inputValue()) < 1,
+    'duplicating a layer at x=1 must visibly offset the copy inward'
+  );
+
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
   const deleteShape = page.getByRole('button', { name: 'Delete', exact: true });
   await deleteShape.click();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
