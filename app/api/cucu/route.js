@@ -83,7 +83,7 @@ async function fetchWithTimeout(url, options = {}, timeout = 10000) {
     return await fetch(url, {
       ...options,
       signal: controller.signal,
-      cache: 'no-store',
+      next: options.next || { revalidate: 21600 },
       headers: {
         'User-Agent': 'AirCard-Card-Studio/4.0 (+https://github.com/NightVibes33/Card-Maker)',
         Accept: options.headers?.Accept || '*/*',
