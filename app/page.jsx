@@ -4469,7 +4469,13 @@ export default function Page() {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
-    renderCard(canvas.getContext('2d'), width, height, {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      canvas.width = 1;
+      canvas.height = 1;
+      throw new Error('Canvas rendering is unavailable');
+    }
+    renderCard(ctx, width, height, {
       original: false,
       design: designRef.current
     });
