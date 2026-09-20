@@ -23,7 +23,13 @@ const SAFE_IMAGE_TYPES = new Set([
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 
 function isAllowed(url) {
-  return url.protocol === 'https:' && ALLOWED_HOSTS.has(url.hostname.toLowerCase());
+  return (
+    url.protocol === 'https:' &&
+    (!url.port || url.port === '443') &&
+    !url.username &&
+    !url.password &&
+    ALLOWED_HOSTS.has(url.hostname.toLowerCase())
+  );
 }
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
