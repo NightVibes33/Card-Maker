@@ -492,7 +492,45 @@ function hexToRgb(hex = '#000000') {
 }
 
 let textMeasureCanvas = null;
+let grainTileCanvas = null;
 let graphemeSegmenter = null;
+
+function fillGrain(ctx, x, y, width, height, opacity) {
+  const amount = clamp(Number(opacity || 0), 0, 1);
+  if (!amount || typeof document === 'undefined') return;
+
+  if (!grainTileCanvas) {
+    grainTileCanvas = document.createElement('canvas');
+    grainTileCanvas.width = 64;
+    grainTileCanvas.height = 64;
+    const grainCtx = grainTileCanvas.getContext('2d');
+    if (!grainCtx) {
+      grainTileCanvas = null;
+      return;
+    }
+
+    const pixels = grainCtx.createImageData(64, 64);
+    let seed = 0x6d2b79f5;
+    for (let i = 0; i < pixels.data.length; i += 4) {
+      seed = (Math.imul(seed ^ (seed >>> 15), 1 | seed) + 0x9e3779b9) >>> 0;
+      const value = seed & 1 ? 255 : 0;
+      pixels.data[i] = value;
+      pixels.data[i + 1] = value;
+      pixels.data[i + 2] = value;
+      pixels.data[i + 3] = 255;
+    }
+    grainCtx.putImageData(pixels, 0, 0);
+  }
+
+  const pattern = ctx.createPattern(grainTileCanvas, 'repeat');
+  if (!pattern) return;
+
+  ctx.save();
+  ctx.globalAlpha *= amount;
+  ctx.fillStyle = pattern;
+  ctx.fillRect(x, y, width, height);
+  ctx.restore();
+}
 
 const CONTACTLESS_BOUNDS = {
   left: 14,
@@ -2723,12 +2761,7 @@ export default function Page() {
         artworkEffectClip.height,
         artworkEffectClip.rotation
       );
-      ctx.globalAlpha = renderDesign.grain;
-      for (let i = 0; i < 3600; i += 1) {
-        ctx.fillStyle = i % 3 ? '#000' : '#fff';
-        ctx.fillRect((i * 331) % OUT_W, (i * 197) % OUT_H, 2, 2);
-      }
-      ctx.globalAlpha = 1;
+      fillGrain(ctx, 0, 0, OUT_W, OUT_H, renderDesign.grain);
       ctx.restore();
     }
 
@@ -2970,15 +3003,7 @@ export default function Page() {
             }
 
             if (Number(settings.grain || 0) > 0) {
-              ctx.save();
-              ctx.globalAlpha *= Number(settings.grain);
-              for (let i = 0; i < 900; i += 1) {
-                ctx.fillStyle = i % 3 ? '#000' : '#fff';
-                const gx = -w / 2 + ((i * 331) % Math.max(1, Math.floor(w)));
-                const gy = -h / 2 + ((i * 197) % Math.max(1, Math.floor(h)));
-                ctx.fillRect(gx, gy, 1.5, 1.5);
-              }
-              ctx.restore();
+              fillGrain(ctx, -w / 2, -h / 2, w, h, settings.grain);
             }
 
             if (Number(settings.fade || 0) > 0) {
