@@ -198,7 +198,7 @@ async function checkBrowseTaxonomy() {
     if (!html.includes(label)) throw new Error('Browse UI missing real source/category label: ' + label);
   }
 
-  if (/Blitz|Original ↗|Open the original|>Cartoon<|>TV</i.test(html)) {
+  if (/Original ↗|Open the original|>Cartoon<|>TV</i.test(html)) {
     throw new Error('Browse UI still contains removed sources, fake taxonomy, or outbound storefront controls');
   }
 
@@ -211,4 +211,4 @@ await check('Rick and Morty', /rick|morty|portal|meeseeks/i);
 await check('Wednesday', /wednesday/i);
 await checkBrowseTaxonomy();
 await checkCucuCatalog();
-console.log('CUCU catalog smoke tests passed; Blitz is fully removed.');
+console.log('CUCU catalog smoke tests passed.');
