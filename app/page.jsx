@@ -4111,14 +4111,23 @@ export default function Page() {
     }
   }
 
-  function useArtwork(item) {
+  function beginArtworkReplacement() {
     finishActiveGesture();
+    invalidatePendingImageImport();
+    invalidatePendingPresetImport();
+    setImage(null);
+    setLoadedBackgroundKey('');
+    setBackgroundLoadError('');
+    setShowOriginal(false);
+    setActiveGuides({ x: null, y: null });
+  }
+
+  function useArtwork(item) {
     if (cleanupInFlightRef.current) {
       setMessage('Finish cleaning imported images before changing artwork.');
       return false;
     }
-    invalidatePendingImageImport();
-    invalidatePendingPresetImport();
+    beginArtworkReplacement();
     const workingImage = proxyImageWidth(item.image, 3072);
     if (!workingImage) {
       setMessage('This artwork source is unavailable or unsupported.');
@@ -4143,6 +4152,34 @@ export default function Page() {
     setTab('studio');
     setMenuItem(null);
     setMessage(item.title + ' selected');
+    return true;
+  }
+
+  function applyImportedArtwork(asset) {
+    if (!asset?.id) return false;
+    if (cleanupInFlightRef.current) {
+      setMessage('Finish cleaning imported images before changing artwork.');
+      return false;
+    }
+
+    beginArtworkReplacement();
+    patch({
+      background: 'idb://imports/' + asset.id,
+      backgroundLabel: safeDisplayText(asset.name, 'Imported image', 160),
+      sourceCrop: null,
+      originalSourceCrop: null,
+      zoom: 1,
+      x: 0,
+      y: 0,
+      rotate: 0,
+      flipX: false,
+      fit: 'cover'
+    });
+    setSelectedElement('artwork');
+    setTab('studio');
+    setStudioTool('crop');
+    setMenuItem(null);
+    setMessage((asset.name || 'Imported image') + ' selected');
     return true;
   }
 
@@ -6463,9 +6500,22 @@ export default function Page() {
                 ))}
               </div>
 
-              <div className="previewModeToggle" role="group" aria-label="Preview style">
-                <button type="button" aria-pressed={previewMode === 'flat'} className={previewMode === 'flat' ? 'active' : ''} onClick={() => setPreviewMode('flat')}>Flat</button>
-                <button type="button" aria-pressed={previewMode === 'physical'} className={previewMode === 'physical' ? 'active' : ''} onClick={() => setPreviewMode('physical')}>Physical</button>
+              <div className="studioModeActions">
+                <button
+                  type="button"
+                  className="studioNewCardButton"
+                  disabled={cleanupInProgress || presetTransferInProgress || imageImportInProgress}
+                  onClick={reset}
+                  aria-label="Start a new card"
+                >
+                  <IOSIcon name="reset" size={16} />
+                  <span>New Card</span>
+                </button>
+
+                <div className="previewModeToggle" role="group" aria-label="Preview style">
+                  <button type="button" aria-pressed={previewMode === 'flat'} className={previewMode === 'flat' ? 'active' : ''} onClick={() => setPreviewMode('flat')}>Flat</button>
+                  <button type="button" aria-pressed={previewMode === 'physical'} className={previewMode === 'physical' ? 'active' : ''} onClick={() => setPreviewMode('physical')}>Physical</button>
+                </div>
               </div>
             </div>
 
@@ -7141,25 +7191,7 @@ export default function Page() {
                       className="actionRow"
                       key={asset.id}
                       disabled={cleanupInProgress || presetTransferInProgress || imageImportInProgress}
-                      onClick={() => {
-                        patch({
-                          background: 'idb://imports/' + asset.id,
-                          backgroundLabel: asset.name,
-                          sourceCrop: null,
-                          originalSourceCrop: null,
-                          zoom: 1,
-                          x: 0,
-                          y: 0,
-                          rotate: 0,
-                          flipX: false,
-                          fit: 'cover'
-                        });
-                        setSelectedElement('artwork');
-                        setShowOriginal(false);
-                        setActiveGuides({ x: null, y: null });
-                        setTab('studio');
-                        setStudioTool('crop');
-                      }}
+                      onClick={() => applyImportedArtwork(asset)}
                     >
                       <span><strong>{asset.name}</strong><small>{asset.type || 'image'}</small></span>
                       <IOSIcon name="chevron" size={17} />
