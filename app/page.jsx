@@ -634,6 +634,16 @@ function pointToLocal(px, py, cx, cy, rotation, scale) {
   };
 }
 
+function clipTransformedRect(ctx, cx, cy, width, height, rotation = 0) {
+  ctx.translate(cx, cy);
+  ctx.rotate((Number(rotation || 0) * Math.PI) / 180);
+  ctx.beginPath();
+  ctx.rect(-width / 2, -height / 2, width, height);
+  ctx.clip();
+  ctx.rotate((-Number(rotation || 0) * Math.PI) / 180);
+  ctx.translate(-cx, -cy);
+}
+
 function pointInRotatedBounds(px, py, cx, cy, rotation, scale, bounds, padding = 0) {
   const local = pointToLocal(px, py, cx, cy, rotation, scale);
   return (
@@ -2365,6 +2375,8 @@ export default function Page() {
     ctx.fillStyle = base;
     ctx.fillRect(0, 0, OUT_W, OUT_H);
 
+    let artworkEffectClip = null;
+
     if (image && loadedBackgroundKey === renderDesign.background) {
       const crop = renderDesign.sourceCrop;
       const sx = crop ? clamp(crop.x, 0, 1) * image.width : 0;
@@ -2388,6 +2400,13 @@ export default function Page() {
 
       const x = (OUT_W - iw) / 2 + renderDesign.x * OUT_W;
       const y = (OUT_H - ih) / 2 + renderDesign.y * OUT_H;
+      artworkEffectClip = {
+        cx: x + iw / 2,
+        cy: y + ih / 2,
+        width: iw,
+        height: ih,
+        rotation: renderDesign.rotate
+      };
       const exposureFactor = artworkOriginal ? 1 : Math.pow(2, Number(renderDesign.exposure || 0));
       const brightness = artworkOriginal ? 1 : clamp(renderDesign.brightness * exposureFactor, 0.2, 3);
       const saturation = artworkOriginal ? 1 : clamp(renderDesign.saturation, 0, 3);
@@ -2416,6 +2435,14 @@ export default function Page() {
         const shadows = Number(renderDesign.shadows || 0);
         if (shadows !== 0) {
           ctx.save();
+          clipTransformedRect(
+            ctx,
+            artworkEffectClip.cx,
+            artworkEffectClip.cy,
+            artworkEffectClip.width,
+            artworkEffectClip.height,
+            artworkEffectClip.rotation
+          );
           ctx.globalCompositeOperation = shadows > 0 ? 'screen' : 'multiply';
           ctx.globalAlpha = Math.abs(shadows) * 0.22;
           ctx.fillStyle = shadows > 0 ? '#6f7890' : '#10141c';
@@ -2426,6 +2453,14 @@ export default function Page() {
         const highlights = Number(renderDesign.highlights || 0);
         if (highlights !== 0) {
           ctx.save();
+          clipTransformedRect(
+            ctx,
+            artworkEffectClip.cx,
+            artworkEffectClip.cy,
+            artworkEffectClip.width,
+            artworkEffectClip.height,
+            artworkEffectClip.rotation
+          );
           ctx.globalCompositeOperation = highlights > 0 ? 'screen' : 'multiply';
           ctx.globalAlpha = Math.abs(highlights) * 0.16;
           ctx.fillStyle = highlights > 0 ? '#fff7ec' : '#7d8794';
@@ -2436,6 +2471,14 @@ export default function Page() {
         const temperature = Number(renderDesign.temperature || 0);
         if (temperature !== 0) {
           ctx.save();
+          clipTransformedRect(
+            ctx,
+            artworkEffectClip.cx,
+            artworkEffectClip.cy,
+            artworkEffectClip.width,
+            artworkEffectClip.height,
+            artworkEffectClip.rotation
+          );
           ctx.globalCompositeOperation = 'soft-light';
           ctx.globalAlpha = Math.abs(temperature) * 0.24;
           ctx.fillStyle = temperature > 0 ? '#ff8a3d' : '#438cff';
@@ -2446,6 +2489,14 @@ export default function Page() {
         const tint = Number(renderDesign.tint || 0);
         if (tint !== 0) {
           ctx.save();
+          clipTransformedRect(
+            ctx,
+            artworkEffectClip.cx,
+            artworkEffectClip.cy,
+            artworkEffectClip.width,
+            artworkEffectClip.height,
+            artworkEffectClip.rotation
+          );
           ctx.globalCompositeOperation = 'soft-light';
           ctx.globalAlpha = Math.abs(tint) * 0.2;
           ctx.fillStyle = tint > 0 ? '#d34cff' : '#38d887';
@@ -2455,16 +2506,35 @@ export default function Page() {
       }
     }
 
-    if (!artworkOriginal && renderDesign.overlay > 0) {
+    if (!artworkOriginal && artworkEffectClip && renderDesign.overlay > 0) {
+      ctx.save();
+      clipTransformedRect(
+        ctx,
+        artworkEffectClip.cx,
+        artworkEffectClip.cy,
+        artworkEffectClip.width,
+        artworkEffectClip.height,
+        artworkEffectClip.rotation
+      );
       const overlay = ctx.createLinearGradient(0, 0, OUT_W, OUT_H);
       overlay.addColorStop(0, 'rgba(0,0,0,' + renderDesign.overlay * 0.55 + ')');
       overlay.addColorStop(0.55, 'rgba(0,0,0,0)');
       overlay.addColorStop(1, 'rgba(0,0,0,' + renderDesign.overlay + ')');
       ctx.fillStyle = overlay;
       ctx.fillRect(0, 0, OUT_W, OUT_H);
+      ctx.restore();
     }
 
-    if (!artworkOriginal && renderDesign.vignette > 0) {
+    if (!artworkOriginal && artworkEffectClip && renderDesign.vignette > 0) {
+      ctx.save();
+      clipTransformedRect(
+        ctx,
+        artworkEffectClip.cx,
+        artworkEffectClip.cy,
+        artworkEffectClip.width,
+        artworkEffectClip.height,
+        artworkEffectClip.rotation
+      );
       const vignette = ctx.createRadialGradient(
         OUT_W / 2,
         OUT_H / 2,
@@ -2477,28 +2547,57 @@ export default function Page() {
       vignette.addColorStop(1, 'rgba(0,0,0,' + renderDesign.vignette + ')');
       ctx.fillStyle = vignette;
       ctx.fillRect(0, 0, OUT_W, OUT_H);
+      ctx.restore();
     }
 
-    if (!artworkOriginal && renderDesign.gloss > 0) {
+    if (!artworkOriginal && artworkEffectClip && renderDesign.gloss > 0) {
+      ctx.save();
+      clipTransformedRect(
+        ctx,
+        artworkEffectClip.cx,
+        artworkEffectClip.cy,
+        artworkEffectClip.width,
+        artworkEffectClip.height,
+        artworkEffectClip.rotation
+      );
       const gloss = ctx.createLinearGradient(0, 0, OUT_W, OUT_H);
       gloss.addColorStop(0, 'rgba(255,255,255,' + renderDesign.gloss * 0.42 + ')');
       gloss.addColorStop(0.22, 'rgba(255,255,255,' + renderDesign.gloss * 0.08 + ')');
       gloss.addColorStop(0.5, 'rgba(255,255,255,0)');
       ctx.fillStyle = gloss;
       ctx.fillRect(0, 0, OUT_W, OUT_H);
+      ctx.restore();
     }
 
-    if (!artworkOriginal && renderDesign.grain > 0) {
+    if (!artworkOriginal && artworkEffectClip && renderDesign.grain > 0) {
+      ctx.save();
+      clipTransformedRect(
+        ctx,
+        artworkEffectClip.cx,
+        artworkEffectClip.cy,
+        artworkEffectClip.width,
+        artworkEffectClip.height,
+        artworkEffectClip.rotation
+      );
       ctx.globalAlpha = renderDesign.grain;
       for (let i = 0; i < 3600; i += 1) {
         ctx.fillStyle = i % 3 ? '#000' : '#fff';
         ctx.fillRect((i * 331) % OUT_W, (i * 197) % OUT_H, 2, 2);
       }
       ctx.globalAlpha = 1;
+      ctx.restore();
     }
 
-    if (!artworkOriginal && renderDesign.fade > 0) {
+    if (!artworkOriginal && artworkEffectClip && renderDesign.fade > 0) {
       ctx.save();
+      clipTransformedRect(
+        ctx,
+        artworkEffectClip.cx,
+        artworkEffectClip.cy,
+        artworkEffectClip.width,
+        artworkEffectClip.height,
+        artworkEffectClip.rotation
+      );
       ctx.globalCompositeOperation = 'screen';
       ctx.globalAlpha = clamp(renderDesign.fade, 0, 1) * 0.34;
       ctx.fillStyle = '#f6efe6';
@@ -2506,9 +2605,17 @@ export default function Page() {
       ctx.restore();
     }
 
-    if (!artworkOriginal && renderDesign.effectTintStrength > 0) {
+    if (!artworkOriginal && artworkEffectClip && renderDesign.effectTintStrength > 0) {
       const [r, g, b] = hexToRgb(renderDesign.effectTint);
       ctx.save();
+      clipTransformedRect(
+        ctx,
+        artworkEffectClip.cx,
+        artworkEffectClip.cy,
+        artworkEffectClip.width,
+        artworkEffectClip.height,
+        artworkEffectClip.rotation
+      );
       ctx.globalCompositeOperation = 'soft-light';
       ctx.globalAlpha = clamp(renderDesign.effectTintStrength, 0, 1) * 0.52;
       ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
