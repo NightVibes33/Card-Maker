@@ -304,6 +304,160 @@ function ArtworkRail({ title, items, onPick }) {
   );
 }
 
+
+function loadSearchImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Artwork image failed'));
+    img.src = src;
+  });
+}
+
+function inspectSearchImage(img) {
+  const width = 96;
+  const height = Math.max(48, Math.round(width / Math.max(0.5, img.naturalWidth / img.naturalHeight)));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = Math.min(96, height);
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return { reject: false, score: 0 };
+
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+  let nearWhite = 0;
+  let lightNeutral = 0;
+  let colorful = 0;
+  let edgePixels = 0;
+  let edgeLightNeutral = 0;
+  let edgeNearWhite = 0;
+  let luminanceSum = 0;
+  let luminanceSqSum = 0;
+  const edgeBand = 4;
+
+  for (let y = 0; y < canvas.height; y += 1) {
+    for (let x = 0; x < canvas.width; x += 1) {
+      const i = (y * canvas.width + x) * 4;
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+      if (a < 20) continue;
+
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const spread = max - min;
+      const lum = (r + g + b) / 3;
+      const white = r > 238 && g > 238 && b > 238;
+      const neutral = lum > 205 && spread < 32;
+      const color = spread > 48 && lum > 35 && lum < 235;
+
+      if (white) nearWhite += 1;
+      if (neutral) lightNeutral += 1;
+      if (color) colorful += 1;
+      luminanceSum += lum;
+      luminanceSqSum += lum * lum;
+
+      const edge =
+        x < edgeBand ||
+        y < edgeBand ||
+        x >= canvas.width - edgeBand ||
+        y >= canvas.height - edgeBand;
+
+      if (edge) {
+        edgePixels += 1;
+        if (neutral) edgeLightNeutral += 1;
+        if (white) edgeNearWhite += 1;
+      }
+    }
+  }
+
+  const total = canvas.width * canvas.height;
+  const whiteRatio = nearWhite / total;
+  const lightNeutralRatio = lightNeutral / total;
+  const edgeNeutralRatio = edgePixels ? edgeLightNeutral / edgePixels : 0;
+  const edgeWhiteRatio = edgePixels ? edgeNearWhite / edgePixels : 0;
+  const colorfulRatio = colorful / total;
+  const mean = luminanceSum / total;
+  const variance = Math.max(0, luminanceSqSum / total - mean * mean);
+  const ratio = img.naturalWidth / img.naturalHeight;
+  const ratioPenalty = Math.abs(Math.log(Math.max(0.2, ratio) / CARD_RATIO));
+
+  // Storefront mockups usually reveal themselves as a large white/light neutral
+  // studio background, especially around the outside edges. Flat/full-bleed
+  // artwork typically carries image detail all the way to the border.
+  const obviousMockup =
+    (edgeNeutralRatio > 0.58 && lightNeutralRatio > 0.16) ||
+    (edgeWhiteRatio > 0.5 && whiteRatio > 0.12) ||
+    whiteRatio > 0.5;
+
+  const nearlyBlank = variance < 180 && colorfulRatio < 0.025;
+  const extremeShape = ratio < 0.72 || ratio > 2.8;
+
+  const score =
+    colorfulRatio * 42 +
+    Math.min(variance / 1800, 2) * 8 -
+    whiteRatio * 34 -
+    edgeNeutralRatio * 30 -
+    ratioPenalty * 8;
+
+  return {
+    reject: obviousMockup || nearlyBlank || extremeShape,
+    score,
+    ratio,
+    whiteRatio,
+    edgeNeutralRatio
+  };
+}
+
+async function chooseCleanProductMedia(item) {
+  const candidates = [...new Set([item.image, ...(item.candidateImages || [])].filter(Boolean))].slice(0, 6);
+  let best = null;
+
+  for (const src of candidates) {
+    try {
+      const img = await loadSearchImage(src);
+      const quality = inspectSearchImage(img);
+      if (quality.reject) continue;
+      if (!best || quality.score > best.quality.score) {
+        best = { src, quality };
+      }
+      // A strong full-bleed candidate is good enough; avoid downloading every
+      // gallery image on mobile when the first useful one is already clean.
+      if (quality.score > 17 && quality.edgeNeutralRatio < 0.16) break;
+    } catch {}
+  }
+
+  if (!best) return null;
+
+  return {
+    ...item,
+    image: best.src,
+    visualQuality: 'client-checked',
+    visualScore: Math.round(best.quality.score * 100) / 100,
+    mediaAspectRatio: best.quality.ratio || item.mediaAspectRatio || null
+  };
+}
+
+async function prepareSearchResults(items) {
+  const queue = items.slice(0, 18);
+  const resolved = new Array(queue.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < queue.length) {
+      const index = cursor;
+      cursor += 1;
+      resolved[index] = await chooseCleanProductMedia(queue[index]);
+    }
+  }
+
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  return resolved.filter(Boolean).slice(0, 12);
+}
+
 export default function Page() {
   const [tab, setTab] = useState('browse');
   const [design, setDesign] = useState(DEFAULTS);
@@ -351,7 +505,11 @@ export default function Page() {
         }
       }
       const storedRecent = JSON.parse(localStorage.getItem('aircard-recent-artwork-v1') || '[]');
-      if (Array.isArray(storedRecent)) setRecent(storedRecent.slice(0, 10));
+      if (Array.isArray(storedRecent)) {
+        // Drop old pre-filter entries so stale storefront mockups do not keep
+        // reappearing in Recent after the cleaner search pipeline ships.
+        setRecent(storedRecent.filter((item) => item?.visualQuality === 'client-checked').slice(0, 10));
+      }
     } catch {}
   }, []);
 
@@ -521,17 +679,32 @@ export default function Page() {
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Search failed');
 
-      const list = Array.isArray(json.results) ? json.results : [];
-      setResults(list);
+      const rawList = Array.isArray(json.results) ? json.results : [];
       setSource(json.source || '');
-      setMessage(list.length ? list.length + ' results' : 'No results');
+
+      if (!rawList.length) {
+        setResults([]);
+        setMessage('No premade card skins found');
+        return;
+      }
+
+      setMessage('Checking flat artwork…');
+      const list = await prepareSearchResults(rawList);
+      setResults(list);
+      setMessage(
+        list.length
+          ? list.length + ' clean card skins'
+          : 'No clean flat artwork found for this search'
+      );
 
       if (autoPick && list[0]) {
         const first = list[0];
         patch({
           background: first.image,
           backgroundLabel: first.title,
-          zoom: 1,
+          // Slight overscan removes tiny storefront edge artifacts and makes
+          // wide artwork sit naturally inside the AirCard aspect ratio.
+          zoom: 1.06,
           x: 0,
           y: 0,
           rotate: 0,
@@ -552,14 +725,14 @@ export default function Page() {
     patch({
       background: item.image,
       backgroundLabel: item.title,
-      zoom: 1,
+      zoom: 1.06,
       x: 0,
       y: 0,
       rotate: 0,
       fit: 'cover'
     });
     rememberArtwork(item);
-    setMessage(item.title + ' selected');
+    setMessage(item.title + ' selected · auto-cropped');
   }
 
   async function useQuickPick(item) {
@@ -750,7 +923,7 @@ export default function Page() {
                 <span>{searching ? 'Searching' : 'Search'}</span>
               </button>
 
-              {source ? <p className="sourceNote">Catalog: {source} · posters blocked</p> : null}
+              {source ? <p className="sourceNote">Catalog: {source} · mockups + posters filtered</p> : null}
             </section>
 
             <ArtworkRail title="Results" items={results} onPick={useArtwork} />
@@ -919,7 +1092,7 @@ export default function Page() {
               </button>
             </Group>
 
-            <p className="legalNote">Artwork rights remain with their respective owners. Anime search uses Jikan with AniList fallback; TV and cartoon search use TVmaze.</p>
+            <p className="legalNote">Artwork rights remain with their respective owners. Search results come from premade card-skin storefront listings and are visually screened in-app for obvious mockup backgrounds before use.</p>
           </div>
         )}
       </div>
