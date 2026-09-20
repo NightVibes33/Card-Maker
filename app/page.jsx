@@ -1443,17 +1443,24 @@ async function prepareLocalImageBlob(blob, limits = {}) {
     : outputType === 'image/webp'
       ? 0.92
       : undefined;
-  const optimizedBlob = await new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (result) => result ? resolve(result) : reject(new Error('Image optimization failed')),
-      outputType,
-      outputQuality
-    );
-  }).finally(() => {
+  const encodeCanvas = (type, quality) => new Promise((resolve) => {
+    canvas.toBlob((result) => resolve(result || null), type, quality);
+  });
+
+  let optimizedBlob;
+  try {
+    optimizedBlob = await encodeCanvas(outputType, outputQuality);
+    if (!optimizedBlob && outputType !== 'image/png') {
+      optimizedBlob = await encodeCanvas('image/png');
+    }
+    if (!optimizedBlob) {
+      throw new Error('Image optimization failed');
+    }
+  } finally {
     canvas.width = 1;
     canvas.height = 1;
     image.src = '';
-  });
+  }
 
   return {
     blob: optimizedBlob,
