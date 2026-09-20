@@ -2359,7 +2359,9 @@ export default function Page() {
         setImage(img);
         setLoadedBackgroundKey(backgroundKey);
         setBackgroundLoadError('');
-        setMessage('Artwork loaded');
+        setMessage((current) =>
+          current === 'Loading artwork…' ? 'Artwork loaded' : current
+        );
       } catch {
         if (cancelled) return;
         setImage(null);
