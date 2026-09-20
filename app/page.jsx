@@ -577,8 +577,14 @@ function textLayerLineAdvance(layer) {
 function measureTrackedText(ctx, text, tracking = 0) {
   const chars = splitGraphemes(text);
   if (!chars.length) return 0;
+
+  const spacing = Number(tracking || 0);
+  if (!spacing || chars.length < 2) {
+    return ctx.measureText(chars.join('')).width;
+  }
+
   return chars.reduce((width, char) => width + ctx.measureText(char).width, 0) +
-    Math.max(0, chars.length - 1) * Number(tracking || 0);
+    Math.max(0, chars.length - 1) * spacing;
 }
 
 function drawTrackedText(ctx, text, x, y, tracking = 0) {
