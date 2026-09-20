@@ -6266,7 +6266,7 @@ export default function Page() {
                 <div className="projectGrid">
                   {projects.map((project) => (
                     <article className="projectCard" key={project.id}>
-                      {project.preview ? <img src={project.preview} alt="" /> : <div className="projectPlaceholder" />}
+                      {project.preview ? <img src={project.preview} alt="" loading="lazy" decoding="async" /> : <div className="projectPlaceholder" />}
                       <strong>{project.name}</strong>
                       <small>{new Date(project.updatedAt || project.createdAt).toLocaleDateString()}</small>
                       <div className="projectActions">
