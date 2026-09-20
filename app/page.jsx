@@ -1807,23 +1807,28 @@ export default function Page() {
       .then(async () => {
         let indexedDbSaved = false;
         let localSaved = false;
+        const updatedAt = Date.now();
 
         try {
           await dbPut('kv', {
             id: 'draft',
             design: copy,
-            updatedAt: Date.now()
+            updatedAt
           });
           indexedDbSaved = true;
         } catch {}
 
         try {
           localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(copy));
+          localStorage.setItem('aircard-sticker-fvp-v3-updated-at', String(updatedAt));
           localSaved = true;
         } catch {}
 
         return {
           success: indexedDbSaved || localSaved,
+          indexedDbSaved,
+          localSaved,
+          updatedAt,
           version
         };
       });
@@ -1862,32 +1867,41 @@ export default function Page() {
         if (cancelled) return;
 
         if (designRef.current === startupDesign) {
-          if (draft?.design && typeof draft.design === 'object') {
-            const parsed = { ...draft.design };
+          let localDraft = null;
+          let localUpdatedAt = 0;
+
+          try {
+            const legacy = localStorage.getItem('aircard-sticker-fvp-v3');
+            localUpdatedAt = Number(
+              localStorage.getItem('aircard-sticker-fvp-v3-updated-at') || 0
+            );
+            if (legacy) {
+              const parsed = JSON.parse(legacy);
+              if (parsed && typeof parsed === 'object') localDraft = parsed;
+            }
+          } catch {
+            try {
+              localStorage.removeItem('aircard-sticker-fvp-v3');
+              localStorage.removeItem('aircard-sticker-fvp-v3-updated-at');
+            } catch {}
+          }
+
+          const indexedDraft =
+            draft?.design && typeof draft.design === 'object'
+              ? draft.design
+              : null;
+          const indexedUpdatedAt = Number(draft?.updatedAt || 0);
+          const preferredDraft =
+            localDraft && (!indexedDraft || localUpdatedAt > indexedUpdatedAt)
+              ? localDraft
+              : indexedDraft;
+
+          if (preferredDraft) {
+            const parsed = { ...preferredDraft };
             parsed.background = parsed.background && isPersistableBackground(parsed.background)
               ? parsed.background
               : '';
             replaceDesign({ ...startupDesign, ...parsed });
-          } else {
-            let legacy = null;
-            try {
-              legacy = localStorage.getItem('aircard-sticker-fvp-v3');
-            } catch {}
-            if (legacy) {
-              try {
-                const parsed = JSON.parse(legacy);
-                if (parsed && typeof parsed === 'object') {
-                  parsed.background = parsed.background && isPersistableBackground(parsed.background)
-                    ? parsed.background
-                    : '';
-                  replaceDesign({ ...startupDesign, ...parsed });
-                }
-              } catch {
-                try {
-                  localStorage.removeItem('aircard-sticker-fvp-v3');
-                } catch {}
-              }
-            }
           }
         }
 
@@ -1954,10 +1968,6 @@ export default function Page() {
             }
 
             setSaveStatus('Saved');
-
-            try {
-              localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(snapshot));
-            } catch {}
 
             try {
               sessionStorage.setItem(reloadKey, '1');
