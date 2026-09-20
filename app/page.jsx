@@ -4116,14 +4116,14 @@ export default function Page() {
     finishActiveGesture();
     if (cleanupInFlightRef.current) {
       setMessage('Finish cleaning imported images before changing artwork.');
-      return;
+      return false;
     }
     invalidatePendingImageImport();
     invalidatePendingPresetImport();
     const workingImage = proxyImageWidth(item.image, 3072);
     if (!workingImage) {
       setMessage('This artwork source is unavailable or unsupported.');
-      return;
+      return false;
     }
     patch({
       background: workingImage,
@@ -4144,6 +4144,7 @@ export default function Page() {
     setTab('studio');
     setMenuItem(null);
     setMessage(item.title + ' selected');
+    return true;
   }
 
   async function uploadImage(event) {
@@ -7337,8 +7338,9 @@ export default function Page() {
             type="button"
             className="secondaryAction"
             onClick={() => {
-              useArtwork(menuItem);
-              setShowExportPreview(true);
+              if (useArtwork(menuItem)) {
+                setShowExportPreview(true);
+              }
             }}
           >
             Preview
