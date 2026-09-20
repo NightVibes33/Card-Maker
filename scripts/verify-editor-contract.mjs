@@ -258,6 +258,9 @@ const proxySecurityChecks = [
   [imageRoute, /responseType = 'image\/webp'/, 'normalized proxy images return a deterministic web format'],
   [inspectRoute, /redirect:\s*'manual'/, 'artwork inspector validates redirects before following them'],
   [inspectRoute, /SAFE_IMAGE_TYPES/, 'artwork inspector rejects unsafe image formats'],
+  [inspectRoute, /const MAX_ANALYSIS_PIXELS = 40_000_000;/, 'artwork inspector bounds decoded pixels'],
+  [inspectRoute, /limitInputPixels: MAX_ANALYSIS_PIXELS/, 'artwork inspector enforces the decoded-pixel bound'],
+  [inspectRoute, /\.rotate\(\)/, 'artwork inspector honors EXIF orientation before pixel analysis'],
   [inspectRoute, /readLimitedBody\(/, 'artwork inspector stream-limits response bodies']
 ];
 
