@@ -175,6 +175,20 @@ try {
     'Undo must restore the pre-drag shape position'
   );
 
+  // A no-op edit must not clear the redo stack. Switch to Card, choose the
+  // already-selected Rectangle type, then require Redo to remain available.
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  const currentRectangle = page.getByRole('group', { name: 'Shape type' })
+    .getByRole('button', { name: 'Rectangle', exact: true });
+  assert.equal(await currentRectangle.getAttribute('aria-pressed'), 'true');
+  await currentRectangle.click();
+  assert.equal(
+    await page.getByRole('button', { name: 'Redo', exact: true }).isDisabled(),
+    false,
+    'a no-op layer edit must preserve redo history'
+  );
+  await page.getByRole('tab', { name: 'Position', exact: true }).click();
+
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await page.waitForFunction(() => {
     const input = document.querySelector('input[aria-label="Layer horizontal position"]');
@@ -488,6 +502,21 @@ try {
     await page.getByLabel('Layer text').inputValue(),
     'AVATAR\nWA',
     'preset import must restore the exported text-layer state'
+  );
+
+  // New Card is destructive-looking UI but must remain one-step undoable.
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByText('New card · Undo is available', { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 5000
+  });
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  await page.getByRole('button', { name: /^Text text /i }).first().click();
+  assert.equal(
+    await page.getByLabel('Layer text').inputValue(),
+    'AVATAR\nWA',
+    'Undo after New Card must restore the previous complete design'
   );
 
   // Verify signed Expert Mode values on mobile WebKit. iPhone numeric
