@@ -23,7 +23,25 @@ const COLLECTIONS = {
   crypto: { label: 'Crypto', handle: 'crypto-currency' }
 };
 
+const CATEGORY_TERMS = {
+  best: ['best seller', 'best sellers', 'trending'],
+  new: ['new', 'latest'],
+  anime: ['anime'],
+  cars: ['cars', 'jdm', 'racing', 'motorsports'],
+  sports: ['sports', 'basketball', 'football', 'baseball', 'soccer', 'hockey', 'nba', 'ufc', 'mma'],
+  artistic: ['artistic', 'art', 'abstract', 'paintings'],
+  cute: ['cute', 'kawaii'],
+  pets: ['pets', 'pet'],
+  classic: ['classic art', 'paintings', 'van gogh', 'monet', 'klimt', 'vermeer', 'renoir'],
+  funny: ['funny', 'funnyy'],
+  memes: ['meme', 'memes', 'brainrot'],
+  retro: ['retro', 'nostalgic', 'nostalgia'],
+  animals: ['animals', 'animal'],
+  crypto: ['crypto', 'bitcoin', 'ethereum', 'dogecoin']
+};
+
 const pageCache = new Map();
+const fallbackCache = new Map();
 
 function cleanText(value = '') {
   return String(value)
@@ -172,6 +190,58 @@ async function getShopifyPage(collectionHandle, page) {
   }
 }
 
+function categoryEvidence(product) {
+  return [
+    cleanText(product?.title || ''),
+    String(product?.handle || ''),
+    cleanText(product?.product_type || ''),
+    cleanText(product?.body_html || ''),
+    Array.isArray(product?.tags) ? product.tags.join(' ') : product?.tags || ''
+  ].join(' ').toLowerCase();
+}
+
+function matchesCategory(product, categoryKey) {
+  const terms = CATEGORY_TERMS[categoryKey] || [];
+  if (!terms.length) return true;
+  const evidence = categoryEvidence(product);
+  return terms.some((term) => evidence.includes(term));
+}
+
+async function getFallbackCatalog(categoryKey) {
+  const now = Date.now();
+  const cached = fallbackCache.get(categoryKey);
+  if (cached && cached.expires > now) return cached.promise;
+
+  const promise = (async () => {
+    const batches = [];
+    for (let sourcePage = 1; sourcePage <= 12; sourcePage += 1) {
+      const batch = await getShopifyPage(DEFAULT_COLLECTION, sourcePage);
+      batches.push(...batch);
+      if (batch.length < SHOPIFY_PAGE_SIZE) break;
+    }
+
+    const seen = new Set();
+    return batches.filter((product) => {
+      const handle = String(product?.handle || '');
+      if (!handle || seen.has(handle) || !matchesCategory(product, categoryKey)) return false;
+      seen.add(handle);
+      return true;
+    });
+  })();
+
+  fallbackCache.set(categoryKey, {
+    promise,
+    expires: now + 6 * 60 * 60 * 1000
+  });
+
+  try {
+    return await promise;
+  } catch (error) {
+    fallbackCache.delete(categoryKey);
+    throw error;
+  }
+}
+
 function flattenProduct(product) {
   const handle = String(product?.handle || '').trim();
   if (!handle) return null;
@@ -249,31 +319,60 @@ export async function GET(request) {
     const firstSourcePage = Math.floor(startIndex / SHOPIFY_PAGE_SIZE) + 1;
     const localStart = startIndex - (firstSourcePage - 1) * SHOPIFY_PAGE_SIZE;
 
-    const firstBatch = await getShopifyPage(collection.handle, firstSourcePage);
-    const needsNextBatch = localStart + limit + 1 > firstBatch.length && firstBatch.length === SHOPIFY_PAGE_SIZE;
-    const secondBatch = needsNextBatch
-      ? await getShopifyPage(collection.handle, firstSourcePage + 1)
-      : [];
+    let results = [];
+    let total = knownTotal || null;
+    let totalPages = total ? Math.max(1, Math.ceil(total / limit)) : null;
+    let inferredHasMore = false;
+    let mode = 'shopify-collection';
 
-    const combined = [...firstBatch, ...secondBatch].map((product) => ({
-      ...product,
-      __collection: collection.handle
-    }));
+    try {
+      const firstBatch = await getShopifyPage(collection.handle, firstSourcePage);
+      if (!firstBatch.length && categoryKey !== 'all') {
+        throw new Error('empty category collection');
+      }
 
-    const wanted = combined.slice(localStart, localStart + limit);
-    const results = wanted.map(flattenProduct).filter(Boolean);
+      const needsNextBatch =
+        localStart + limit + 1 > firstBatch.length &&
+        firstBatch.length === SHOPIFY_PAGE_SIZE;
+      const secondBatch = needsNextBatch
+        ? await getShopifyPage(collection.handle, firstSourcePage + 1)
+        : [];
 
-    const hasBufferedNext = combined.length > localStart + limit;
-    const sourceCouldContinue =
-      firstBatch.length === SHOPIFY_PAGE_SIZE &&
-      (hasBufferedNext || secondBatch.length === SHOPIFY_PAGE_SIZE);
+      const combined = [...firstBatch, ...secondBatch].map((product) => ({
+        ...product,
+        __collection: collection.handle
+      }));
 
-    const inferredHasMore = knownTotal
-      ? startIndex + limit < knownTotal
-      : hasBufferedNext || sourceCouldContinue;
+      const wanted = combined.slice(localStart, localStart + limit);
+      results = wanted.map(flattenProduct).filter(Boolean);
 
-    const total = knownTotal || null;
-    const totalPages = total ? Math.max(1, Math.ceil(total / limit)) : null;
+      const hasBufferedNext = combined.length > localStart + limit;
+      const sourceCouldContinue =
+        firstBatch.length === SHOPIFY_PAGE_SIZE &&
+        (hasBufferedNext || secondBatch.length === SHOPIFY_PAGE_SIZE);
+
+      inferredHasMore = knownTotal
+        ? startIndex + limit < knownTotal
+        : hasBufferedNext || sourceCouldContinue;
+    } catch (collectionError) {
+      if (categoryKey === 'all') throw collectionError;
+
+      const fallback = await getFallbackCatalog(categoryKey);
+      total = fallback.length;
+      totalPages = Math.max(1, Math.ceil(total / limit));
+      inferredHasMore = startIndex + limit < total;
+      mode = 'product-tag-fallback';
+
+      results = fallback
+        .slice(startIndex, startIndex + limit)
+        .map((product) =>
+          flattenProduct({
+            ...product,
+            __collection: collection.handle
+          })
+        )
+        .filter(Boolean);
+    }
 
     return NextResponse.json(
       {
@@ -294,7 +393,8 @@ export async function GET(request) {
         })),
         upstream: {
           collection: collection.handle,
-          shopifyPageSize: SHOPIFY_PAGE_SIZE
+          shopifyPageSize: SHOPIFY_PAGE_SIZE,
+          mode
         }
       },
       {
