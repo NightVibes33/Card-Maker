@@ -72,6 +72,7 @@ const pageChecks = [
   [/if \(designRef\.current !== snapshot\)/, 'service-worker reload refuses to discard edits made during persistence'],
   [/let hasServiceWorkerController = Boolean\(navigator\.serviceWorker\.controller\)/, 'service-worker distinguishes first claim from an update'],
   [/if \(!hasServiceWorkerController\)/, 'first service-worker claim does not force an app reload'],
+  [/imageImportInFlightRef\.current \|\|[\s\S]{0,220}exportInFlightRef\.current/, 'service-worker updates never reload through active editor transactions'],
   [/Layer limit reached\. Delete a layer before adding another\./, 'custom layer adds enforce the layer cap'],
   [/order\.unshift\(id\);/, 'new custom layers start at the bottom of the unified stack'],
   [/visibleImageIdsTopDown\.length > MAX_VISIBLE_IMAGE_LAYERS/, 'older designs normalize overflow image layers instead of failing hydration'],
