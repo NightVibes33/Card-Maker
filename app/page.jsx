@@ -1786,8 +1786,10 @@ function isPersistableBackground(src = '') {
 function normalizePersistedArtworkSource(src = '', width = 3072) {
   const source = String(src || '').trim();
   if (!source) return '';
-  if (isPersistableBackground(source)) return source;
-  if (/^https:\/\//i.test(source)) return proxyImageWidth(source, width);
+  if (source.startsWith('idb://imports/')) return source;
+  if (source.startsWith('/api/image?') || /^https:\/\//i.test(source)) {
+    return proxyImageWidth(source, width);
+  }
   return '';
 }
 
