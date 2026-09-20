@@ -537,25 +537,27 @@ function CatalogArtwork({ item, alt, useThumbnail = true }) {
   const crop = item?.sourceCrop;
   const src = useThumbnail ? (item.thumbnail || item.image) : item.image;
 
-  if (crop && crop.w > 0 && crop.h > 0) {
-    return (
-      <img
-        className="croppedCatalogImage"
-        src={src}
-        alt={alt}
-        loading="lazy"
-        decoding="async"
-        style={{
-          width: (100 / crop.w) + '%',
-          height: (100 / crop.h) + '%',
-          left: (-100 * crop.x / crop.w) + '%',
-          top: (-100 * crop.y / crop.h) + '%'
-        }}
-      />
-    );
-  }
-
-  return <img src={src} alt={alt} loading="lazy" decoding="async" />;
+  return (
+    <span className="catalogArtworkFrame">
+      {crop && crop.w > 0 && crop.h > 0 ? (
+        <img
+          className="croppedCatalogImage"
+          src={src}
+          alt={alt}
+          loading="lazy"
+          decoding="async"
+          style={{
+            width: (100 / crop.w) + '%',
+            height: (100 / crop.h) + '%',
+            left: (-100 * crop.x / crop.w) + '%',
+            top: (-100 * crop.y / crop.h) + '%'
+          }}
+        />
+      ) : (
+        <img src={src} alt={alt} loading="lazy" decoding="async" />
+      )}
+    </span>
+  );
 }
 
 function SkinActions({ item, isFavorite, onPick, onFavorite, onMenu }) {
@@ -2811,7 +2813,6 @@ export default function Page() {
     <main className="studio">
       <header className="largeTitleBar">
         <h1>Card Studio</h1>
-        <button type="button" className="navTextButton" onClick={reset}>New</button>
       </header>
 
       {!online ? (
