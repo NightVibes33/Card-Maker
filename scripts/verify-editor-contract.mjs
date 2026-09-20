@@ -233,6 +233,24 @@ requireMatch(
 );
 requireMatch(
   css,
+  /\.studioPreview \.cardFrame\{[^}]*--card-shape-radius:18px;[^}]*border-radius:var\(--card-shape-radius\)/s,
+  'Studio card shape has one shared corner-radius token'
+);
+requireMatch(
+  css,
+  /\.physicalCard canvas\{[^}]*border-radius:inherit;[^}]*clip-path:inset\(0 round var\(--card-shape-radius\)\)/s,
+  'physical canvas is independently clipped to the exact Studio card shape'
+);
+requireMatch(
+  css,
+  /\.physicalCard:after\{[^}]*inset:0;[^}]*border-radius:inherit;[^}]*clip-path:inset\(0 round var\(--card-shape-radius\)\)/s,
+  'physical sheen cannot bleed outside the exact card mask'
+);
+if (/\.physicalCard:after\{[\s\S]{0,180}inset:-15%/.test(css)) {
+  throw new Error('Editor contract failed: physical sheen must not overscan past the card mask');
+}
+requireMatch(
+  css,
   /\.cleanupShield\{[^}]*position:fixed;[^}]*z-index:260;[^}]*inset:0;/s,
   'cleanup shield covers and blocks the editor during destructive maintenance'
 );
