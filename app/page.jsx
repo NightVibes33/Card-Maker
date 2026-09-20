@@ -218,10 +218,15 @@ function drawContactless(ctx, d) {
   ctx.restore();
 }
 
-function SliderRow({ label, value, min, max, step, onChange, suffix = '' }) {
+function SliderRow({ label, value, min, max, step, onChange, suffix = '', disabled = false }) {
   const decimals = step >= 1 ? 0 : step < 0.01 ? 3 : 2;
+  const emit = (event) => {
+    const next = clamp(Number(event.currentTarget.value), Number(min), Number(max));
+    if (Number.isFinite(next)) onChange(next);
+  };
+
   return (
-    <label className="sliderRow">
+    <label className={'sliderRow ' + (disabled ? 'isDisabled' : '')}>
       <div className="rowHeader">
         <span>{label}</span>
         <span className="rowValue">{Number(value).toFixed(decimals)}{suffix}</span>
@@ -233,7 +238,9 @@ function SliderRow({ label, value, min, max, step, onChange, suffix = '' }) {
         min={min}
         max={max}
         step={step}
-        onChange={(event) => onChange(Number(event.target.value))}
+        disabled={disabled}
+        onInput={emit}
+        onChange={emit}
       />
     </label>
   );
@@ -606,6 +613,13 @@ async function prepareSearchResults(items) {
   return (await prepareCleanResults(items, 18)).slice(0, 12);
 }
 
+function isPersistableBackground(src = '') {
+  return (
+    src.startsWith('/api/image?') ||
+    src.startsWith('/api/blitz-image?')
+  );
+}
+
 export default function Page() {
   const [tab, setTab] = useState('browse');
   const [design, setDesign] = useState(DEFAULTS);
@@ -641,7 +655,10 @@ export default function Page() {
   );
 
   const patch = useCallback((next) => {
-    setDesign((current) => ({ ...current, ...next }));
+    setDesign((current) => {
+      const delta = typeof next === 'function' ? next(current) : next;
+      return { ...current, ...delta };
+    });
   }, []);
 
   const rememberArtwork = useCallback((item) => {
@@ -660,7 +677,7 @@ export default function Page() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
-          parsed.background = parsed.background && parsed.background.startsWith('/api/image?') ? parsed.background : '';
+          parsed.background = parsed.background && isPersistableBackground(parsed.background) ? parsed.background : '';
           setDesign((current) => ({ ...current, ...parsed }));
         }
       }
@@ -676,7 +693,7 @@ export default function Page() {
   useEffect(() => {
     try {
       const copy = { ...design };
-      if (copy.background && !copy.background.startsWith('/api/image?')) copy.background = '';
+      if (copy.background && !isPersistableBackground(copy.background)) copy.background = '';
       localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(copy));
     } catch {}
   }, [design]);
@@ -1044,16 +1061,19 @@ export default function Page() {
       const rect = event.currentTarget.getBoundingClientRect();
       const dx = event.clientX - lastPoint.current.x;
       const dy = event.clientY - lastPoint.current.y;
-      patch({
-        x: clamp(design.x + dx / rect.width, -1.5, 1.5),
-        y: clamp(design.y + dy / rect.height, -1.5, 1.5)
-      });
+      patch((current) => ({
+        x: clamp(current.x + dx / Math.max(1, rect.width), -1.5, 1.5),
+        y: clamp(current.y + dy / Math.max(1, rect.height), -1.5, 1.5)
+      }));
       lastPoint.current = { x: event.clientX, y: event.clientY };
     } else if (pointers.current.size === 2) {
       const p = Array.from(pointers.current.values());
       const distance = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
-      if (lastDistance.current) {
-        patch({ zoom: clamp(design.zoom * (distance / lastDistance.current), 0.5, 5) });
+      if (lastDistance.current && Number.isFinite(distance)) {
+        const factor = distance / Math.max(1, lastDistance.current);
+        patch((current) => ({
+          zoom: clamp(current.zoom * factor, 0.5, 5)
+        }));
       }
       lastDistance.current = distance;
     }
@@ -1061,7 +1081,14 @@ export default function Page() {
 
   function pointerUp(event) {
     pointers.current.delete(event.pointerId);
-    lastPoint.current = null;
+
+    if (pointers.current.size === 1) {
+      const remaining = Array.from(pointers.current.values())[0];
+      lastPoint.current = remaining ? { ...remaining } : null;
+    } else {
+      lastPoint.current = null;
+    }
+
     lastDistance.current = null;
   }
 
@@ -1265,13 +1292,16 @@ export default function Page() {
 
         {tab === 'edit' && (
           <div className="tabScreen">
+            <p className="editStatus" aria-live="polite">
+              {design.background ? 'Live preview · changes apply instantly' : 'Choose a card skin or photo first'}
+            </p>
             <Group title="LAYOUT" footer="Drag directly on the card to move the artwork. Pinch the card with two fingers to zoom.">
               <div className="groupRow segmentedRow">
                 <div className="segmentedControl compact" role="tablist" aria-label="Artwork fit mode">
                   <button type="button" role="tab" aria-selected={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
                   <button type="button" role="tab" aria-selected={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
                 </div>
-                <button type="button" className="iconTextButton" onClick={() => patch({ zoom: 1, x: 0, y: 0, rotate: 0 })}>
+                <button type="button" className="iconTextButton" onClick={() => patch({ fit: 'cover', zoom: 1, x: 0, y: 0, rotate: 0 })}>
                   <IOSIcon name="reset" size={18} />
                   <span>Reset</span>
                 </button>
@@ -1287,12 +1317,27 @@ export default function Page() {
               <SliderRow label="Saturation" value={design.saturation} min={0} max={2.4} step={0.01} onChange={(value) => patch({ saturation: value })} />
               <SliderRow label="Contrast" value={design.contrast} min={0.45} max={1.8} step={0.01} onChange={(value) => patch({ contrast: value })} />
               <SliderRow label="Soft Blur" value={design.blur} min={0} max={1} step={0.01} onChange={(value) => patch({ blur: value })} />
+              <button
+                type="button"
+                className="settingsResetButton"
+                onClick={() => patch({ brightness: 1, saturation: 1, contrast: 1, blur: 0 })}
+              >
+                Reset Image Adjustments
+              </button>
             </Group>
 
             <Group title="FINISH">
+              <SliderRow label="Dark Overlay" value={design.overlay} min={0} max={0.75} step={0.01} onChange={(value) => patch({ overlay: value })} />
               <SliderRow label="Vignette" value={design.vignette} min={0} max={0.8} step={0.01} onChange={(value) => patch({ vignette: value })} />
               <SliderRow label="Gloss" value={design.gloss} min={0} max={0.8} step={0.01} onChange={(value) => patch({ gloss: value })} />
               <SliderRow label="Grain" value={design.grain} min={0} max={0.22} step={0.005} onChange={(value) => patch({ grain: value })} />
+              <button
+                type="button"
+                className="settingsResetButton"
+                onClick={() => patch({ overlay: 0.1, vignette: 0.24, gloss: 0.2, grain: 0.035 })}
+              >
+                Reset Finish
+              </button>
             </Group>
           </div>
         )}
