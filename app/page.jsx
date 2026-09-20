@@ -10,6 +10,7 @@ import {
   dbGetAll,
   dbGetImportMetadata,
   dbPut,
+  dbPutIfBelowLimit,
   makeId
 } from './lib/storage';
 import { IMAGE_PROXY_VERSION, parseAllowedRemoteImageUrl } from './lib/imagePolicy';
@@ -2455,7 +2456,6 @@ export default function Page() {
   const favoriteOpsRef = useRef(new Set());
   const projectSaveInFlightRef = useRef(false);
   const projectOpsRef = useRef(new Set());
-  const projectCountRef = useRef(0);
   const presetTransferInFlightRef = useRef(false);
   const presetImportGenerationRef = useRef(0);
   const presetImportActiveRef = useRef(false);
@@ -2863,7 +2863,6 @@ export default function Page() {
           const merged = [...mergedById.values()].sort(
             (a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0)
           );
-          projectCountRef.current = merged.length;
           return merged;
         });
         const hydratedImports = storedImports
@@ -4722,10 +4721,6 @@ export default function Page() {
       setMessage('Library is still loading. Try saving again once it is ready.');
       return null;
     }
-    if (projectCountRef.current + projectOpsRef.current.size >= MAX_SAVED_PROJECTS) {
-      setMessage('Project limit reached. Delete an older saved design before saving another.');
-      return null;
-    }
     if (imageImportInFlightRef.current) {
       setMessage('Finish the image import before saving this design.');
       return null;
@@ -4764,13 +4759,17 @@ export default function Page() {
       updatedAt: now
     };
 
+    let projectInserted = false;
     try {
-      await dbPut('projects', project);
+      projectInserted = await dbPutIfBelowLimit('projects', project, MAX_SAVED_PROJECTS);
     } catch {
       setMessage('Could not save this design. Device storage may be full.');
       return null;
     }
-    projectCountRef.current += 1;
+    if (!projectInserted) {
+      setMessage('Project limit reached. Delete an older saved design before saving another.');
+      return null;
+    }
     setProjects((current) => [project, ...current]);
 
     const remoteArtwork = new Set();
@@ -4882,13 +4881,6 @@ export default function Page() {
 
   async function duplicateProject(project) {
     await withProjectOperation(project?.id, async () => {
-    const pendingOtherProjectOps = Math.max(0, projectOpsRef.current.size - 1);
-    const pendingNamedSave = projectSaveInFlightRef.current ? 1 : 0;
-    if (projectCountRef.current + pendingOtherProjectOps + pendingNamedSave >= MAX_SAVED_PROJECTS) {
-      setMessage('Project limit reached. Delete an older saved design before duplicating.');
-      return;
-    }
-
     const copy = {
       ...project,
       id: makeId('project'),
@@ -4897,13 +4889,17 @@ export default function Page() {
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
+    let copyInserted = false;
     try {
-      await dbPut('projects', copy);
+      copyInserted = await dbPutIfBelowLimit('projects', copy, MAX_SAVED_PROJECTS);
     } catch {
       setMessage('Could not duplicate this design. Device storage may be full.');
       return;
     }
-    projectCountRef.current += 1;
+    if (!copyInserted) {
+      setMessage('Project limit reached. Delete an older saved design before duplicating.');
+      return;
+    }
     setProjects((current) => [copy, ...current]);
     setMessage('Design duplicated');
     });
@@ -4921,7 +4917,6 @@ export default function Page() {
       setMessage('Could not delete this design.');
       return;
     }
-    projectCountRef.current = Math.max(0, projectCountRef.current - 1);
     setProjects((current) => current.filter((entry) => entry.id !== project.id));
     setMessage('Design deleted');
     });
