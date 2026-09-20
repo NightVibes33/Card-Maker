@@ -41,8 +41,13 @@ export async function GET(request) {
   const analysisUrl = new URL(source);
   analysisUrl.searchParams.set('width', '560');
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+
   try {
     const response = await fetch(analysisUrl, {
+      signal: controller.signal,
+      redirect: 'follow',
       headers: {
         Accept: 'image/avif,image/webp,image/jpeg,image/png,*/*',
         'User-Agent': 'AirCard-Card-Studio/5.0'
@@ -54,8 +59,14 @@ export async function GET(request) {
       throw new Error('CUCU artwork returned ' + response.status);
     }
 
+    const finalUrl = new URL(response.url);
+    if (!allowed(finalUrl)) throw new Error('CUCU artwork redirected to a disallowed host');
+
     const type = response.headers.get('content-type') || '';
     if (!type.startsWith('image/')) throw new Error('CUCU artwork was not an image');
+
+    const declaredLength = Number(response.headers.get('content-length') || 0);
+    if (declaredLength > 8 * 1024 * 1024) throw new Error('CUCU artwork too large');
 
     const buffer = Buffer.from(await response.arrayBuffer());
     if (buffer.byteLength > 8 * 1024 * 1024) throw new Error('CUCU artwork too large');
@@ -189,5 +200,7 @@ export async function GET(request) {
         headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300' }
       }
     );
+  } finally {
+    clearTimeout(timer);
   }
 }
