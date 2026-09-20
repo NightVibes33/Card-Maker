@@ -1193,30 +1193,69 @@ function handleTabKeyDown(event, values, current, onSelect) {
 }
 
 function proxyImageWidth(src = '', width = 1600) {
-  let source = String(src || '');
+  let source = String(src || '').trim();
+  if (!source || source.length > 4096) return '';
 
-  // Older builds could persist the proxy as an absolute URL. Normalize that
-  // back to the local route before deciding whether a source is third-party.
+  // Older builds could persist our proxy as an absolute URL. Normalize that
+  // back to the local route before deciding whether the source itself is
+  // third-party artwork.
   if (/^https:\/\//i.test(source)) {
     try {
       const absolute = new URL(source);
       if (absolute.pathname === '/api/image' && absolute.searchParams.has('url')) {
         source = '/api/image?' + absolute.searchParams.toString();
       }
-    } catch {}
+    } catch {
+      return '';
+    }
   }
 
   // Older favorites/recent items may store the original HTTPS artwork URL.
-  // Route those through the same-origin proxy so canvas export stays untainted
-  // and the server still enforces the current image-host allowlist.
+  // Route those through the same-origin proxy so canvas export stays untainted.
   if (/^https:\/\//i.test(source)) {
-    source = '/api/image?url=' + encodeURIComponent(source);
+    try {
+      const remote = new URL(source);
+      if (
+        remote.protocol !== 'https:' ||
+        remote.username ||
+        remote.password ||
+        (remote.port && remote.port !== '443') ||
+        remote.toString().length > 2200
+      ) {
+        return '';
+      }
+      source = '/api/image?url=' + encodeURIComponent(remote.toString());
+    } catch {
+      return '';
+    }
   }
 
   if (!source.startsWith('/api/image?')) return source;
+
   const params = new URLSearchParams(source.slice('/api/image?'.length));
-  params.set('w', String(Math.max(160, Math.min(3072, Math.round(width)))));
-  return '/api/image?' + params.toString();
+  const rawUrl = params.get('url');
+  if (!rawUrl || rawUrl.length > 2200) return '';
+
+  let remote;
+  try {
+    remote = new URL(rawUrl);
+  } catch {
+    return '';
+  }
+
+  if (
+    remote.protocol !== 'https:' ||
+    remote.username ||
+    remote.password ||
+    (remote.port && remote.port !== '443')
+  ) {
+    return '';
+  }
+
+  const normalized = new URLSearchParams();
+  normalized.set('url', remote.toString());
+  normalized.set('w', String(Math.max(160, Math.min(3072, Math.round(width)))));
+  return '/api/image?' + normalized.toString();
 }
 
 function CatalogArtwork({ item, alt, useThumbnail = true }) {
@@ -1889,17 +1928,30 @@ async function prepareCleanResults(items, maxItems = items.length) {
   return resolved.filter(Boolean);
 }
 
+function normalizeImportArtworkSource(src = '') {
+  const source = String(src || '').trim();
+  const match = source.match(/^idb:\/\/imports\/([A-Za-z0-9._:-]{1,200})$/);
+  return match ? 'idb://imports/' + match[1] : '';
+}
+
 function isPersistableBackground(src = '') {
-  return src.startsWith('/api/image?') || src.startsWith('idb://imports/');
+  const source = String(src || '').trim();
+  if (normalizeImportArtworkSource(source)) return true;
+  return source.startsWith('/api/image?') && Boolean(proxyImageWidth(source, 3072));
 }
 
 function normalizePersistedArtworkSource(src = '', width = 3072) {
   const source = String(src || '').trim();
   if (!source) return '';
-  if (source.startsWith('idb://imports/')) return source;
+
+  const imported = normalizeImportArtworkSource(source);
+  if (imported) return imported;
+
   if (source.startsWith('/api/image?') || /^https:\/\//i.test(source)) {
-    return proxyImageWidth(source, width);
+    const proxied = proxyImageWidth(source, width);
+    return proxied.startsWith('/api/image?') ? proxied : '';
   }
+
   return '';
 }
 
