@@ -67,10 +67,10 @@ const DEFAULTS = {
   tint: 0,
   sharpness: 0,
   blur: 0,
-  vignette: 0.24,
-  grain: 0.035,
-  gloss: 0.2,
-  overlay: 0.1,
+  vignette: 0,
+  grain: 0,
+  gloss: 0,
+  overlay: 0,
   fade: 0,
   effectTint: '#7b61ff',
   effectTintStrength: 0,
@@ -3206,7 +3206,7 @@ export default function Page() {
                     onClick={() => patchImageTarget(
                       selectedImageLayer
                         ? { vignette: 0, grain: 0, gloss: 0, overlay: 0, fade: 0, effectTintStrength: 0 }
-                        : { overlay: 0.1, vignette: 0.24, gloss: 0.2, grain: 0.035, fade: 0, effectTintStrength: 0 }
+                        : { overlay: 0, vignette: 0, gloss: 0, grain: 0, fade: 0, effectTintStrength: 0 }
                     )}
                   >
                     Reset Effects
