@@ -4111,13 +4111,17 @@ export default function Page() {
     }
   }
 
-  function beginArtworkReplacement() {
+  function beginArtworkReplacement(nextBackground) {
     finishActiveGesture();
     invalidatePendingImageImport();
     invalidatePendingPresetImport();
-    setImage(null);
-    setLoadedBackgroundKey('');
-    setBackgroundLoadError('');
+
+    if (String(nextBackground || '') !== String(designRef.current.background || '')) {
+      setImage(null);
+      setLoadedBackgroundKey('');
+      setBackgroundLoadError('');
+    }
+
     setShowOriginal(false);
     setActiveGuides({ x: null, y: null });
   }
@@ -4127,8 +4131,8 @@ export default function Page() {
       setMessage('Finish cleaning imported images before changing artwork.');
       return false;
     }
-    beginArtworkReplacement();
     const workingImage = proxyImageWidth(item.image, 3072);
+    beginArtworkReplacement(workingImage);
     if (!workingImage) {
       setMessage('This artwork source is unavailable or unsupported.');
       return false;
@@ -4162,9 +4166,10 @@ export default function Page() {
       return false;
     }
 
-    beginArtworkReplacement();
+    const importedBackground = 'idb://imports/' + asset.id;
+    beginArtworkReplacement(importedBackground);
     patch({
-      background: 'idb://imports/' + asset.id,
+      background: importedBackground,
       backgroundLabel: safeDisplayText(asset.name, 'Imported image', 160),
       sourceCrop: null,
       originalSourceCrop: null,
