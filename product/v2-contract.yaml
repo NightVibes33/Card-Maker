@@ -151,7 +151,7 @@ features:
     contains:
       - "Import Photo or File"
       - "idb://imports/"
-      - "accept="image/*""
+      - 'accept="image/*"'
   full_screen_export_preview:
     file: app/page.jsx
     contains:
