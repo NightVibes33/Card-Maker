@@ -3087,16 +3087,22 @@ export default function Page() {
   }
 
   async function saveProject(nameOverride = '') {
+    const currentDesign = designRef.current;
     const now = Date.now();
     const id = makeId('project');
-    const name = nameOverride.trim() || design.backgroundLabel || 'Untitled Card';
-    const preview = assetsReadyForDesign(designRef.current)
-      ? makeCanvas(384, 242).toDataURL('image/jpeg', 0.78)
-      : '';
+    const name = nameOverride.trim() || currentDesign.backgroundLabel || 'Untitled Card';
+    let preview = '';
+
+    if (assetsReadyForDesign(currentDesign)) {
+      try {
+        preview = makeCanvas(384, 242).toDataURL('image/jpeg', 0.78);
+      } catch {}
+    }
+
     const project = {
       id,
       name,
-      design: { ...design },
+      design: JSON.parse(JSON.stringify(currentDesign)),
       preview,
       createdAt: now,
       updatedAt: now
@@ -3109,8 +3115,8 @@ export default function Page() {
       return null;
     }
     setProjects((current) => [project, ...current]);
-    if (design.background.startsWith('/api/image?')) cacheArtwork(design.background);
-    setMessage('Saved to Library');
+    if (currentDesign.background.startsWith('/api/image?')) cacheArtwork(currentDesign.background);
+    setMessage(preview ? 'Saved to Library' : 'Saved to Library · preview unavailable');
     return project;
   }
 
@@ -3125,7 +3131,7 @@ export default function Page() {
     setShowOriginal(false);
     setActiveGuides({ x: null, y: null });
     setTab('studio');
-    setMessage(project.name + ' opened');
+    setMessage((project.name || 'Design') + ' opened');
   }
 
   async function duplicateProject(project) {
