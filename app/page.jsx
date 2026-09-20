@@ -181,16 +181,153 @@ const STUDIO_TOOLS = [
 ];
 
 const ADJUSTMENT_PRESETS = {
-  Original: { exposure: 0, brightness: 1, contrast: 1, saturation: 1, highlights: 0, shadows: 0, temperature: 0, tint: 0, sharpness: 0, blur: 0 },
-  Vivid: { exposure: 0.08, brightness: 1.05, contrast: 1.13, saturation: 1.28, highlights: 0.08, shadows: 0.06, temperature: 0.03, tint: 0, sharpness: 0.18, blur: 0 },
-  Dark: { exposure: -0.22, brightness: 0.86, contrast: 1.2, saturation: 1.02, highlights: -0.18, shadows: -0.08, temperature: -0.02, tint: 0, sharpness: 0.08, blur: 0 },
-  AMOLED: { exposure: -0.12, brightness: 0.91, contrast: 1.34, saturation: 1.18, highlights: -0.22, shadows: -0.18, temperature: -0.03, tint: 0.02, sharpness: 0.15, blur: 0 },
-  Warm: { exposure: 0.04, brightness: 1.02, contrast: 1.04, saturation: 1.1, highlights: 0.06, shadows: 0.05, temperature: 0.28, tint: 0.04, sharpness: 0.05, blur: 0 },
-  Cold: { exposure: 0.02, brightness: 1.02, contrast: 1.08, saturation: 0.98, highlights: 0.03, shadows: 0.02, temperature: -0.3, tint: -0.03, sharpness: 0.08, blur: 0 },
-  Film: { exposure: -0.03, brightness: 1.01, contrast: 0.92, saturation: 0.87, highlights: -0.12, shadows: 0.16, temperature: 0.12, tint: 0.05, sharpness: -0.08, blur: 0.03 },
-  Neon: { exposure: 0.04, brightness: 1.02, contrast: 1.27, saturation: 1.55, highlights: 0.12, shadows: -0.08, temperature: -0.06, tint: 0.16, sharpness: 0.22, blur: 0 },
-  Vintage: { exposure: -0.05, brightness: 1.02, contrast: 0.88, saturation: 0.72, highlights: -0.08, shadows: 0.18, temperature: 0.24, tint: 0.08, sharpness: -0.12, blur: 0.02 },
-  Monochrome: { exposure: 0, brightness: 1.02, contrast: 1.12, saturation: 0, highlights: 0.02, shadows: 0.02, temperature: 0, tint: 0, sharpness: 0.08, blur: 0 }
+  // Presets are full looks, not labels pasted over tiny slider changes.
+  // Every preset owns the entire image-adjustment/effects surface so switching
+  // between looks is deterministic and Original truly restores a clean image.
+  Original: {
+    ...IMAGE_LAYER_DEFAULTS
+  },
+  Vivid: {
+    ...IMAGE_LAYER_DEFAULTS,
+    exposure: 0.1,
+    brightness: 1.07,
+    contrast: 1.18,
+    saturation: 1.38,
+    highlights: 0.1,
+    shadows: 0.08,
+    temperature: 0.03,
+    tint: 0.01,
+    sharpness: 0.28,
+    vignette: 0.06,
+    grain: 0.015,
+    gloss: 0.1
+  },
+  Dark: {
+    ...IMAGE_LAYER_DEFAULTS,
+    exposure: -0.42,
+    brightness: 0.78,
+    contrast: 1.28,
+    saturation: 0.92,
+    highlights: -0.36,
+    shadows: -0.28,
+    temperature: -0.04,
+    sharpness: 0.12,
+    vignette: 0.32,
+    grain: 0.02,
+    overlay: 0.2,
+    effectTint: '#0b1020',
+    effectTintStrength: 0.1
+  },
+  AMOLED: {
+    ...IMAGE_LAYER_DEFAULTS,
+    exposure: -0.25,
+    brightness: 0.82,
+    contrast: 1.62,
+    saturation: 1.32,
+    highlights: -0.18,
+    shadows: -0.72,
+    temperature: -0.03,
+    tint: 0.03,
+    sharpness: 0.25,
+    vignette: 0.28,
+    overlay: 0.24,
+    effectTint: '#090014',
+    effectTintStrength: 0.18
+  },
+  Warm: {
+    ...IMAGE_LAYER_DEFAULTS,
+    exposure: 0.04,
+    brightness: 1.03,
+    contrast: 1.07,
+    saturation: 1.12,
+    highlights: 0.08,
+    shadows: 0.05,
+    temperature: 0.34,
+    tint: 0.05,
+    sharpness: 0.08,
+    gloss: 0.05,
+    effectTint: '#ff8a3d',
+    effectTintStrength: 0.08
+  },
+  Cold: {
+    ...IMAGE_LAYER_DEFAULTS,
+    exposure: 0.01,
+    brightness: 1.01,
+    contrast: 1.12,
+    saturation: 1.02,
+    highlights: 0.02,
+    shadows: -0.06,
+    temperature: -0.38,
+    tint: -0.05,
+    sharpness: 0.12,
+    vignette: 0.08,
+    effectTint: '#438cff',
+    effectTintStrength: 0.1
+  },
+  Film: {
+    ...IMAGE_LAYER_DEFAULTS,
+    exposure: -0.05,
+    brightness: 1.01,
+    contrast: 0.9,
+    saturation: 0.84,
+    highlights: -0.16,
+    shadows: 0.2,
+    temperature: 0.14,
+    tint: 0.05,
+    sharpness: -0.08,
+    blur: 0.025,
+    vignette: 0.18,
+    grain: 0.085,
+    fade: 0.14,
+    effectTint: '#d6a56f',
+    effectTintStrength: 0.08
+  },
+  Neon: {
+    ...IMAGE_LAYER_DEFAULTS,
+    exposure: 0.02,
+    brightness: 1.03,
+    contrast: 1.55,
+    saturation: 1.95,
+    highlights: 0.22,
+    shadows: -0.38,
+    temperature: -0.12,
+    tint: 0.28,
+    sharpness: 0.35,
+    vignette: 0.3,
+    gloss: 0.12,
+    overlay: 0.12,
+    effectTint: '#8a16ff',
+    effectTintStrength: 0.28
+  },
+  Vintage: {
+    ...IMAGE_LAYER_DEFAULTS,
+    exposure: -0.08,
+    brightness: 1.01,
+    contrast: 0.86,
+    saturation: 0.68,
+    highlights: -0.1,
+    shadows: 0.22,
+    temperature: 0.3,
+    tint: 0.09,
+    sharpness: -0.1,
+    blur: 0.018,
+    vignette: 0.2,
+    grain: 0.065,
+    fade: 0.17,
+    effectTint: '#c68a54',
+    effectTintStrength: 0.12
+  },
+  Monochrome: {
+    ...IMAGE_LAYER_DEFAULTS,
+    brightness: 1.01,
+    contrast: 1.32,
+    saturation: 0,
+    highlights: 0.06,
+    shadows: -0.14,
+    sharpness: 0.2,
+    vignette: 0.16,
+    grain: 0.025
+  }
 };
 
 const IMAGE_LAYER_DEFAULTS = {
@@ -2484,7 +2621,7 @@ export default function Page() {
   const [exportInProgress, setExportInProgress] = useState(false);
   const [exportHistory, setExportHistory] = useState([]);
   const [expertMode, setExpertMode] = useState(false);
-  const [guidesEnabled, setGuidesEnabled] = useState(true);
+  const [guidesEnabled, setGuidesEnabled] = useState(false);
   const [activeGuides, setActiveGuides] = useState({ x: null, y: null });
   const [selectedElement, setSelectedElement] = useState('artwork');
   const [previewMode, setPreviewMode] = useState('flat');
@@ -4282,7 +4419,7 @@ export default function Page() {
     setPreviewMode('flat');
     setShowOriginal(false);
     setShowExportPreview(false);
-    setGuidesEnabled(true);
+    setGuidesEnabled(false);
     setActiveGuides({ x: null, y: null });
     setStudioTool(studioTool);
     setProjectName('');
