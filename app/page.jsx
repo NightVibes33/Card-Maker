@@ -2393,7 +2393,12 @@ export default function Page() {
       createdAt: Date.now()
     };
 
-    await dbPut('imports', asset);
+    try {
+      await dbPut('imports', asset);
+    } catch {
+      setMessage('Could not save the imported image. Free some device storage and try again.');
+      return;
+    }
     setImports((current) => [asset, ...current.filter((entry) => entry.id !== id)]);
 
     patch({
@@ -2438,7 +2443,12 @@ export default function Page() {
       createdAt: Date.now()
     };
 
-    await dbPut('imports', asset);
+    try {
+      await dbPut('imports', asset);
+    } catch {
+      setMessage('Could not save the image layer. Free some device storage and try again.');
+      return;
+    }
     setImports((current) => [asset, ...current.filter((entry) => entry.id !== assetId)]);
     patch((current) => ({
       layerOrder: insertCustomLayerBelowHardware(current, layerId),
@@ -2784,7 +2794,12 @@ export default function Page() {
       updatedAt: now
     };
 
-    await dbPut('projects', project);
+    try {
+      await dbPut('projects', project);
+    } catch {
+      setMessage('Could not save this design. Device storage may be full.');
+      return null;
+    }
     setProjects((current) => [project, ...current]);
     if (design.background.startsWith('/api/image?')) cacheArtwork(design.background);
     setMessage('Saved to Library');
@@ -2813,13 +2828,23 @@ export default function Page() {
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
-    await dbPut('projects', copy);
+    try {
+      await dbPut('projects', copy);
+    } catch {
+      setMessage('Could not duplicate this design. Device storage may be full.');
+      return;
+    }
     setProjects((current) => [copy, ...current]);
     setMessage('Design duplicated');
   }
 
   async function removeProject(project) {
-    await dbDelete('projects', project.id);
+    try {
+      await dbDelete('projects', project.id);
+    } catch {
+      setMessage('Could not delete this design.');
+      return;
+    }
     setProjects((current) => current.filter((entry) => entry.id !== project.id));
     setMessage('Design deleted');
   }
