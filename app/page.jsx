@@ -17,6 +17,8 @@ const OUT_H = 969;
 const CARD_RATIO = OUT_W / OUT_H;
 const MAX_IMAGE_IMPORT_BYTES = 30 * 1024 * 1024;
 const MAX_PRESET_IMPORT_BYTES = 64 * 1024 * 1024;
+const MAX_IMAGE_PIXELS = 65_000_000;
+const MAX_IMAGE_DIMENSION = 12_000;
 
 const CUCU_CATEGORIES = [
   ['all', 'All Card Skins'],
@@ -1145,6 +1147,45 @@ function loadSearchImage(src) {
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error('Artwork image failed'));
     img.src = src;
+  });
+}
+
+function validateLocalImageBlob(blob) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.decoding = 'async';
+
+    const cleanup = () => URL.revokeObjectURL(url);
+
+    img.onload = () => {
+      const width = Number(img.naturalWidth || img.width || 0);
+      const height = Number(img.naturalHeight || img.height || 0);
+      cleanup();
+
+      if (!width || !height) {
+        reject(new Error('Image dimensions could not be read'));
+        return;
+      }
+
+      if (
+        width > MAX_IMAGE_DIMENSION ||
+        height > MAX_IMAGE_DIMENSION ||
+        width * height > MAX_IMAGE_PIXELS
+      ) {
+        reject(new Error('Image dimensions are too large'));
+        return;
+      }
+
+      resolve({ width, height });
+    };
+
+    img.onerror = () => {
+      cleanup();
+      reject(new Error('Image could not be decoded'));
+    };
+
+    img.src = url;
   });
 }
 
@@ -2408,6 +2449,17 @@ export default function Page() {
       return;
     }
 
+    try {
+      await validateLocalImageBlob(file);
+    } catch (error) {
+      setMessage(
+        error?.message === 'Image dimensions are too large'
+          ? 'Image resolution is too large for reliable iPhone editing.'
+          : 'This image could not be decoded on this device.'
+      );
+      return;
+    }
+
     const id = makeId('import');
     const asset = {
       id,
@@ -2454,6 +2506,17 @@ export default function Page() {
     }
     if (file.size > MAX_IMAGE_IMPORT_BYTES) {
       setMessage('Image is too large. Choose a file under 30 MB.');
+      return;
+    }
+
+    try {
+      await validateLocalImageBlob(file);
+    } catch (error) {
+      setMessage(
+        error?.message === 'Image dimensions are too large'
+          ? 'Image resolution is too large for reliable iPhone editing.'
+          : 'This image could not be decoded on this device.'
+      );
       return;
     }
 
@@ -2938,13 +3001,19 @@ export default function Page() {
         if ((assetType && !assetType.startsWith('image/')) || !String(asset.data).startsWith('data:image/')) {
           throw new Error('Preset contains a non-image asset');
         }
+        const blob = dataUrlToBlob(asset.data);
+        if (blob.size > MAX_IMAGE_IMPORT_BYTES) {
+          throw new Error('Preset image asset is too large');
+        }
+        await validateLocalImageBlob(blob);
+
         const newId = makeId('import');
         idMap[oldId] = newId;
         await dbPut('imports', {
           id: newId,
           name: asset.name || 'Preset asset',
           type: asset.type || 'image/*',
-          blob: dataUrlToBlob(asset.data),
+          blob,
           createdAt: Date.now()
         });
       }
