@@ -23,7 +23,7 @@ const pageChecks = [
   [/function pointInRotatedBounds\(/, 'rotated geometry hit testing exists'],
   [/function customLayerSelectionStyle\(/, 'selection outlines use object geometry'],
   [/loadedImageLayerSourceKey === imageLayerSourceKey/, 'image layers are source-key gated'],
-  [/loadedBackgroundKey === design\.background/, 'background rendering is source-key gated'],
+  [/loadedBackgroundKey === renderDesign\.background/, 'background rendering is source-key gated'],
   [/label="Corner Radius"/, 'shape corner-radius control exists'],
   [/label="Show Layer"/, 'hidden layers remain recoverable'],
   [/label="Lock Layer"/, 'layer locking control exists'],
