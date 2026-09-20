@@ -171,10 +171,11 @@ export async function GET(request) {
 
     let responseBody = buffer;
     let responseType = contentType;
-    const animatedType = contentType === 'image/gif' || contentType === 'image/apng';
-    const shouldNormalize =
-      width >= 160 &&
-      (!upstreamResizeRequested || animatedType);
+
+    // Always enforce requested dimensions ourselves. Known CDNs still receive
+    // the width hint above to reduce transfer size, but the proxy never trusts
+    // an upstream to have actually honored it before the image reaches iOS.
+    const shouldNormalize = width >= 160;
 
     if (shouldNormalize) {
       try {
