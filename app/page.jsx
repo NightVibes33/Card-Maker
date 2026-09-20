@@ -3929,8 +3929,16 @@ export default function Page() {
         return;
       }
       for (const project of storedProjects) addDesignRefs(project?.design);
+
+      let storedImports;
+      try {
+        storedImports = await dbGetImportMetadata();
+      } catch {
+        setMessage('Could not verify imported images, so nothing was removed.');
+        return;
+      }
   
-      const unused = imports.filter((asset) => asset?.id && !referenced.has(asset.id));
+      const unused = storedImports.filter((asset) => asset?.id && !referenced.has(asset.id));
       if (!unused.length) {
         setMessage('No unused imported images to clean up');
         return;
