@@ -77,7 +77,10 @@ requireMatch(storage, /export async function dbGetImportMetadata\(/, 'metadata-o
 requireMatch(page, /dbGetImportMetadata\(\)/, 'Library hydrates import metadata instead of blobs');
 requireMatch(page, /const MAX_STORED_IMAGE_PIXELS = 12_000_000;/, 'local image working-set pixels are bounded');
 requireMatch(page, /const MAX_STORED_IMAGE_DIMENSION = 4096;/, 'local image working-set dimensions are bounded');
+requireMatch(page, /const MAX_STORED_LAYER_IMAGE_PIXELS = 4_000_000;/, 'custom image-layer working-set pixels are bounded separately');
+requireMatch(page, /const MAX_STORED_LAYER_IMAGE_DIMENSION = 2560;/, 'custom image-layer dimensions are bounded separately');
 requireMatch(page, /async function prepareLocalImageBlob\(/, 'oversized local images are downsampled before persistence');
+requireMatch(page, /maxPixels: MAX_STORED_LAYER_IMAGE_PIXELS/, 'custom image-layer imports use the smaller working set');
 if (/dbGetAll\('imports'\)/.test(page)) {
   throw new Error('Editor contract failed: Library must not hydrate full import blobs into React state');
 }
