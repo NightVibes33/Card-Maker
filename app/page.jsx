@@ -1913,6 +1913,7 @@ export default function Page() {
   const [favorites, setFavorites] = useState([]);
   const [projects, setProjects] = useState([]);
   const [projectName, setProjectName] = useState('');
+  const [projectSaveInProgress, setProjectSaveInProgress] = useState(false);
   const [imports, setImports] = useState([]);
   const [cleanupInProgress, setCleanupInProgress] = useState(false);
   const [exportInProgress, setExportInProgress] = useState(false);
@@ -1966,6 +1967,9 @@ export default function Page() {
   const gestureHistoryRecorded = useRef(false);
   const draftSaveQueueRef = useRef(Promise.resolve());
   const draftSaveVersionRef = useRef(0);
+  const favoriteOpsRef = useRef(new Set());
+  const projectSaveInFlightRef = useRef(false);
+  const presetTransferInFlightRef = useRef(false);
   const exportInFlightRef = useRef(false);
 
   const gradient = useMemo(
@@ -3218,43 +3222,50 @@ export default function Page() {
 
   async function toggleFavorite(item) {
     if (!item?.id) return;
+    const itemId = String(item.id);
+    if (favoriteOpsRef.current.has(itemId)) return;
 
-    const already = favoriteIds.has(item.id);
-    if (already) {
-      try {
-        await dbDelete('favorites', item.id);
-      } catch {
-        setMessage('Could not remove this favorite from local storage.');
+    favoriteOpsRef.current.add(itemId);
+    try {
+      const already = favoriteIds.has(item.id);
+      if (already) {
+        try {
+          await dbDelete('favorites', item.id);
+        } catch {
+          setMessage('Could not remove this favorite from local storage.');
+          return;
+        }
+        setFavoriteIds((current) => {
+          const next = new Set(current);
+          next.delete(item.id);
+          return next;
+        });
+        setFavorites((current) => current.filter((entry) => entry.id !== item.id));
+        setMessage('Removed from Favorites');
         return;
       }
-      setFavoriteIds((current) => {
-        const next = new Set(current);
-        next.delete(item.id);
-        return next;
-      });
-      setFavorites((current) => current.filter((entry) => entry.id !== item.id));
-      setMessage('Removed from Favorites');
-      return;
+
+      const stored = { ...item };
+      try {
+        await dbPut('favorites', {
+          id: item.id,
+          item: stored,
+          updatedAt: Date.now()
+        });
+      } catch {
+        setMessage('Could not save this favorite. Device storage may be full.');
+        return;
+      }
+
+      cacheArtwork(proxyImageWidth(item.image, 3072));
+      if (item.thumbnail) cacheArtwork(proxyImageWidth(item.thumbnail, 560));
+
+      setFavoriteIds((current) => new Set([...current, item.id]));
+      setFavorites((current) => [stored, ...current.filter((entry) => entry.id !== item.id)]);
+      setMessage('Added to Favorites');
+    } finally {
+      favoriteOpsRef.current.delete(itemId);
     }
-
-    const stored = { ...item };
-    try {
-      await dbPut('favorites', {
-        id: item.id,
-        item: stored,
-        updatedAt: Date.now()
-      });
-    } catch {
-      setMessage('Could not save this favorite. Device storage may be full.');
-      return;
-    }
-
-    cacheArtwork(proxyImageWidth(item.image, 3072));
-    if (item.thumbnail) cacheArtwork(proxyImageWidth(item.thumbnail, 560));
-
-    setFavoriteIds((current) => new Set([...current, item.id]));
-    setFavorites((current) => [stored, ...current.filter((entry) => entry.id !== item.id)]);
-    setMessage('Added to Favorites');
   }
 
   function useArtwork(item) {
@@ -3814,7 +3825,16 @@ export default function Page() {
   }
 
   async function saveProject(nameOverride = '') {
-    const currentDesign = designRef.current;
+    if (projectSaveInFlightRef.current) {
+      setMessage('A design save is already in progress');
+      return null;
+    }
+
+    projectSaveInFlightRef.current = true;
+    setProjectSaveInProgress(true);
+
+    try {
+      const currentDesign = designRef.current;
     const now = Date.now();
     const id = makeId('project');
     const name = nameOverride.trim() || currentDesign.backgroundLabel || 'Untitled Card';
@@ -3861,14 +3881,18 @@ export default function Page() {
       offlineCacheComplete = cacheResults.every(Boolean);
     }
 
-    setMessage(
-      !preview
-        ? 'Saved to Library · preview unavailable'
-        : offlineCacheComplete
-          ? 'Saved to Library'
-          : 'Saved to Library · some remote art is not cached offline'
-    );
-    return project;
+      setMessage(
+        !preview
+          ? 'Saved to Library · preview unavailable'
+          : offlineCacheComplete
+            ? 'Saved to Library'
+            : 'Saved to Library · some remote art is not cached offline'
+      );
+      return project;
+    } finally {
+      projectSaveInFlightRef.current = false;
+      setProjectSaveInProgress(false);
+    }
   }
 
   function openProject(project) {
@@ -4053,6 +4077,12 @@ export default function Page() {
   }
 
   async function exportPresetJson() {
+    if (presetTransferInFlightRef.current) {
+      setMessage('Another preset operation is already in progress');
+      return;
+    }
+
+    presetTransferInFlightRef.current = true;
     try {
       const payload = await serializePreset();
       const json = JSON.stringify(payload, null, 2);
@@ -4073,6 +4103,8 @@ export default function Page() {
       setMessage('Design preset exported');
     } catch (error) {
       setMessage(error?.message || 'Design preset could not be exported');
+    } finally {
+      presetTransferInFlightRef.current = false;
     }
   }
 
@@ -4080,6 +4112,10 @@ export default function Page() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    if (presetTransferInFlightRef.current) {
+      setMessage('Another preset operation is already in progress');
+      return;
+    }
     if (file.size > MAX_PRESET_IMPORT_BYTES) {
       setMessage('Design preset is too large to import safely.');
       return;
@@ -4087,6 +4123,7 @@ export default function Page() {
 
     const createdImportIds = [];
     let presetApplied = false;
+    presetTransferInFlightRef.current = true;
 
     try {
       const payload = JSON.parse(await file.text());
@@ -4211,6 +4248,8 @@ export default function Page() {
         await Promise.all(createdImportIds.map((id) => dbDelete('imports', id).catch(() => {})));
       }
       setMessage('Preset could not be imported');
+    } finally {
+      presetTransferInFlightRef.current = false;
     }
   }
 
@@ -5648,12 +5687,13 @@ export default function Page() {
                 <button
                   type="button"
                   className="primaryAction librarySaveButton"
+                  disabled={projectSaveInProgress}
                   onClick={async () => {
                     const saved = await saveProject(projectName);
                     if (saved) setProjectName('');
                   }}
                 >
-                  Save Current Design
+                  {projectSaveInProgress ? 'Saving…' : 'Save Current Design'}
                 </button>
               </div>
               {projects.length ? (
@@ -5820,7 +5860,9 @@ export default function Page() {
               </button>
             </Group>
 
-            <button type="button" className="secondaryAction bigAction" onClick={() => saveProject()}>Save Design to Library</button>
+            <button type="button" className="secondaryAction bigAction" disabled={projectSaveInProgress} onClick={() => saveProject()}>
+              {projectSaveInProgress ? 'Saving Design…' : 'Save Design to Library'}
+            </button>
 
             <p className="legalNote">Artwork rights remain with their respective owners. Card-skin media is screened in-app for usable card artwork before export.</p>
           </div>
