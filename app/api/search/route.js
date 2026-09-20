@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 
 const STORES = [
   {
+    name: 'CUCU Covers',
+    origin: 'https://cucucovers.com',
+    priority: 5
+  },
+  {
     name: 'Anime Town Creations',
     origin: 'https://www.animetowncreations.com',
     priority: 4
@@ -12,31 +17,33 @@ const STORES = [
     priority: 3
   },
   {
-    name: 'CUCU Covers',
-    origin: 'https://cucucovers.com',
-    priority: 2
-  },
-  {
     name: 'Styled Cards',
     origin: 'https://styledcards.com',
-    priority: 1
+    priority: 2
   }
 ];
 
 const QUERY_ALIASES = new Map([
-  ['spongebob', ['SpongeBob', 'Bikini Bottom']],
-  ['spongebob squarepants', ['SpongeBob SquarePants', 'Bikini Bottom']],
-  ['breaking bad', ['Breaking Bad', 'Walter White']],
-  ['hunter x hunter', ['Hunter x Hunter', 'HxH']],
-  ['dragon ball z', ['Dragon Ball Z', 'Dragon Ball', 'Vegeta', 'Goku']],
-  ['dragon ball', ['Dragon Ball', 'Vegeta', 'Goku']],
-  ['pokemon', ['Pokemon', 'Pikachu', 'Charizard']],
-  ['one piece', ['One Piece', 'Luffy']],
-  ['jujutsu kaisen', ['Jujutsu Kaisen', 'Gojo']],
-  ['demon slayer', ['Demon Slayer']],
-  ['naruto', ['Naruto']],
-  ['tokyo ghoul', ['Tokyo Ghoul']],
-  ['rick and morty', ['Rick and Morty', 'Rick & Morty']]
+  ['spongebob', ['Bikini Bottom', 'Patrick', 'Krusty Krab']],
+  ['spongebob squarepants', ['Bikini Bottom', 'Patrick', 'Krusty Krab']],
+  ['breaking bad', ['Walter White', 'Heisenberg']],
+  ['hunter x hunter', ['HxH', 'Hunter Hunter']],
+  ['dragon ball z', ['Goku', 'Vegeta', 'Dragon Ball']],
+  ['dragon ball', ['Goku', 'Vegeta']],
+  ['pokemon', ['Pikachu', 'Charizard']],
+  ['one piece', ['Luffy', 'Zoro']],
+  ['jujutsu kaisen', ['Gojo', 'Sukuna']],
+  ['demon slayer', ['Tanjiro', 'Nezuko']],
+  ['naruto', ['Konohagakure', 'Akatsuki']],
+  ['tokyo ghoul', ['Kaneki']],
+  ['attack on titan', ['Scouts', 'Levi']],
+  ['adventure time', ['Finn Jake', 'Finn']],
+  ['regular show', ['Mordecai Rigby', 'Mordecai']],
+  ['rick and morty', ['Rick & Morty', 'Portal', 'Mr Meeseeks']],
+  ['stranger things', ['Hawkins', 'Hellfire Club']],
+  ['the boys', ['Homelander']],
+  ['fallout', ['Vault Boy']],
+  ['wednesday', ['Wednesday Dance', 'Wednesday and Enid']]
 ]);
 
 const REJECT_MEDIA = [
@@ -447,11 +454,19 @@ async function fetchProduct(store, hit, matchedTerm, originalQuery) {
   // silently substituted with a poster or unrelated product photo.
   if (best.score < 3) return null;
 
+  const candidateImages = [...new Set(
+    usable
+      .slice(0, 6)
+      .map((candidate) => candidate.src)
+      .filter(Boolean)
+  )].map(imageProxy);
+
   return {
     id: store.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + handle,
     title,
     subtitle: store.name,
     image: imageProxy(best.src),
+    candidateImages,
     source: store.name,
     sourceUrl: productUrl,
     mediaType: 'premade-card-skin',
@@ -460,6 +475,7 @@ async function fetchProduct(store, hit, matchedTerm, originalQuery) {
     mediaAlt: best.alt || '',
     mediaAspectRatio: best.ratio || null,
     priority: store.priority,
+    qualityScore: best.score,
     matchedTerm,
     queryRelevant
   };
@@ -493,16 +509,17 @@ export async function GET(request) {
     const productJobs = [];
     const seenProduct = new Set();
 
+    // Validate a fair slice from every store/search-term group. The previous
+    // global cap could be exhausted by the first store, causing valid CUCU
+    // and other results to be skipped entirely.
     for (const group of discovered) {
-      for (const hit of group.hits.slice(0, 8)) {
+      for (const hit of group.hits.slice(0, 4)) {
         const handle = extractHandle(hit.url);
         const key = group.store.origin + '|' + handle + '|' + group.term.toLowerCase();
         if (!handle || seenProduct.has(key)) continue;
         seenProduct.add(key);
         productJobs.push(fetchProduct(group.store, hit, group.term, q));
-        if (productJobs.length >= 32) break;
       }
-      if (productJobs.length >= 32) break;
     }
 
     const products = (await Promise.all(productJobs)).filter(Boolean);
@@ -513,7 +530,12 @@ export async function GET(request) {
       const bText = b.title.toLowerCase();
       const aMatch = queryTokens.reduce((score, token) => score + (aText.includes(token) ? 1 : 0), 0);
       const bMatch = queryTokens.reduce((score, token) => score + (bText.includes(token) ? 1 : 0), 0);
-      return Number(b.queryRelevant) - Number(a.queryRelevant) || bMatch - aMatch || b.priority - a.priority;
+      return (
+        Number(b.queryRelevant) - Number(a.queryRelevant) ||
+        bMatch - aMatch ||
+        b.priority - a.priority ||
+        b.qualityScore - a.qualityScore
+      );
     });
 
     const deduped = [];
@@ -523,7 +545,7 @@ export async function GET(request) {
       const key = item.title.toLowerCase().replace(/[^a-z0-9]+/g, '');
       if (!key || seen.has(key)) continue;
       seen.add(key);
-      const { priority, originalImage, queryRelevant, ...publicItem } = item;
+      const { priority, qualityScore, originalImage, queryRelevant, ...publicItem } = item;
       deduped.push(publicItem);
       if (deduped.length >= 20) break;
     }
