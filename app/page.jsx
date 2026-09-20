@@ -2872,12 +2872,12 @@ export default function Page() {
       const imported = JSON.parse(JSON.stringify(payload.design));
       if (imported.background?.startsWith('idb://imports/')) {
         const oldId = imported.background.slice('idb://imports/'.length);
-        if (idMap[oldId]) imported.background = 'idb://imports/' + idMap[oldId];
+        imported.background = idMap[oldId] ? 'idb://imports/' + idMap[oldId] : '';
       }
-      imported.customLayers = (imported.customLayers || []).map((layer) => {
-        if (!layer.src?.startsWith('idb://imports/')) return layer;
+      imported.customLayers = (Array.isArray(imported.customLayers) ? imported.customLayers : []).map((layer) => {
+        if (!layer?.src?.startsWith('idb://imports/')) return layer;
         const oldId = layer.src.slice('idb://imports/'.length);
-        return idMap[oldId] ? { ...layer, src: 'idb://imports/' + idMap[oldId] } : layer;
+        return { ...layer, src: idMap[oldId] ? 'idb://imports/' + idMap[oldId] : '' };
       });
 
       patch({ ...DEFAULTS, ...imported });
@@ -3275,7 +3275,14 @@ export default function Page() {
           return { id, name: 'Contactless', type: 'Built-in hardware', selection: 'contactless', builtin: true };
         }
         if (id === 'builtin-text') {
-          return { id, name: 'Card Text', type: 'Built-in text', selection: 'artwork', builtin: true };
+          return {
+            id,
+            name: 'Card Text',
+            type: 'Built-in text',
+            selection: null,
+            builtin: true,
+            action: 'card-text'
+          };
         }
         const layer = custom.get(id);
         return layer
@@ -3930,6 +3937,12 @@ export default function Page() {
                       key={entry.id}
                       className={'layerRow ' + (selectedElement === entry.selection ? 'selected' : '')}
                       onClick={() => {
+                        if (entry.action === 'card-text') {
+                          setSelectedElement('artwork');
+                          setStudioTool('card');
+                          setMessage('Card text controls ready');
+                          return;
+                        }
                         if (!entry.builtin && selectedElement === entry.selection) {
                           setSelectedElement('artwork');
                           setMessage('Artwork selected');
@@ -3944,7 +3957,7 @@ export default function Page() {
                         <small>{entry.type}{entry.hidden ? ' · hidden' : ''}{index === 0 ? ' · top' : ''}</small>
                       </span>
                       <span>
-                        {entry.hidden ? 'Hidden' : entry.locked ? 'Locked' : selectedElement === entry.selection ? 'Selected' : entry.builtin ? 'Built-in' : 'Edit'}
+                        {entry.action === 'card-text' ? 'Edit Text' : entry.hidden ? 'Hidden' : entry.locked ? 'Locked' : selectedElement === entry.selection ? 'Selected' : entry.builtin ? 'Built-in' : 'Edit'}
                       </span>
                     </button>
                   ))}
