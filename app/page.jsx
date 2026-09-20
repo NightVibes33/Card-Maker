@@ -94,7 +94,8 @@ const DEFAULTS = {
   badgeText: 'CARD',
   textColor: '#ffffff',
   shadow: true,
-  customLayers: []
+  customLayers: [],
+  layerOrder: ['builtin-chip', 'builtin-contactless', 'builtin-text']
 };
 
 const TAB_ITEMS = [
@@ -150,6 +151,50 @@ function snapValue(value, targets, threshold = 0.018) {
     }
   }
   return distance <= threshold ? { value: best, snapped: true } : { value, snapped: false };
+}
+
+const BUILTIN_LAYER_IDS = ['builtin-chip', 'builtin-contactless', 'builtin-text'];
+
+function normalizeLayerOrder(design) {
+  const customIds = (design.customLayers || []).map((layer) => layer.id).filter(Boolean);
+  const valid = new Set([...customIds, ...BUILTIN_LAYER_IDS]);
+  const requested = Array.isArray(design.layerOrder) ? design.layerOrder : [];
+  const seen = new Set();
+  const ordered = [];
+
+  for (const id of requested) {
+    if (!valid.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    ordered.push(id);
+  }
+
+  // Existing projects created before unified stacking did not have layerOrder.
+  // Keep their custom art below card hardware/text by default.
+  for (const id of customIds) {
+    if (!seen.has(id)) {
+      const firstBuiltin = ordered.findIndex((entry) => BUILTIN_LAYER_IDS.includes(entry));
+      if (firstBuiltin >= 0) ordered.splice(firstBuiltin, 0, id);
+      else ordered.push(id);
+      seen.add(id);
+    }
+  }
+
+  for (const id of BUILTIN_LAYER_IDS) {
+    if (!seen.has(id)) {
+      ordered.push(id);
+      seen.add(id);
+    }
+  }
+
+  return ordered;
+}
+
+function insertCustomLayerBelowHardware(design, id) {
+  const order = normalizeLayerOrder(design).filter((entry) => entry !== id);
+  const firstBuiltin = order.findIndex((entry) => BUILTIN_LAYER_IDS.includes(entry));
+  if (firstBuiltin >= 0) order.splice(firstBuiltin, 0, id);
+  else order.push(id);
+  return order;
 }
 
 function hexToRgb(hex = '#000000') {
@@ -1363,36 +1408,57 @@ export default function Page() {
       ctx.restore();
     }
 
-    if (design.chip) drawChip(ctx, design);
-    if (design.contactless) drawContactless(ctx, design);
+    const customLayerMap = new Map((design.customLayers || []).map((layer) => [layer.id, layer]));
+    const stackOrder = normalizeLayerOrder(design);
 
-    ctx.fillStyle = design.textColor;
-    ctx.shadowColor = design.shadow ? 'rgba(0,0,0,.55)' : 'transparent';
-    ctx.shadowBlur = design.shadow ? 16 : 0;
+    const drawBuiltinText = () => {
+      ctx.save();
+      ctx.fillStyle = design.textColor;
+      ctx.shadowColor = design.shadow ? 'rgba(0,0,0,.55)' : 'transparent';
+      ctx.shadowBlur = design.shadow ? 16 : 0;
 
-    if (design.badge) {
-      ctx.textAlign = 'right';
-      ctx.font = '800 66px -apple-system, BlinkMacSystemFont, sans-serif';
-      ctx.fillText(design.badgeText || 'CARD', OUT_W - 105, 130);
-    }
-    if (design.number) {
-      ctx.textAlign = 'left';
-      ctx.font = '600 64px ui-monospace, SFMono-Regular, Menlo, monospace';
-      ctx.fillText(design.numberText, 120, 700);
-    }
+      if (design.badge) {
+        ctx.textAlign = 'right';
+        ctx.font = '800 66px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.fillText(design.badgeText || 'CARD', OUT_W - 105, 130);
+      }
+      if (design.number) {
+        ctx.textAlign = 'left';
+        ctx.font = '600 64px ui-monospace, SFMono-Regular, Menlo, monospace';
+        ctx.fillText(design.numberText, 120, 700);
+      }
 
-    ctx.font = '650 34px -apple-system, BlinkMacSystemFont, sans-serif';
-    if (design.holder) {
-      ctx.textAlign = 'left';
-      ctx.fillText(design.holderText, 122, 815);
-    }
-    if (design.expiry) {
-      ctx.textAlign = 'right';
-      ctx.fillText(design.expiryText, OUT_W - 122, 815);
-    }
+      ctx.font = '650 34px -apple-system, BlinkMacSystemFont, sans-serif';
+      if (design.holder) {
+        ctx.textAlign = 'left';
+        ctx.fillText(design.holderText, 122, 815);
+      }
+      if (design.expiry) {
+        ctx.textAlign = 'right';
+        ctx.fillText(design.expiryText, OUT_W - 122, 815);
+      }
+      ctx.restore();
+    };
 
-    for (const layer of design.customLayers || []) {
-      if (layer.hidden) continue;
+    for (const stackId of stackOrder) {
+      if (stackId === 'builtin-chip') {
+        if (design.chip) drawChip(ctx, design);
+        continue;
+      }
+
+      if (stackId === 'builtin-contactless') {
+        if (design.contactless) drawContactless(ctx, design);
+        continue;
+      }
+
+      if (stackId === 'builtin-text') {
+        drawBuiltinText();
+        continue;
+      }
+
+      const layer = customLayerMap.get(stackId);
+      if (!layer || layer.hidden) continue;
+
       ctx.save();
       ctx.globalAlpha = clamp(Number(layer.opacity ?? 1), 0, 1);
 
@@ -1693,6 +1759,7 @@ export default function Page() {
     await dbPut('imports', asset);
     setImports((current) => [asset, ...current.filter((entry) => entry.id !== assetId)]);
     patch((current) => ({
+      layerOrder: insertCustomLayerBelowHardware(current, layerId),
       customLayers: [
         ...(current.customLayers || []),
         {
@@ -1742,6 +1809,7 @@ export default function Page() {
   function addTextLayer() {
     const id = makeId('layer');
     patch((current) => ({
+      layerOrder: insertCustomLayerBelowHardware(current, id),
       customLayers: [
         ...(current.customLayers || []),
         {
@@ -1772,6 +1840,7 @@ export default function Page() {
   function addShapeLayer() {
     const id = makeId('layer');
     patch((current) => ({
+      layerOrder: insertCustomLayerBelowHardware(current, id),
       customLayers: [
         ...(current.customLayers || []),
         {
@@ -1799,6 +1868,7 @@ export default function Page() {
   function addChipLayer() {
     const id = makeId('layer');
     patch((current) => ({
+      layerOrder: insertCustomLayerBelowHardware(current, id),
       customLayers: [
         ...(current.customLayers || []),
         {
@@ -1822,6 +1892,7 @@ export default function Page() {
   function addContactlessLayer() {
     const id = makeId('layer');
     patch((current) => ({
+      layerOrder: insertCustomLayerBelowHardware(current, id),
       customLayers: [
         ...(current.customLayers || []),
         {
@@ -1852,6 +1923,7 @@ export default function Page() {
 
   function deleteLayer(id) {
     patch((current) => ({
+      layerOrder: normalizeLayerOrder(current).filter((entry) => entry !== id),
       customLayers: (current.customLayers || []).filter((layer) => layer.id !== id)
     }));
     setSelectedElement('artwork');
@@ -1868,21 +1940,29 @@ export default function Page() {
         x: clamp(Number(source.x || 0.5) + 0.03, 0, 1),
         y: clamp(Number(source.y || 0.5) + 0.03, 0, 1)
       };
+      const order = normalizeLayerOrder(current);
+      const sourceIndex = order.indexOf(id);
+      const nextOrder = [...order];
+      nextOrder.splice(sourceIndex >= 0 ? sourceIndex + 1 : 0, 0, copy.id);
       setSelectedElement(copy.id);
-      return { customLayers: [...(current.customLayers || []), copy] };
+      return {
+        customLayers: [...(current.customLayers || []), copy],
+        layerOrder: nextOrder
+      };
     });
   }
 
   function moveLayer(id, direction) {
     patch((current) => {
-      const layers = [...(current.customLayers || [])];
-      const index = layers.findIndex((layer) => layer.id === id);
+      const order = normalizeLayerOrder(current);
+      const index = order.indexOf(id);
       if (index < 0) return {};
-      const target = clamp(index + direction, 0, layers.length - 1);
+      const target = clamp(index + direction, 0, order.length - 1);
       if (target === index) return {};
-      const [layer] = layers.splice(index, 1);
-      layers.splice(target, 0, layer);
-      return { customLayers: layers };
+      const next = [...order];
+      const [entry] = next.splice(index, 1);
+      next.splice(target, 0, entry);
+      return { layerOrder: next };
     });
   }
 
@@ -2067,33 +2147,39 @@ export default function Page() {
     const rect = event.currentTarget.getBoundingClientRect();
     const nx = (event.clientX - rect.left) / Math.max(1, rect.width);
     const ny = (event.clientY - rect.top) / Math.max(1, rect.height);
+    const customLayerMap = new Map((design.customLayers || []).map((layer) => [layer.id, layer]));
+    const stack = normalizeLayerOrder(design).slice().reverse();
 
-    const layers = [...(design.customLayers || [])].reverse();
-    for (const layer of layers) {
-      if (layer.hidden || layer.locked) continue;
+    for (const stackId of stack) {
+      if (stackId === 'builtin-contactless' && design.contactless) {
+        const dx = nx - design.contactlessX;
+        const dy = ny - design.contactlessY;
+        if (Math.hypot(dx, dy) < 0.075 * design.contactlessScale) return 'contactless';
+        continue;
+      }
+
+      if (stackId === 'builtin-chip' && design.chip) {
+        const chipW = (255 * design.chipScale) / OUT_W;
+        const chipH = (188 * design.chipScale) / OUT_H;
+        if (
+          nx >= design.chipX &&
+          nx <= design.chipX + chipW &&
+          ny >= design.chipY &&
+          ny <= design.chipY + chipH
+        ) {
+          return 'chip';
+        }
+        continue;
+      }
+
+      if (BUILTIN_LAYER_IDS.includes(stackId)) continue;
+
+      const layer = customLayerMap.get(stackId);
+      if (!layer || layer.hidden || layer.locked) continue;
       const dx = nx - Number(layer.x || 0.5);
       const dy = ny - Number(layer.y || 0.5);
       if (Math.hypot(dx, dy) < 0.09 * Math.max(0.7, Number(layer.scale || 1))) {
         return layer.id;
-      }
-    }
-
-    if (design.contactless) {
-      const dx = nx - design.contactlessX;
-      const dy = ny - design.contactlessY;
-      if (Math.hypot(dx, dy) < 0.075 * design.contactlessScale) return 'contactless';
-    }
-
-    if (design.chip) {
-      const chipW = (255 * design.chipScale) / OUT_W;
-      const chipH = (188 * design.chipScale) / OUT_H;
-      if (
-        nx >= design.chipX &&
-        nx <= design.chipX + chipW &&
-        ny >= design.chipY &&
-        ny <= design.chipY + chipH
-      ) {
-        return 'chip';
       }
     }
 
