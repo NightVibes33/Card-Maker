@@ -4019,7 +4019,9 @@ export default function Page() {
       await recordExport(name, width, height, 'native-image-sheet');
       setMessage('Image sheet closed');
     } catch (error) {
-      if (error?.name !== 'AbortError') {
+      if (error?.name === 'AbortError') {
+        setMessage('Image sharing canceled');
+      } else {
         setMessage('Could not open the native image sheet.');
       }
     }
