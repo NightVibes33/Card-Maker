@@ -900,7 +900,7 @@ function IOSIcon({ name, size = 24 }) {
   return null;
 }
 
-function drawChip(ctx, d) {
+function drawChip(ctx, d, pixelScale = 1) {
   const palettes = {
     gold: ['#fff0a0', '#d8b24a', '#9e7421'],
     silver: ['#f5f7f8', '#b8c0c6', '#6f777d'],
@@ -920,8 +920,8 @@ function drawChip(ctx, d) {
   ctx.translate(-(x + w / 2), -(y + h / 2));
 
   ctx.shadowColor = 'rgba(0,0,0,.4)';
-  ctx.shadowBlur = 24;
-  ctx.shadowOffsetY = 10;
+  ctx.shadowBlur = 24 * pixelScale;
+  ctx.shadowOffsetY = 10 * pixelScale;
 
   const g = ctx.createLinearGradient(x, y, x + w, y + h);
   g.addColorStop(0, p[0]);
@@ -965,7 +965,7 @@ function drawChip(ctx, d) {
   ctx.restore();
 }
 
-function drawChipLayerAtOrigin(ctx, tone = 'gold') {
+function drawChipLayerAtOrigin(ctx, tone = 'gold', pixelScale = 1) {
   const palettes = {
     gold: ['#fff0a0', '#d8b24a', '#9e7421'],
     silver: ['#f5f7f8', '#b8c0c6', '#6f777d'],
@@ -980,8 +980,8 @@ function drawChipLayerAtOrigin(ctx, tone = 'gold') {
   const r = 30;
 
   ctx.shadowColor = 'rgba(0,0,0,.4)';
-  ctx.shadowBlur = 24;
-  ctx.shadowOffsetY = 10;
+  ctx.shadowBlur = 24 * pixelScale;
+  ctx.shadowOffsetY = 10 * pixelScale;
 
   const g = ctx.createLinearGradient(x, y, x + w, y + h);
   g.addColorStop(0, p[0]);
@@ -2762,6 +2762,10 @@ export default function Page() {
     const renderImageLayerSourceKey = imageLayerSourceKeyForDesign(renderDesign);
     const originalTarget = options.originalTarget || (options.original ? 'all' : null);
     const artworkOriginal = originalTarget === 'all' || originalTarget === 'artwork';
+    const renderPixelScale = Math.max(
+      0.01,
+      Math.min(width / OUT_W, height / OUT_H)
+    );
     ctx.save();
     ctx.clearRect(0, 0, width, height);
     ctx.scale(width / OUT_W, height / OUT_H);
@@ -2827,7 +2831,7 @@ export default function Page() {
         'brightness(' + brightness + ')' +
         ' saturate(' + saturation + ')' +
         ' contrast(' + contrast + ')' +
-        ' blur(' + blur * 7 + 'px)';
+        ' blur(' + blur * 7 * renderPixelScale + 'px)';
       ctx.drawImage(image, sx, sy, sw, sh, -iw / 2, -ih / 2, iw, ih);
       ctx.restore();
 
@@ -3025,7 +3029,7 @@ export default function Page() {
       ctx.save();
       ctx.fillStyle = renderDesign.textColor;
       ctx.shadowColor = renderDesign.shadow ? 'rgba(0,0,0,.55)' : 'transparent';
-      ctx.shadowBlur = renderDesign.shadow ? 16 : 0;
+      ctx.shadowBlur = renderDesign.shadow ? 16 * renderPixelScale : 0;
 
       if (renderDesign.badge) {
         ctx.textAlign = 'right';
@@ -3052,7 +3056,7 @@ export default function Page() {
 
     for (const stackId of stackOrder) {
       if (stackId === 'builtin-chip') {
-        if (renderDesign.chip) drawChip(ctx, renderDesign);
+        if (renderDesign.chip) drawChip(ctx, renderDesign, renderPixelScale);
         continue;
       }
 
@@ -3084,7 +3088,7 @@ export default function Page() {
         ctx.fillStyle = layer.color || '#ffffff';
         ctx.textAlign = layer.align || 'center';
         ctx.shadowColor = layer.shadow ? 'rgba(0,0,0,.5)' : 'transparent';
-        ctx.shadowBlur = layer.shadow ? 12 : 0;
+        ctx.shadowBlur = layer.shadow ? 12 * renderPixelScale : 0;
         const lines = textLayerLines(layer);
         const lineAdvance = textLayerLineAdvance(layer);
         const firstBaseline = -((lines.length - 1) * lineAdvance) / 2;
@@ -3144,7 +3148,7 @@ export default function Page() {
             'brightness(' + brightness + ')' +
             ' saturate(' + saturation + ')' +
             ' contrast(' + contrast + ')' +
-            ' blur(' + blur * 7 + 'px)';
+            ' blur(' + blur * 7 * renderPixelScale + 'px)';
           ctx.drawImage(layerImage, sx, sy, sw, sh, -w / 2, -h / 2, w, h);
           ctx.restore();
 
@@ -3247,7 +3251,7 @@ export default function Page() {
           }
         }
       } else if (layer.type === 'chip') {
-        drawChipLayerAtOrigin(ctx, layer.tone || 'gold');
+        drawChipLayerAtOrigin(ctx, layer.tone || 'gold', renderPixelScale);
       } else if (layer.type === 'contactless') {
         drawContactlessLayerAtOrigin(ctx, layer.color || '#ffffff');
       }
