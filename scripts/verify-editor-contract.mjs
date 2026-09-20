@@ -36,7 +36,7 @@ const pageChecks = [
   [/Math\.abs\(normalized\.w - 1\) < 1e-9[\s\S]{0,120}return null;/, 'full-frame crops normalize back to no-op state'],
   [/try \{[\s\S]{0,100}setPointerCapture\(event\.pointerId\);[\s\S]{0,50}\} catch \{\}/, 'mobile pointer capture failures are non-fatal'],
   [/function normalizeFreeRotation\(/, 'free rotations wrap smoothly through the ±180° boundary'],
-  [/contactlessRotation: normalizeFreeRotation\(/, 'contactless gesture rotation wraps instead of sticking at 180°'],
+  [/const nextRotation = normalizeFreeRotation\([\s\S]{0,420}contactlessRotation: nextRotation/, 'contactless gesture rotation wraps instead of sticking at 180°'],
   [/rotation: normalizeFreeRotation\(/, 'custom layer gesture rotation wraps instead of sticking at 180°'],
   [/rotate: normalizeFreeRotation\(/, 'artwork gesture rotation wraps instead of sticking at 180°'],
   [/const localPadding = Number\(padding \|\| 0\) \/ safeScale;/, 'transformed hit padding remains scale-independent'],
