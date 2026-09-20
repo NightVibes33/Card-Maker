@@ -4156,6 +4156,7 @@ export default function Page() {
     setPreviewMode('flat');
     setShowOriginal(false);
     setShowExportPreview(false);
+    setGuidesEnabled(true);
     setActiveGuides({ x: null, y: null });
     setStudioTool(studioTool);
     setProjectName('');
@@ -4163,8 +4164,20 @@ export default function Page() {
     setMenuItem(null);
     setMessage(statusMessage);
 
-    // Queue the replacement immediately instead of waiting only for the
-    // debounced autosave. Saved named projects remain untouched in IndexedDB.
+    // A project boundary must also replace the synchronous recovery snapshot
+    // immediately. Otherwise an iOS suspend/reload in the autosave debounce
+    // window can resurrect the previous project's chip/position/effect state.
+    if (hydrated) {
+      try {
+        const now = Date.now();
+        localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(next));
+        localStorage.setItem('aircard-sticker-fvp-v3-updated-at', String(now));
+        if (!autosaveReady) autosavePausedBaselineRef.current = next;
+      } catch {}
+    }
+
+    // Queue the IndexedDB replacement too. Saved named projects remain
+    // untouched; only the current working draft is replaced.
     if (hydrated && autosaveReady) {
       setSaveStatus('Saving…');
       persistDraftSnapshot(next).then((result) => {
