@@ -3725,6 +3725,21 @@ export default function Page() {
       if (presetAssets.length > MAX_PRESET_ASSETS) {
         throw new Error('Preset contains too many embedded assets');
       }
+      const presetAssetMap = new Map(presetAssets);
+      const referencedPresetAssetIds = new Set();
+      const rawBackground = String(payload.design.background || '');
+      if (rawBackground.startsWith('idb://imports/')) {
+        referencedPresetAssetIds.add(rawBackground.slice('idb://imports/'.length));
+      }
+      for (const layer of Array.isArray(payload.design.customLayers) ? payload.design.customLayers : []) {
+        const src = String(layer?.src || '');
+        if (layer?.type === 'image' && src.startsWith('idb://imports/')) {
+          referencedPresetAssetIds.add(src.slice('idb://imports/'.length));
+        }
+      }
+      if (referencedPresetAssetIds.size > MAX_PRESET_ASSETS) {
+        throw new Error('Preset references too many embedded assets');
+      }
       if (Array.isArray(payload.design.customLayers) && payload.design.customLayers.length > MAX_CUSTOM_LAYERS) {
         throw new Error('Preset contains too many layers');
       }
@@ -3742,8 +3757,11 @@ export default function Page() {
         : '';
       let estimatedEmbeddedBytes = 0;
 
-      for (const [oldId, asset] of presetAssets) {
-        if (!asset?.data) continue;
+      for (const oldId of referencedPresetAssetIds) {
+        const asset = presetAssetMap.get(oldId);
+        if (!asset?.data) {
+          throw new Error('Preset is missing a referenced image asset');
+        }
         const assetType = String(asset.type || '');
         if ((assetType && !assetType.startsWith('image/')) || !String(asset.data).startsWith('data:image/')) {
           throw new Error('Preset contains a non-image asset');
