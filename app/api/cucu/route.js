@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 const ORIGIN = 'https://cucucovers.com';
 const DEFAULT_COLLECTION = 'all-card-covers';
 const SHOPIFY_PAGE_SIZE = 100;
-const FALLBACK_TOTAL = 2225;
 
 const COLLECTIONS = {
   all: { label: 'All Card Skins', handle: 'all-card-covers', total: 2225 },
@@ -214,10 +213,25 @@ async function getFallbackCatalog(categoryKey) {
 
   const promise = (async () => {
     const batches = [];
-    for (let sourcePage = 1; sourcePage <= 30; sourcePage += 1) {
-      const batch = await getShopifyPage(DEFAULT_COLLECTION, sourcePage);
-      batches.push(...batch);
-      if (batch.length < SHOPIFY_PAGE_SIZE) break;
+    const concurrency = 3;
+    let done = false;
+
+    for (let startPage = 1; startPage <= 30 && !done; startPage += concurrency) {
+      const pages = Array.from(
+        { length: Math.min(concurrency, 31 - startPage) },
+        (_, index) => startPage + index
+      );
+      const pageResults = await Promise.all(
+        pages.map((sourcePage) => getShopifyPage(DEFAULT_COLLECTION, sourcePage))
+      );
+
+      for (const batch of pageResults) {
+        batches.push(...batch);
+        if (batch.length < SHOPIFY_PAGE_SIZE) {
+          done = true;
+          break;
+        }
+      }
     }
 
     const seen = new Set();
