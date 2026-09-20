@@ -6481,7 +6481,15 @@ export default function Page() {
                                   ? 'built-in'
                                   : 'edit')
                       }
-                      className={'layerRow ' + (selectedElement === entry.selection ? 'selected' : '')}
+                      className={
+                        'layerRow ' +
+                        (
+                          entry.action === 'card-text'
+                            ? selectedElement === 'card-text'
+                            : selectedElement === entry.selection
+                        ? 'selected'
+                        : ''
+                      }
                       onClick={() => {
                         if (entry.action === 'card-text') {
                           setSelectedElement('card-text');
