@@ -2251,24 +2251,40 @@ export default function Page() {
       }
 
       let cursor = 0;
+      const decodedBySource = new Map();
 
-      async function hydrateOneLayer(layer) {
-        let src = layer.src;
+      async function decodeLayerSource(source) {
+        if (decodedBySource.has(source)) {
+          return decodedBySource.get(source);
+        }
 
-        try {
+        const work = (async () => {
+          let src = source;
+
           if (src.startsWith('idb://imports/')) {
             const id = src.slice('idb://imports/'.length);
             const asset = await dbGet('imports', id);
-            if (cancelled) return;
-            if (!asset?.blob) {
-              failed = true;
-              return;
-            }
+            if (cancelled) throw new Error('Layer hydration canceled');
+            if (!asset?.blob) throw new Error('Imported layer image is missing');
             src = URL.createObjectURL(asset.blob);
             urls.push(src);
           }
 
-          const decoded = await loadSearchImage(src);
+          return loadSearchImage(src);
+        })();
+
+        decodedBySource.set(source, work);
+        try {
+          return await work;
+        } catch (error) {
+          decodedBySource.delete(source);
+          throw error;
+        }
+      }
+
+      async function hydrateOneLayer(layer) {
+        try {
+          const decoded = await decodeLayerSource(layer.src);
           if (cancelled) return;
           next[layer.id] = decoded;
         } catch {
