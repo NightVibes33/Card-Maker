@@ -139,6 +139,19 @@ function clamp(v, a, b) {
   return Math.max(a, Math.min(b, v));
 }
 
+function snapValue(value, targets, threshold = 0.018) {
+  let best = value;
+  let distance = Infinity;
+  for (const target of targets) {
+    const delta = Math.abs(value - target);
+    if (delta < distance) {
+      distance = delta;
+      best = target;
+    }
+  }
+  return distance <= threshold ? { value: best, snapped: true } : { value, snapped: false };
+}
+
 function hexToRgb(hex = '#000000') {
   const clean = String(hex).replace('#', '').trim();
   const normalized = clean.length === 3
@@ -790,7 +803,7 @@ export default function Page() {
   const [exportHistory, setExportHistory] = useState([]);
   const [expertMode, setExpertMode] = useState(false);
   const [guidesEnabled, setGuidesEnabled] = useState(true);
-  const [activeGuides, setActiveGuides] = useState({ x: false, y: false });
+  const [activeGuides, setActiveGuides] = useState({ x: null, y: null });
   const [selectedElement, setSelectedElement] = useState('artwork');
   const [previewMode, setPreviewMode] = useState('flat');
   const [showOriginal, setShowOriginal] = useState(false);
@@ -1952,25 +1965,23 @@ export default function Page() {
 
       if (selectedElement === 'chip') {
         patch((current) => {
-          let x = clamp(current.chipX + dx, 0, 0.82);
-          let y = clamp(current.chipY + dy, 0, 0.8);
-          const snapX = Math.abs(x - 0.105) < 0.018;
-          const snapY = Math.abs(y - 0.35) < 0.018;
-          if (snapX) x = 0.105;
-          if (snapY) y = 0.35;
-          setActiveGuides({ x: snapX, y: snapY });
-          return { chipX: x, chipY: y };
+          const snapX = snapValue(clamp(current.chipX + dx, 0, 0.82), [0.04, 0.105, 1 / 3, 0.5, 2 / 3, 0.78]);
+          const snapY = snapValue(clamp(current.chipY + dy, 0, 0.8), [0.04, 1 / 3, 0.35, 0.5, 2 / 3, 0.76]);
+          setActiveGuides({
+            x: snapX.snapped ? snapX.value : null,
+            y: snapY.snapped ? snapY.value : null
+          });
+          return { chipX: snapX.value, chipY: snapY.value };
         }, false);
       } else if (selectedElement === 'contactless') {
         patch((current) => {
-          let x = clamp(current.contactlessX + dx, 0.03, 0.97);
-          let y = clamp(current.contactlessY + dy, 0.03, 0.97);
-          const snapX = Math.abs(x - 0.285) < 0.018;
-          const snapY = Math.abs(y - 0.43) < 0.018;
-          if (snapX) x = 0.285;
-          if (snapY) y = 0.43;
-          setActiveGuides({ x: snapX, y: snapY });
-          return { contactlessX: x, contactlessY: y };
+          const snapX = snapValue(clamp(current.contactlessX + dx, 0.03, 0.97), [0.05, 0.285, 1 / 3, 0.5, 2 / 3, 0.95]);
+          const snapY = snapValue(clamp(current.contactlessY + dy, 0.03, 0.97), [0.05, 1 / 3, 0.43, 0.5, 2 / 3, 0.95]);
+          setActiveGuides({
+            x: snapX.snapped ? snapX.value : null,
+            y: snapY.snapped ? snapY.value : null
+          });
+          return { contactlessX: snapX.value, contactlessY: snapY.value };
         }, false);
       } else if (selectedElement !== 'artwork') {
         const layer = (design.customLayers || []).find((entry) => entry.id === selectedElement);
@@ -1978,27 +1989,27 @@ export default function Page() {
           patch((current) => ({
             customLayers: (current.customLayers || []).map((entry) => {
               if (entry.id !== selectedElement) return entry;
-              let x = clamp(Number(entry.x || 0.5) + dx, 0, 1);
-              let y = clamp(Number(entry.y || 0.5) + dy, 0, 1);
-              const snapX = Math.abs(x - 0.5) < 0.018;
-              const snapY = Math.abs(y - 0.5) < 0.018;
-              if (snapX) x = 0.5;
-              if (snapY) y = 0.5;
-              setActiveGuides({ x: snapX, y: snapY });
-              return { ...entry, x, y };
+              const snapX = snapValue(clamp(Number(entry.x || 0.5) + dx, 0, 1), [0.05, 1 / 3, 0.5, 2 / 3, 0.95]);
+              const snapY = snapValue(clamp(Number(entry.y || 0.5) + dy, 0, 1), [0.05, 1 / 3, 0.5, 2 / 3, 0.95]);
+              setActiveGuides({
+                x: snapX.snapped ? snapX.value : null,
+                y: snapY.snapped ? snapY.value : null
+              });
+              return { ...entry, x: snapX.value, y: snapY.value };
             })
           }), false);
         }
       } else {
         patch((current) => {
-          let x = clamp(current.x + dx, -1.5, 1.5);
-          let y = clamp(current.y + dy, -1.5, 1.5);
-          const snapX = Math.abs(x) < 0.018;
-          const snapY = Math.abs(y) < 0.018;
-          if (snapX) x = 0;
-          if (snapY) y = 0;
-          setActiveGuides({ x: snapX, y: snapY });
-          return { x, y };
+          const rawX = clamp(current.x + dx, -1.5, 1.5);
+          const rawY = clamp(current.y + dy, -1.5, 1.5);
+          const snapX = snapValue(rawX, [-0.45, -1 / 6, 0, 1 / 6, 0.45]);
+          const snapY = snapValue(rawY, [-0.45, -1 / 6, 0, 1 / 6, 0.45]);
+          setActiveGuides({
+            x: snapX.snapped ? clamp(0.5 + snapX.value, 0.05, 0.95) : null,
+            y: snapY.snapped ? clamp(0.5 + snapY.value, 0.05, 0.95) : null
+          });
+          return { x: snapX.value, y: snapY.value };
         }, false);
       }
 
@@ -2063,7 +2074,7 @@ export default function Page() {
     }
 
     if (pointers.current.size === 0) {
-      setActiveGuides({ x: false, y: false });
+      setActiveGuides({ x: null, y: null });
     }
   }
 
@@ -2158,7 +2169,7 @@ export default function Page() {
           onPointerCancel={() => setShowOriginal(false)}
           onPointerLeave={() => setShowOriginal(false)}
         >
-          Before
+          {showOriginal ? 'After' : 'Before / After'}
         </button>
       </div>
 
@@ -2176,12 +2187,13 @@ export default function Page() {
 
         {tab === 'studio' && guidesEnabled ? (
           <div className="cardGuides" aria-hidden="true">
+            <i className="guide bleedEdge" />
             <i className="guide safeEdge" />
             <i className="guide textSafe" />
             <i className="guide chipZone" />
             <i className="guide contactlessZone" />
-            {activeGuides.x ? <i className="snapGuide vertical" /> : null}
-            {activeGuides.y ? <i className="snapGuide horizontal" /> : null}
+            {activeGuides.x != null ? <i className="snapGuide vertical" style={{ left: (activeGuides.x * 100) + '%' }} /> : null}
+            {activeGuides.y != null ? <i className="snapGuide horizontal" style={{ top: (activeGuides.y * 100) + '%' }} /> : null}
           </div>
         ) : null}
 
@@ -2207,6 +2219,19 @@ export default function Page() {
               top: (design.contactlessY * 100 - 8) + '%',
               width: '10%',
               height: '16%'
+            }}
+          />
+        ) : null}
+
+        {previewMode === 'physical' && design.chip ? (
+          <i
+            className="physicalChipReflection"
+            aria-hidden="true"
+            style={{
+              left: (design.chipX * 100) + '%',
+              top: (design.chipY * 100) + '%',
+              width: ((255 * design.chipScale / OUT_W) * 100) + '%',
+              height: ((188 * design.chipScale / OUT_H) * 100) + '%'
             }}
           />
         ) : null}
