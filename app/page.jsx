@@ -1078,6 +1078,29 @@ function Group({ title, footer, children }) {
   );
 }
 
+function handleTabKeyDown(event, values, current, onSelect) {
+  const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+  if (!keys.includes(event.key) || !values.length) return;
+
+  event.preventDefault();
+  const index = Math.max(0, values.indexOf(current));
+  let nextIndex = index;
+
+  if (event.key === 'Home') nextIndex = 0;
+  else if (event.key === 'End') nextIndex = values.length - 1;
+  else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    nextIndex = (index + 1) % values.length;
+  } else {
+    nextIndex = (index - 1 + values.length) % values.length;
+  }
+
+  onSelect(values[nextIndex]);
+
+  const tabList = event.currentTarget.closest('[role="tablist"]');
+  const tabs = tabList ? Array.from(tabList.querySelectorAll('[role="tab"]')) : [];
+  window.requestAnimationFrame(() => tabs[nextIndex]?.focus());
+}
+
 function proxyImageWidth(src = '', width = 1600) {
   let source = String(src || '');
 
@@ -4799,13 +4822,12 @@ export default function Page() {
               ) : null}
             </div>
 
-            <div className="categoryScroller discoverCategories" role="tablist" aria-label="Card skin collection">
+            <div className="categoryScroller discoverCategories" role="group" aria-label="Card skin collection">
               {CUCU_CATEGORIES.map(([value, label]) => (
                 <button
                   type="button"
-                  role="tab"
                   key={value}
-                  aria-selected={!query && cucuCategory === value}
+                  aria-pressed={!query && cucuCategory === value}
                   className={!query && cucuCategory === value ? 'categoryChip selected' : 'categoryChip'}
                   onClick={() => {
                     const clearingSearch = Boolean(query || searchInput.trim());
@@ -4886,7 +4908,14 @@ export default function Page() {
                     role="tab"
                     key={value}
                     aria-selected={studioTool === value}
+                    tabIndex={studioTool === value ? 0 : -1}
                     className={studioTool === value ? 'active' : ''}
+                    onKeyDown={(event) => handleTabKeyDown(
+                      event,
+                      STUDIO_TOOLS.map(([tool]) => tool),
+                      studioTool,
+                      setStudioTool
+                    )}
                     onClick={() => setStudioTool(value)}
                   >
                     {label}
@@ -4895,8 +4924,8 @@ export default function Page() {
               </div>
 
               <div className="previewModeToggle" role="group" aria-label="Preview style">
-                <button type="button" className={previewMode === 'flat' ? 'active' : ''} onClick={() => setPreviewMode('flat')}>Flat</button>
-                <button type="button" className={previewMode === 'physical' ? 'active' : ''} onClick={() => setPreviewMode('physical')}>Physical</button>
+                <button type="button" aria-pressed={previewMode === 'flat'} className={previewMode === 'flat' ? 'active' : ''} onClick={() => setPreviewMode('flat')}>Flat</button>
+                <button type="button" aria-pressed={previewMode === 'physical'} className={previewMode === 'physical' ? 'active' : ''} onClick={() => setPreviewMode('physical')}>Physical</button>
               </div>
             </div>
 
@@ -5665,7 +5694,14 @@ export default function Page() {
             role="tab"
             aria-selected={tab === value}
             aria-controls={'panel-' + value}
+            tabIndex={tab === value ? 0 : -1}
             className={tab === value ? 'active' : ''}
+            onKeyDown={(event) => handleTabKeyDown(
+              event,
+              TAB_ITEMS.map(([item]) => item),
+              tab,
+              setTab
+            )}
             onClick={() => setTab(value)}
           >
             <IOSIcon name={value} size={24} />
