@@ -6029,7 +6029,7 @@ export default function Page() {
                     <div className="cropControlBlock">
                       <SliderRow
                         label="Layer Crop Left"
-                        disabled={Boolean(selectedImageLayer.locked)}
+                        disabled={!activeImageEditable}
                         value={selectedImageLayer.crop?.x || 0}
                         min={0}
                         max={0.9}
@@ -6039,7 +6039,7 @@ export default function Page() {
                       />
                       <SliderRow
                         label="Layer Crop Right"
-                        disabled={Boolean(selectedImageLayer.locked)}
+                        disabled={!activeImageEditable}
                         value={selectedImageLayer.crop ? Math.max(0, 1 - selectedImageLayer.crop.x - selectedImageLayer.crop.w) : 0}
                         min={0}
                         max={0.9}
@@ -6049,7 +6049,7 @@ export default function Page() {
                       />
                       <SliderRow
                         label="Layer Crop Top"
-                        disabled={Boolean(selectedImageLayer.locked)}
+                        disabled={!activeImageEditable}
                         value={selectedImageLayer.crop?.y || 0}
                         min={0}
                         max={0.9}
@@ -6059,7 +6059,7 @@ export default function Page() {
                       />
                       <SliderRow
                         label="Layer Crop Bottom"
-                        disabled={Boolean(selectedImageLayer.locked)}
+                        disabled={!activeImageEditable}
                         value={selectedImageLayer.crop ? Math.max(0, 1 - selectedImageLayer.crop.y - selectedImageLayer.crop.h) : 0}
                         min={0}
                         max={0.9}
@@ -6071,7 +6071,7 @@ export default function Page() {
                     <button
                       type="button"
                       className="settingsResetButton"
-                      disabled={Boolean(selectedImageLayer.locked)}
+                      disabled={!activeImageEditable}
                       onClick={() => updateLayer(selectedImageLayer.id, { crop: selectedImageLayer.originalCrop || null })}
                     >
                       Reset Layer Crop
@@ -6093,15 +6093,15 @@ export default function Page() {
                       <IOSIcon name="photo" size={19} />
                     </button>
                     <div className="cropControlBlock">
-                      <SliderRow label="Crop Left" value={design.sourceCrop?.x || 0} min={0} max={0.9} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('left', value)} />
-                      <SliderRow label="Crop Right" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.x - design.sourceCrop.w) : 0} min={0} max={0.9} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('right', value)} />
-                      <SliderRow label="Crop Top" value={design.sourceCrop?.y || 0} min={0} max={0.9} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('top', value)} />
-                      <SliderRow label="Crop Bottom" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.y - design.sourceCrop.h) : 0} min={0} max={0.9} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('bottom', value)} />
+                      <SliderRow label="Crop Left" value={design.sourceCrop?.x || 0} min={0} max={0.9} step={0.005} disabled={!activeImageEditable} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('left', value)} />
+                      <SliderRow label="Crop Right" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.x - design.sourceCrop.w) : 0} min={0} max={0.9} step={0.005} disabled={!activeImageEditable} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('right', value)} />
+                      <SliderRow label="Crop Top" value={design.sourceCrop?.y || 0} min={0} max={0.9} step={0.005} disabled={!activeImageEditable} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('top', value)} />
+                      <SliderRow label="Crop Bottom" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.y - design.sourceCrop.h) : 0} min={0} max={0.9} step={0.005} disabled={!activeImageEditable} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('bottom', value)} />
                     </div>
                     <button
                       type="button"
                       className="settingsResetButton"
-                      disabled={!design.background}
+                      disabled={!activeImageEditable}
                       onClick={() => patch({
                         sourceCrop: design.originalSourceCrop || null
                       })}
