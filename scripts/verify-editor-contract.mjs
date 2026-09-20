@@ -92,6 +92,7 @@ for (const [pattern, label] of touchChecks) {
 requireMatch(sw, /\[ART_CACHE\]:\s*40/, 'full artwork cache is bounded');
 requireMatch(sw, /\[THUMB_CACHE\]:\s*160/, 'thumbnail cache is bounded separately');
 requireMatch(sw, /async function trimCache\(/, 'service-worker cache eviction exists');
+requireMatch(sw, /const SHELL = \['\/', '\/manifest\.webmanifest'\];/, 'app root is precached for first offline launch');
 requireMatch(sw, /const OWNED_CACHE_PREFIX = 'card-studio-';/, 'service-worker cleanup is scoped to Card Studio caches');
 requireMatch(sw, /key\.startsWith\(OWNED_CACHE_PREFIX\)/, 'service-worker leaves unrelated origin caches untouched');
 requireMatch(sw, /requestedWidth > 0 && requestedWidth <= 800/, 'thumbnail cache routing is width-bounded');
