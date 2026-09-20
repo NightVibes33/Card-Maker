@@ -169,6 +169,45 @@ export async function dbPut(store, value) {
   }));
 }
 
+export async function dbPutIfBelowLimit(store, value, maxCount) {
+  const limit = Math.max(0, Math.floor(Number(maxCount) || 0));
+  if (!limit) return false;
+
+  return withDbRetry((db) => new Promise((resolve, reject) => {
+    let tx;
+    let objectStore;
+    let inserted = false;
+
+    try {
+      tx = db.transaction(store, 'readwrite');
+      objectStore = tx.objectStore(store);
+      const countRequest = objectStore.count();
+
+      countRequest.onsuccess = () => {
+        if (Number(countRequest.result || 0) >= limit) return;
+        try {
+          objectStore.put(value);
+          inserted = true;
+        } catch (error) {
+          try { tx.abort(); } catch {}
+          reject(error);
+        }
+      };
+      countRequest.onerror = () => {
+        try { tx.abort(); } catch {}
+        reject(countRequest.error || new Error('IndexedDB count failed'));
+      };
+    } catch (error) {
+      reject(error);
+      return;
+    }
+
+    tx.oncomplete = () => resolve(inserted);
+    tx.onerror = () => reject(tx.error || new Error('IndexedDB limited write failed'));
+    tx.onabort = () => reject(tx.error || new Error('IndexedDB limited write aborted'));
+  }));
+}
+
 export async function dbGet(store, id) {
   return withDbRetry((db) => new Promise((resolve, reject) => {
     let request;
