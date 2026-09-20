@@ -12,6 +12,7 @@ import {
   dbPut,
   makeId
 } from './lib/storage';
+import { parseAllowedRemoteImageUrl } from './lib/imagePolicy';
 
 const OUT_W = 1536;
 const OUT_H = 969;
@@ -1215,21 +1216,9 @@ function proxyImageWidth(src = '', width = 1600) {
   // Older favorites/recent items may store the original HTTPS artwork URL.
   // Route those through the same-origin proxy so canvas export stays untainted.
   if (/^https:\/\//i.test(source)) {
-    try {
-      const remote = new URL(source);
-      if (
-        remote.protocol !== 'https:' ||
-        remote.username ||
-        remote.password ||
-        (remote.port && remote.port !== '443') ||
-        remote.toString().length > 2200
-      ) {
-        return '';
-      }
-      source = '/api/image?url=' + encodeURIComponent(remote.toString());
-    } catch {
-      return '';
-    }
+    const remote = parseAllowedRemoteImageUrl(source);
+    if (!remote || remote.toString().length > 2200) return '';
+    source = '/api/image?url=' + encodeURIComponent(remote.toString());
   }
 
   if (!source.startsWith('/api/image?')) return '';
@@ -1238,21 +1227,8 @@ function proxyImageWidth(src = '', width = 1600) {
   const rawUrl = params.get('url');
   if (!rawUrl || rawUrl.length > 2200) return '';
 
-  let remote;
-  try {
-    remote = new URL(rawUrl);
-  } catch {
-    return '';
-  }
-
-  if (
-    remote.protocol !== 'https:' ||
-    remote.username ||
-    remote.password ||
-    (remote.port && remote.port !== '443')
-  ) {
-    return '';
-  }
+  const remote = parseAllowedRemoteImageUrl(rawUrl);
+  if (!remote) return '';
 
   const normalized = new URLSearchParams();
   normalized.set('url', remote.toString());
