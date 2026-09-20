@@ -4550,6 +4550,13 @@ export default function Page() {
     setCleanupInProgress(true);
 
     try {
+      const flushedDraft = await persistDraftSnapshot(designRef.current);
+      if (!flushedDraft?.success) {
+        setMessage('Could not flush the current draft safely, so no imported images were removed.');
+        return;
+      }
+      await draftSaveQueueRef.current;
+
       const referenced = new Set();
   
       const addDesignRefs = (value) => {
@@ -4629,6 +4636,7 @@ export default function Page() {
       for (const snapshot of redoRef.current) addDesignRefs(snapshot);
 
       try {
+        await draftSaveQueueRef.current;
         const latestDraft = await dbGet('kv', 'draft');
         addDesignRefs(latestDraft?.design);
       } catch {
