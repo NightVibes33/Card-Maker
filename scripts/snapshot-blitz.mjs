@@ -1,13 +1,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import createClient from 'microlink.io';
 import * as cheerio from 'cheerio';
 
 const ORIGIN = 'https://blitzcovers.com';
 const COLLECTION = '/collections/credit-card-cover';
 const PAGE_COUNT = 8;
-
-const microlink = createClient();
 
 function cleanText(value = '') {
   return String(value).replace(/\s+/g, ' ').trim();
@@ -163,12 +160,35 @@ function extractProducts(html, pageNumber) {
 
 const all = new Map();
 
+async function fetchMicrolinkHtml(target) {
+  const api = new URL('https://api.microlink.io');
+  api.searchParams.set('url', target);
+  api.searchParams.set('meta', 'false');
+  api.searchParams.set('data.page.selector', 'html');
+  api.searchParams.set('data.page.attr', 'html');
+  api.searchParams.set('data.page.type', 'string');
+
+  const response = await fetch(api, {
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': 'AirCard-Blitz-Snapshot/1.0'
+    }
+  });
+
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok || json.status !== 'success' || typeof json?.data?.page !== 'string') {
+    throw new Error(
+      'Microlink failed for ' + target + ': ' +
+      (json?.message || json?.status || response.status)
+    );
+  }
+
+  return json.data.page;
+}
+
 for (let page = 1; page <= PAGE_COUNT; page += 1) {
   const target = ORIGIN + COLLECTION + (page > 1 ? '?page=' + page : '');
-  const html = await microlink.html(target, {
-    prerender: true,
-    waitUntil: 'networkidle0'
-  });
+  const html = await fetchMicrolinkHtml(target);
 
   const products = extractProducts(html, page);
   console.log('PAGE', page, '=>', products.length, 'products');
