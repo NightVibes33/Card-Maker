@@ -4761,7 +4761,7 @@ export default function Page() {
                         <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
                         <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
                       </div>
-                      <button type="button" className="iconTextButton" disabled={!design.background} onClick={() => patch({ flipX: !design.flipX })}>
+                      <button type="button" className="iconTextButton" disabled={!design.background} aria-pressed={Boolean(design.flipX)} onClick={() => patch({ flipX: !design.flipX })}>
                         <span>{design.flipX ? 'Unflip' : 'Flip'}</span>
                       </button>
                     </div>
@@ -4810,7 +4810,7 @@ export default function Page() {
                           <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
                           <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
                         </div>
-                        <button type="button" className="iconTextButton" disabled={!design.background} onClick={() => patch({ flipX: !design.flipX })}>
+                        <button type="button" className="iconTextButton" disabled={!design.background} aria-pressed={Boolean(design.flipX)} onClick={() => patch({ flipX: !design.flipX })}>
                           <span>{design.flipX ? 'Unflip' : 'Flip Horizontal'}</span>
                         </button>
                       </div>
@@ -4845,7 +4845,7 @@ export default function Page() {
                       {selectedLayer.type === 'image' ? (
                         <>
                           <div className="groupRow">
-                            <button type="button" className="iconTextButton" disabled={Boolean(selectedLayer.locked)} onClick={() => updateLayer(selectedLayer.id, { flipX: !selectedLayer.flipX })}>
+                            <button type="button" className="iconTextButton" disabled={Boolean(selectedLayer.locked)} aria-pressed={Boolean(selectedLayer.flipX)} onClick={() => updateLayer(selectedLayer.id, { flipX: !selectedLayer.flipX })}>
                               <span>{selectedLayer.flipX ? 'Unflip Image' : 'Flip Image Horizontally'}</span>
                             </button>
                           </div>
@@ -5124,7 +5124,7 @@ export default function Page() {
                         </label>
                         <div className="textAlignRow" role="group" aria-label="Text alignment">
                           {['left', 'center', 'right'].map((align) => (
-                            <button type="button" key={align} className={(selectedLayer.align || 'center') === align ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { align })}>
+                            <button type="button" key={align} aria-pressed={(selectedLayer.align || 'center') === align} className={(selectedLayer.align || 'center') === align ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { align })}>
                               {align[0].toUpperCase() + align.slice(1)}
                             </button>
                           ))}
@@ -5139,9 +5139,9 @@ export default function Page() {
                     ) : null}
                     {selectedLayer.type === 'shape' ? (
                       <>
-                        <div className="segmentedControl compact">
-                          <button type="button" className={selectedLayer.shape !== 'ellipse' ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { shape: 'rectangle' })}>Rectangle</button>
-                          <button type="button" className={selectedLayer.shape === 'ellipse' ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { shape: 'ellipse' })}>Ellipse</button>
+                        <div className="segmentedControl compact" role="group" aria-label="Shape type">
+                          <button type="button" aria-pressed={selectedLayer.shape !== 'ellipse'} className={selectedLayer.shape !== 'ellipse' ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { shape: 'rectangle' })}>Rectangle</button>
+                          <button type="button" aria-pressed={selectedLayer.shape === 'ellipse'} className={selectedLayer.shape === 'ellipse' ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { shape: 'ellipse' })}>Ellipse</button>
                         </div>
                         <SliderRow label="Width" value={selectedLayer.width || 280} min={20} max={1200} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
                         <SliderRow label="Height" value={selectedLayer.height || 120} min={20} max={800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { height: value })} />
