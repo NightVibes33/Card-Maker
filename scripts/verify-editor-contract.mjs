@@ -67,6 +67,7 @@ const pageChecks = [
   [/Object\.is\(currentDesign\.zoom, nextZoom\)/, 'bounded artwork pinch gestures do not create no-op history'],
   [/return true;\s*\n\s*}\s*\n\s*\n\s*async function uploadImage/, 'artwork selection reports successful application'],
   [/if \(useArtwork\(menuItem\)\) \{\s*setShowExportPreview\(true\)/, 'final preview opens only after artwork selection succeeds'],
+  [/const workingImage = proxyImageWidth\(item\.image, 3072\);[\s\S]{0,180}if \(!workingImage\)[\s\S]{0,220}beginArtworkReplacement\(workingImage\)/, 'invalid artwork sources are rejected before clearing decoded artwork'],
   [/finishActiveGesture\(\);[\s\S]{0,120}if \(cleanupInFlightRef\.current\)/, 'Undo and other guarded actions finalize active gestures first'],
   [/inert=\{blockingAssetOperation \|\| undefined\}/, 'blocking editor operations use a boolean inert attribute'],
   [/setSelectedElement\('card-text'\)/, 'built-in card text keeps an independent selection state'],
