@@ -1,19 +1,8 @@
 import { NextResponse } from 'next/server';
 import sharp from 'sharp';
+import { parseAllowedRemoteImageUrl } from '../../lib/imagePolicy';
 
 export const runtime = 'nodejs';
-
-const ALLOWED_HOSTS = new Set([
-  'cdn.shopify.com',
-  'www.animetowncreations.com',
-  'animetowncreations.com',
-  'stickyinkdesigns.com',
-  'www.stickyinkdesigns.com',
-  'cucucovers.com',
-  'www.cucucovers.com',
-  'styledcards.com',
-  'www.styledcards.com'
-]);
 
 const SAFE_IMAGE_TYPES = new Set([
   'image/avif',
@@ -28,13 +17,7 @@ const MAX_PROXY_OUTPUT_BYTES = 15 * 1024 * 1024;
 const MAX_DECODED_IMAGE_PIXELS = 80_000_000;
 
 function isAllowed(url) {
-  return (
-    url.protocol === 'https:' &&
-    (!url.port || url.port === '443') &&
-    !url.username &&
-    !url.password &&
-    ALLOWED_HOSTS.has(url.hostname.toLowerCase())
-  );
+  return Boolean(parseAllowedRemoteImageUrl(url));
 }
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
