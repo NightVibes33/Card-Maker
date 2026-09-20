@@ -2539,8 +2539,9 @@ export default function Page() {
 
         try {
           const legacy = localStorage.getItem('aircard-sticker-fvp-v3');
-          localUpdatedAt = Number(
-            localStorage.getItem('aircard-sticker-fvp-v3-updated-at') || 0
+          localUpdatedAt = finiteNumber(
+            localStorage.getItem('aircard-sticker-fvp-v3-updated-at'),
+            0
           );
           if (legacy) {
             const parsed = JSON.parse(legacy);
@@ -2563,7 +2564,7 @@ export default function Page() {
             draft?.design && typeof draft.design === 'object'
               ? draft.design
               : null;
-          const indexedUpdatedAt = Number(draft?.updatedAt || 0);
+          const indexedUpdatedAt = finiteNumber(draft?.updatedAt, 0);
           const preferredDraft =
             localDraft && (!indexedDraft || localUpdatedAt >= indexedUpdatedAt)
               ? localDraft
