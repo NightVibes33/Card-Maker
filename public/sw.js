@@ -3,6 +3,7 @@ const ART_CACHE = 'card-studio-art-v4';
 const THUMB_CACHE = 'card-studio-thumb-v1';
 const CATALOG_CACHE = 'card-studio-catalog-v3';
 const STATIC_CACHE = 'card-studio-static-v3';
+const OWNED_CACHE_PREFIX = 'card-studio-';
 
 const SHELL = ['/manifest.webmanifest'];
 const CACHE_LIMITS = {
@@ -45,7 +46,11 @@ self.addEventListener('activate', (event) => {
     caches.keys()
       .then((keys) => Promise.all(
         keys
-          .filter((key) => ![SHELL_CACHE, ART_CACHE, THUMB_CACHE, CATALOG_CACHE, STATIC_CACHE].includes(key))
+          .filter(
+            (key) =>
+              key.startsWith(OWNED_CACHE_PREFIX) &&
+              ![SHELL_CACHE, ART_CACHE, THUMB_CACHE, CATALOG_CACHE, STATIC_CACHE].includes(key)
+          )
           .map((key) => caches.delete(key))
       ))
       .then(() => Promise.all([
