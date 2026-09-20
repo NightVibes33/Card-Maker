@@ -3348,6 +3348,10 @@ export default function Page() {
     } catch {}
     for (const project of storedProjects) addDesignRefs(project?.design);
 
+    addDesignRefs(designRef.current);
+    for (const snapshot of undoRef.current) addDesignRefs(snapshot);
+    for (const snapshot of redoRef.current) addDesignRefs(snapshot);
+
     const unused = imports.filter((asset) => asset?.id && !referenced.has(asset.id));
     if (!unused.length) {
       setMessage('No unused imported images to clean up');
