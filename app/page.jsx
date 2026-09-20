@@ -1,6 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  blobToDataUrl,
+  cacheArtwork,
+  dataUrlToBlob,
+  dbDelete,
+  dbGet,
+  dbGetAll,
+  dbPut,
+  makeId
+} from './lib/storage';
 
 const OUT_W = 1536;
 const OUT_H = 969;
@@ -45,14 +55,24 @@ const DEFAULTS = {
   x: 0,
   y: 0,
   rotate: 0,
+  flipX: false,
+  exposure: 0,
   brightness: 1,
   saturation: 1,
   contrast: 1,
+  highlights: 0,
+  shadows: 0,
+  temperature: 0,
+  tint: 0,
+  sharpness: 0,
   blur: 0,
   vignette: 0.24,
   grain: 0.035,
   gloss: 0.2,
   overlay: 0.1,
+  fade: 0,
+  effectTint: '#7b61ff',
+  effectTintStrength: 0,
   chip: true,
   chipTone: 'gold',
   chipX: 0.105,
@@ -72,15 +92,47 @@ const DEFAULTS = {
   badge: false,
   badgeText: 'CARD',
   textColor: '#ffffff',
-  shadow: true
+  shadow: true,
+  customLayers: []
 };
 
 const TAB_ITEMS = [
-  ['browse', 'Browse'],
-  ['edit', 'Edit'],
-  ['layers', 'Layers'],
+  ['discover', 'Discover'],
+  ['studio', 'Studio'],
+  ['library', 'Library'],
   ['export', 'Export']
 ];
+
+const STUDIO_TOOLS = [
+  ['crop', 'Crop'],
+  ['position', 'Position'],
+  ['adjust', 'Adjust'],
+  ['effects', 'Effects'],
+  ['card', 'Card']
+];
+
+const ADJUSTMENT_PRESETS = {
+  Original: { exposure: 0, brightness: 1, contrast: 1, saturation: 1, highlights: 0, shadows: 0, temperature: 0, tint: 0, sharpness: 0, blur: 0 },
+  Vivid: { exposure: 0.08, brightness: 1.05, contrast: 1.13, saturation: 1.28, highlights: 0.08, shadows: 0.06, temperature: 0.03, tint: 0, sharpness: 0.18, blur: 0 },
+  Dark: { exposure: -0.22, brightness: 0.86, contrast: 1.2, saturation: 1.02, highlights: -0.18, shadows: -0.08, temperature: -0.02, tint: 0, sharpness: 0.08, blur: 0 },
+  AMOLED: { exposure: -0.12, brightness: 0.91, contrast: 1.34, saturation: 1.18, highlights: -0.22, shadows: -0.18, temperature: -0.03, tint: 0.02, sharpness: 0.15, blur: 0 },
+  Warm: { exposure: 0.04, brightness: 1.02, contrast: 1.04, saturation: 1.1, highlights: 0.06, shadows: 0.05, temperature: 0.28, tint: 0.04, sharpness: 0.05, blur: 0 },
+  Cold: { exposure: 0.02, brightness: 1.02, contrast: 1.08, saturation: 0.98, highlights: 0.03, shadows: 0.02, temperature: -0.3, tint: -0.03, sharpness: 0.08, blur: 0 },
+  Film: { exposure: -0.03, brightness: 1.01, contrast: 0.92, saturation: 0.87, highlights: -0.12, shadows: 0.16, temperature: 0.12, tint: 0.05, sharpness: -0.08, blur: 0.03 },
+  Neon: { exposure: 0.04, brightness: 1.02, contrast: 1.27, saturation: 1.55, highlights: 0.12, shadows: -0.08, temperature: -0.06, tint: 0.16, sharpness: 0.22, blur: 0 },
+  Vintage: { exposure: -0.05, brightness: 1.02, contrast: 0.88, saturation: 0.72, highlights: -0.08, shadows: 0.18, temperature: 0.24, tint: 0.08, sharpness: -0.12, blur: 0.02 },
+  Monochrome: { exposure: 0, brightness: 1.02, contrast: 1.12, saturation: 0, highlights: 0.02, shadows: 0.02, temperature: 0, tint: 0, sharpness: 0.08, blur: 0 }
+};
+
+const CARD_PRESETS = {
+  'Classic Gold': { chip: true, chipTone: 'gold', contactless: true, textColor: '#ffffff', number: false, holder: false, expiry: false, badge: false },
+  'Black Metal': { chip: true, chipTone: 'black', contactless: true, textColor: '#f7f7f7', shadow: true },
+  Silver: { chip: true, chipTone: 'silver', contactless: true, textColor: '#ffffff', shadow: true },
+  'Rose Gold': { chip: true, chipTone: 'rose', contactless: true, textColor: '#fff5f2', shadow: true },
+  Minimal: { chip: true, chipTone: 'gold', contactless: false, number: false, holder: false, expiry: false, badge: false },
+  'No Chip': { chip: false, contactless: true },
+  'Full Art': { chip: false, contactless: false, number: false, holder: false, expiry: false, badge: false }
+};
 
 function clamp(v, a, b) {
   return Math.max(a, Math.min(b, v));
