@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server';
+import sharp from 'sharp';
+
+export const runtime = 'nodejs';
 
 const ALLOWED_HOSTS = new Set([
   'cdn.shopify.com',
@@ -21,6 +24,7 @@ const SAFE_IMAGE_TYPES = new Set([
   'image/gif'
 ]);
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+const MAX_DECODED_IMAGE_PIXELS = 80_000_000;
 
 function isAllowed(url) {
   return (
@@ -135,10 +139,13 @@ export async function GET(request) {
     ? Math.max(0, Math.min(3072, Math.floor(requestedWidth)))
     : 0;
 
-  // Shopify's CDN can resize source artwork before it reaches our function.
-  // Browse thumbnails use small widths; Studio/export can request a bounded
-  // high-resolution working copy without decoding arbitrarily large originals.
-  if (width >= 160 && (/^cdn\.shopify\.com$/i.test(url.hostname) || /(^|\.)cucucovers\.com$/i.test(url.hostname))) {
+  // Prefer origin/CDN resizing when it is known to be supported. Other
+  // allowlisted hosts are normalized server-side below so a thumbnail request
+  // can never silently return a multi-megapixel original to iPhone Safari.
+  const upstreamResizeRequested =
+    width >= 160 &&
+    (/^cdn\.shopify\.com$/i.test(url.hostname) || /(^|\.)cucucovers\.com$/i.test(url.hostname));
+  if (upstreamResizeRequested) {
     url.searchParams.set('width', String(width));
   }
 
@@ -178,9 +185,40 @@ export async function GET(request) {
       throw error;
     }
 
-    return new NextResponse(buffer, {
+    let responseBody = buffer;
+    let responseType = contentType;
+    const animatedType = contentType === 'image/gif' || contentType === 'image/apng';
+    const shouldNormalize =
+      width >= 160 &&
+      (!upstreamResizeRequested || animatedType);
+
+    if (shouldNormalize) {
+      try {
+        responseBody = await sharp(Buffer.from(buffer), {
+          animated: false,
+          limitInputPixels: MAX_DECODED_IMAGE_PIXELS
+        })
+          .rotate()
+          .resize({
+            width,
+            withoutEnlargement: true,
+            fit: 'inside'
+          })
+          .webp({
+            quality: width <= 800 ? 84 : 92,
+            effort: 4
+          })
+          .toBuffer();
+        responseType = 'image/webp';
+      } catch (error) {
+        console.error('image proxy resize failed', error);
+        return new NextResponse('Image resize failed', { status: 422 });
+      }
+    }
+
+    return new NextResponse(responseBody, {
       headers: {
-        'Content-Type': contentType,
+        'Content-Type': responseType,
         'Cache-Control': 'public, max-age=31536000, immutable',
         'CDN-Cache-Control': 'public, max-age=31536000, stale-while-revalidate=31536000',
         'Vercel-CDN-Cache-Control': 'public, max-age=31536000, stale-while-revalidate=31536000',
