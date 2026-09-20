@@ -954,9 +954,18 @@ function Group({ title, footer, children }) {
   );
 }
 
+function proxyImageWidth(src = '', width = 1600) {
+  if (!String(src).startsWith('/api/image?')) return src;
+  const params = new URLSearchParams(String(src).slice('/api/image?'.length));
+  params.set('w', String(Math.max(160, Math.min(3072, Math.round(width)))));
+  return '/api/image?' + params.toString();
+}
+
 function CatalogArtwork({ item, alt, useThumbnail = true }) {
   const crop = item?.sourceCrop;
-  const src = useThumbnail ? (item.thumbnail || item.image) : item.image;
+  const src = useThumbnail
+    ? (item.thumbnail || proxyImageWidth(item.image, 560))
+    : proxyImageWidth(item.image, 1600);
 
   return (
     <span className="catalogArtworkFrame">
@@ -2688,7 +2697,7 @@ export default function Page() {
       return;
     }
 
-    cacheArtwork(item.image);
+    cacheArtwork(proxyImageWidth(item.image, 3072));
     if (item.thumbnail) cacheArtwork(item.thumbnail);
 
     setFavoriteIds((current) => new Set([...current, item.id]));
@@ -2697,8 +2706,9 @@ export default function Page() {
   }
 
   function useArtwork(item) {
+    const workingImage = proxyImageWidth(item.image, 3072);
     patch({
-      background: item.image,
+      background: workingImage,
       backgroundLabel: item.title,
       sourceCrop: item.sourceCrop || null,
       originalSourceCrop: item.sourceCrop || null,
@@ -2710,7 +2720,7 @@ export default function Page() {
       fit: 'cover'
     });
     rememberArtwork(item);
-    cacheArtwork(item.image);
+    cacheArtwork(workingImage);
     setSelectedElement('artwork');
     setStudioTool('position');
     setTab('studio');
