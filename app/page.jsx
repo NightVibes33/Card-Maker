@@ -4005,7 +4005,9 @@ export default function Page() {
 
     try {
       const payload = JSON.parse(await file.text());
-      if (!payload?.design || Number(payload.version) < 2) throw new Error('Unsupported preset');
+      if (!payload?.design || Number(payload.version) !== 2) {
+        throw new Error('Unsupported preset version');
+      }
 
       const idMap = Object.create(null);
       const presetAssets = Object.entries(payload.assets || {});
