@@ -1420,7 +1420,14 @@ async function prepareLocalImageBlob(blob, limits = {}) {
   const dimensionScale = maxDimension / Math.max(width, height);
   const scale = Math.min(1, pixelScale, dimensionScale);
   const sourceType = String(blob.type || '').toLowerCase();
-  const needsFormatNormalization = /^image\/(?:gif|apng|svg\+xml|heic|heif)$/.test(sourceType);
+  const sourceName = String(blob.name || '');
+  const animatedOrVectorSource =
+    /^image\/(?:gif|apng|svg\+xml)$/.test(sourceType) ||
+    /\.(?:gif|apng|svg)$/i.test(sourceName);
+  const needsFormatNormalization =
+    animatedOrVectorSource ||
+    /^image\/(?:heic|heif)$/.test(sourceType) ||
+    /\.(?:heic|heif)$/i.test(sourceName);
 
   if (scale >= 0.999 && !needsFormatNormalization) {
     image.src = '';
@@ -1443,11 +1450,12 @@ async function prepareLocalImageBlob(blob, limits = {}) {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
 
-  const outputType = /^image\/(?:jpe?g|heic|heif)$/.test(sourceType)
-    ? 'image/jpeg'
-    : /^image\/(?:webp|avif)$/.test(sourceType)
-      ? 'image/webp'
-      : 'image/png';
+  const outputType =
+    /^image\/(?:jpe?g|heic|heif)$/.test(sourceType) || /\.(?:heic|heif)$/i.test(sourceName)
+      ? 'image/jpeg'
+      : animatedOrVectorSource || /^image\/(?:webp|avif)$/.test(sourceType)
+        ? 'image/webp'
+        : 'image/png';
   const outputQuality = outputType === 'image/jpeg'
     ? 0.94
     : outputType === 'image/webp'
