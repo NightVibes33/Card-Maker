@@ -28,6 +28,20 @@ CI currently proves:
 
 Important: the app performs source and metadata filtering. It does not claim pixel-level computer-vision proof that every upstream image is watermark/logo-free.
 
+## CUCU Covers category
+
+Browse now includes a dedicated **CUCU** category backed by CUCU Covers' `all-card-covers` Shopify collection.
+
+- Collection route: `/api/cucu`
+- Current upstream collection count: about 2,199 card-cover designs
+- App pagination: 24 products per page
+- Shopify source pagination: 250 products per upstream page
+- Every app page maps back to the full collection, including the final upstream page
+- Up to 8 candidate product images are exposed for client-side visual screening
+- Obvious white/light storefront mockups are screened before a result is shown as usable artwork
+- Product links always point back to the original CUCU product listing
+- The collection is loaded on demand so iPhone Safari never has to render thousands of images at once
+
 ## iPhone UI
 
 The interface is intentionally modeled around iOS interaction conventions:
