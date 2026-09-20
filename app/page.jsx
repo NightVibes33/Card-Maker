@@ -409,6 +409,11 @@ function isLayerStackEntryVisible(design, id) {
   return Boolean(layer && !layer.hidden);
 }
 
+function isLayerStackEntryListed(design, id) {
+  if (BUILTIN_LAYER_IDS.includes(id)) return isLayerStackEntryVisible(design, id);
+  return Boolean((design.customLayers || []).some((entry) => entry.id === id));
+}
+
 function hexToRgb(hex = '#000000') {
   const clean = String(hex).replace('#', '').trim();
   const normalized = clean.length === 3
@@ -2545,7 +2550,9 @@ export default function Page() {
     patch((current) => ({
       customLayers: (current.customLayers || []).map((layer) => {
         if (layer.id !== id) return layer;
-        if (layer.locked && !Object.prototype.hasOwnProperty.call(delta || {}, 'locked')) return layer;
+        const deltaKeys = Object.keys(delta || {});
+        const lockedSafeChange = deltaKeys.every((keyName) => keyName === 'locked' || keyName === 'hidden');
+        if (layer.locked && !lockedSafeChange) return layer;
         const updated = { ...layer, ...delta };
 
         if (updated.type === 'shape') {
@@ -3194,7 +3201,7 @@ export default function Page() {
   const visualLayerStack = useMemo(() => {
     const custom = new Map((design.customLayers || []).map((layer) => [layer.id, layer]));
     return normalizeLayerOrder(design)
-      .filter((id) => isLayerStackEntryVisible(design, id))
+      .filter((id) => isLayerStackEntryListed(design, id))
       .slice()
       .reverse()
       .map((id) => {
@@ -3209,7 +3216,15 @@ export default function Page() {
         }
         const layer = custom.get(id);
         return layer
-          ? { id, name: layer.name || layer.type, type: layer.type, selection: layer.id, builtin: false, locked: layer.locked }
+          ? {
+              id,
+              name: layer.name || layer.type,
+              type: layer.type,
+              selection: layer.id,
+              builtin: false,
+              locked: layer.locked,
+              hidden: layer.hidden
+            }
           : null;
       })
       .filter(Boolean);
@@ -3323,7 +3338,7 @@ export default function Page() {
           />
         ) : null}
 
-        {tab === 'studio' && previewMode === 'flat' && selectedLayer ? (
+        {tab === 'studio' && previewMode === 'flat' && selectedLayer && !selectedLayer.hidden ? (
           <div
             className="selectionOutline layerSelection"
             aria-hidden="true"
@@ -3863,10 +3878,10 @@ export default function Page() {
                     >
                       <span>
                         <strong>{entry.name}</strong>
-                        <small>{entry.type}{index === 0 ? ' · top' : ''}</small>
+                        <small>{entry.type}{entry.hidden ? ' · hidden' : ''}{index === 0 ? ' · top' : ''}</small>
                       </span>
                       <span>
-                        {entry.locked ? 'Locked' : selectedElement === entry.selection ? 'Selected' : entry.builtin ? 'Built-in' : 'Edit'}
+                        {entry.hidden ? 'Hidden' : entry.locked ? 'Locked' : selectedElement === entry.selection ? 'Selected' : entry.builtin ? 'Built-in' : 'Edit'}
                       </span>
                     </button>
                   ))}
@@ -3992,6 +4007,12 @@ export default function Page() {
                       </div>
                     ) : null}
                     </fieldset>
+                    <SwitchRow
+                      label="Show Layer"
+                      detail={selectedLayer.hidden ? 'Hidden from preview and export' : 'Visible in preview and export'}
+                      value={!Boolean(selectedLayer.hidden)}
+                      onChange={(value) => updateLayer(selectedLayer.id, { hidden: !value })}
+                    />
                     <SwitchRow label="Lock Layer" value={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id, { locked: value })} />
                     <div className="layerActionGrid">
                       <button type="button" disabled={Boolean(selectedLayer.locked)} onClick={() => moveLayer(selectedLayer.id, 1)}>Bring Forward</button>
