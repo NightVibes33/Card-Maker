@@ -1799,7 +1799,7 @@ export default function Page() {
             if (shadows !== 0) {
               ctx.save();
               ctx.globalCompositeOperation = shadows > 0 ? 'screen' : 'multiply';
-              ctx.globalAlpha = Math.abs(shadows) * 0.22;
+              ctx.globalAlpha *= Math.abs(shadows) * 0.22;
               ctx.fillStyle = shadows > 0 ? '#6f7890' : '#10141c';
               ctx.fillRect(-w / 2, -h / 2, w, h);
               ctx.restore();
@@ -1809,7 +1809,7 @@ export default function Page() {
             if (highlights !== 0) {
               ctx.save();
               ctx.globalCompositeOperation = highlights > 0 ? 'screen' : 'multiply';
-              ctx.globalAlpha = Math.abs(highlights) * 0.16;
+              ctx.globalAlpha *= Math.abs(highlights) * 0.16;
               ctx.fillStyle = highlights > 0 ? '#fff7ec' : '#7d8794';
               ctx.fillRect(-w / 2, -h / 2, w, h);
               ctx.restore();
@@ -1819,7 +1819,7 @@ export default function Page() {
             if (temperature !== 0) {
               ctx.save();
               ctx.globalCompositeOperation = 'soft-light';
-              ctx.globalAlpha = Math.abs(temperature) * 0.24;
+              ctx.globalAlpha *= Math.abs(temperature) * 0.24;
               ctx.fillStyle = temperature > 0 ? '#ff8a3d' : '#438cff';
               ctx.fillRect(-w / 2, -h / 2, w, h);
               ctx.restore();
@@ -1829,7 +1829,7 @@ export default function Page() {
             if (layerTint !== 0) {
               ctx.save();
               ctx.globalCompositeOperation = 'soft-light';
-              ctx.globalAlpha = Math.abs(layerTint) * 0.2;
+              ctx.globalAlpha *= Math.abs(layerTint) * 0.2;
               ctx.fillStyle = layerTint > 0 ? '#d34cff' : '#38d887';
               ctx.fillRect(-w / 2, -h / 2, w, h);
               ctx.restore();
@@ -1863,7 +1863,7 @@ export default function Page() {
 
             if (Number(settings.grain || 0) > 0) {
               ctx.save();
-              ctx.globalAlpha = Number(settings.grain);
+              ctx.globalAlpha *= Number(settings.grain);
               for (let i = 0; i < 900; i += 1) {
                 ctx.fillStyle = i % 3 ? '#000' : '#fff';
                 const gx = -w / 2 + ((i * 331) % Math.max(1, Math.floor(w)));
@@ -1876,7 +1876,7 @@ export default function Page() {
             if (Number(settings.fade || 0) > 0) {
               ctx.save();
               ctx.globalCompositeOperation = 'screen';
-              ctx.globalAlpha = clamp(Number(settings.fade), 0, 1) * 0.34;
+              ctx.globalAlpha *= clamp(Number(settings.fade), 0, 1) * 0.34;
               ctx.fillStyle = '#f6efe6';
               ctx.fillRect(-w / 2, -h / 2, w, h);
               ctx.restore();
@@ -1886,7 +1886,7 @@ export default function Page() {
               const [r, g, b] = hexToRgb(settings.effectTint || '#7b61ff');
               ctx.save();
               ctx.globalCompositeOperation = 'soft-light';
-              ctx.globalAlpha = clamp(Number(settings.effectTintStrength), 0, 1) * 0.52;
+              ctx.globalAlpha *= clamp(Number(settings.effectTintStrength), 0, 1) * 0.52;
               ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
               ctx.fillRect(-w / 2, -h / 2, w, h);
               ctx.restore();
@@ -2677,7 +2677,8 @@ export default function Page() {
       if (BUILTIN_LAYER_IDS.includes(stackId)) continue;
 
       const layer = customLayerMap.get(stackId);
-      if (!layer || layer.hidden) continue;
+      if (!layer || layer.hidden || Number(layer.opacity ?? 1) <= 0.01) continue;
+      if (layer.type === 'text' && String(layer.text ?? '').length === 0) continue;
       const bounds = customLayerBounds(layer, layerImages[layer.id]);
       if (
         pointInRotatedBounds(
