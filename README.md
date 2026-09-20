@@ -33,7 +33,7 @@ Important: the app performs source and metadata filtering. It does not claim pix
 Browse now includes a dedicated **CUCU** category backed by CUCU Covers' `all-card-covers` Shopify collection.
 
 - Collection route: `/api/cucu`
-- Current upstream collection count: about 2,199 card-cover designs
+- Current upstream collection count: 2,225 card-cover designs (verified by production smoke test)
 - App pagination: 24 products per page
 - Shopify source pagination: 250 products per upstream page
 - Every app page maps back to the full collection, including the final upstream page
