@@ -1522,6 +1522,18 @@ function isPersistableBackground(src = '') {
   return src.startsWith('/api/image?') || src.startsWith('idb://imports/');
 }
 
+function estimateDataUrlBytes(value = '') {
+  const text = String(value);
+  const comma = text.indexOf(',');
+  if (comma < 0 || !/;base64/i.test(text.slice(0, comma))) return Infinity;
+
+  const payloadLength = text.length - comma - 1;
+  let padding = 0;
+  if (text.endsWith('==')) padding = 2;
+  else if (text.endsWith('=')) padding = 1;
+  return Math.max(0, Math.floor((payloadLength * 3) / 4) - padding);
+}
+
 function importListItem(asset = {}) {
   return {
     id: asset.id,
@@ -3331,12 +3343,24 @@ export default function Page() {
         throw new Error('Preset contains too many layers');
       }
 
+      let estimatedEmbeddedBytes = 0;
+
       for (const [oldId, asset] of presetAssets) {
         if (!asset?.data) continue;
         const assetType = String(asset.type || '');
         if ((assetType && !assetType.startsWith('image/')) || !String(asset.data).startsWith('data:image/')) {
           throw new Error('Preset contains a non-image asset');
         }
+
+        const estimatedBytes = estimateDataUrlBytes(asset.data);
+        if (!Number.isFinite(estimatedBytes) || estimatedBytes > MAX_IMAGE_IMPORT_BYTES) {
+          throw new Error('Preset image asset is too large');
+        }
+        estimatedEmbeddedBytes += estimatedBytes;
+        if (estimatedEmbeddedBytes > MAX_PRESET_EMBEDDED_BYTES) {
+          throw new Error('Preset contains too much embedded image data');
+        }
+
         const blob = dataUrlToBlob(asset.data);
         if (blob.size > MAX_IMAGE_IMPORT_BYTES) {
           throw new Error('Preset image asset is too large');
