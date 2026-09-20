@@ -2121,6 +2121,7 @@ export default function Page() {
 
   const persistDraftSnapshot = useCallback((snapshot) => {
     const version = ++draftSaveVersionRef.current;
+    const queuedAt = Date.now();
     const copy = JSON.parse(JSON.stringify(snapshot || designRef.current));
     if (copy.background && !isPersistableBackground(copy.background)) copy.background = '';
 
@@ -2129,7 +2130,7 @@ export default function Page() {
       .then(async () => {
         let indexedDbSaved = false;
         let localSaved = false;
-        const updatedAt = Date.now();
+        const updatedAt = queuedAt;
 
         try {
           await dbPut('kv', {
@@ -2140,11 +2141,16 @@ export default function Page() {
           indexedDbSaved = true;
         } catch {}
 
-        try {
-          localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(copy));
-          localStorage.setItem('aircard-sticker-fvp-v3-updated-at', String(updatedAt));
-          localSaved = true;
-        } catch {}
+        // A newer snapshot may have been queued while this IndexedDB write was
+        // in flight. Never let an older job overwrite the synchronous fallback
+        // copy that iOS backgrounding relies on.
+        if (version === draftSaveVersionRef.current) {
+          try {
+            localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(copy));
+            localStorage.setItem('aircard-sticker-fvp-v3-updated-at', String(updatedAt));
+            localSaved = true;
+          } catch {}
+        }
 
         return {
           success: indexedDbSaved || localSaved,
