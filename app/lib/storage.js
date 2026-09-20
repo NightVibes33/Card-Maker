@@ -253,7 +253,14 @@ export async function cacheArtwork(url) {
     const cacheLimit = isThumbnail ? THUMB_CACHE_LIMIT : ART_CACHE_LIMIT;
     const cache = await caches.open(cacheName);
     const existing = await cache.match(url);
-    if (existing) return true;
+    if (existing) {
+      // Refresh explicit saves/favorites to the newest cache position so
+      // bounded eviction does not immediately discard artwork the user just
+      // chose to keep offline.
+      await cache.delete(url);
+      await cache.put(url, existing.clone());
+      return true;
+    }
 
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), CACHE_ARTWORK_TIMEOUT_MS);
