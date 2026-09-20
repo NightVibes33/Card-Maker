@@ -428,6 +428,31 @@ try {
     'preset import must restore the exported text-layer state'
   );
 
+  // Verify signed Expert Mode values on mobile WebKit. iPhone numeric
+  // keyboards historically made negative values impossible to enter.
+  await page.getByRole('tab', { name: 'Library', exact: true }).click();
+  const expertMode = page.getByRole('switch', { name: 'Expert Mode' });
+  if ((await expertMode.getAttribute('aria-checked')) !== 'true') {
+    await expertMode.click();
+  }
+  await page.getByRole('tab', { name: 'Studio', exact: true }).click();
+  await page.getByRole('tab', { name: 'Position', exact: true }).click();
+
+  const exactArtworkX = page.getByLabel('Artwork X');
+  await exactArtworkX.fill('-0.25');
+  await exactArtworkX.blur();
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Artwork X"]');
+    return input && Math.abs(Number(input.value) + 0.25) < 0.001;
+  });
+  assert.ok(
+    Math.abs(Number(await exactArtworkX.inputValue()) + 0.25) < 0.001,
+    'signed Expert Mode coordinates must accept negative values in WebKit'
+  );
+
+  await exactArtworkX.fill('0');
+  await exactArtworkX.blur();
+
   await page.getByRole('tab', { name: 'Export', exact: true }).click();
   const save2x = page.getByRole('button', { name: /Save 2× Image/ }).first();
   await save2x.waitFor({ state: 'visible' });
