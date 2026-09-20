@@ -1896,7 +1896,7 @@ function safeDisplayText(value, fallback, maxLength = 120) {
     typeof value === 'string' || typeof value === 'number'
       ? String(value).trim()
       : '';
-  return (raw || fallback).slice(0, maxLength);
+  return splitGraphemes(raw || fallback).slice(0, maxLength).join('');
 }
 
 function normalizeStoredArtworkItem(item) {
