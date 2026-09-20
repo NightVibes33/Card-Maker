@@ -84,17 +84,20 @@ function excluded(title, handle) {
   );
 }
 
-function extractProducts(html, pageNumber) {
-  const $ = cheerio.load(html);
+function extractProducts(anchors, pageNumber) {
   const byHandle = new Map();
 
-  $('a[href*="/products/"]').each((_, anchor) => {
-    const href = $(anchor).attr('href') || '';
-    const product = normalizeProductUrl(href);
-    if (!product) return;
+  for (const outerHtml of anchors || []) {
+    const $ = cheerio.load(String(outerHtml || ''));
+    const anchor = $('a').first();
+    if (!anchor.length) continue;
 
-    const img = $(anchor).find('img').first();
-    if (!img.length) return;
+    const href = anchor.attr('href') || '';
+    const product = normalizeProductUrl(href);
+    if (!product) continue;
+
+    const img = anchor.find('img').first();
+    if (!img.length) continue;
 
     const srcset =
       img.attr('data-srcset') ||
@@ -109,18 +112,13 @@ function extractProducts(html, pageNumber) {
       '';
 
     const image = normalizeShopifyImage(rawImage);
-    if (!image) return;
+    if (!image) continue;
 
     let title = cleanText(
       img.attr('alt') ||
-      $(anchor).attr('aria-label') ||
-      $(anchor).text()
+      anchor.attr('aria-label') ||
+      anchor.text()
     );
-
-    if (!title) {
-      const escapedHref = href.replace(/"/g, '\\"');
-      title = cleanText($('a[href="' + escapedHref + '"]').not(anchor).first().text());
-    }
 
     if (!title) {
       title = product.handle
@@ -129,7 +127,7 @@ function extractProducts(html, pageNumber) {
         .join(' ');
     }
 
-    if (excluded(title, product.handle)) return;
+    if (excluded(title, product.handle)) continue;
 
     const existing = byHandle.get(product.handle);
     const candidate = {
@@ -149,48 +147,50 @@ function extractProducts(html, pageNumber) {
       sourcePage: pageNumber
     };
 
-    // Prefer a larger-looking URL when the same product is repeated by the theme.
     if (!existing || /1500x/i.test(candidate.image)) {
       byHandle.set(product.handle, candidate);
     }
-  });
+  }
 
   return [...byHandle.values()];
 }
 
 const all = new Map();
 
-async function fetchMicrolinkHtml(target) {
+async function fetchMicrolinkProductAnchors(target) {
   const api = new URL('https://api.microlink.io');
   api.searchParams.set('url', target);
   api.searchParams.set('meta', 'false');
-  api.searchParams.set('data.page.selector', 'html');
-  api.searchParams.set('data.page.attr', 'html');
-  api.searchParams.set('data.page.type', 'string');
+  api.searchParams.set('data.products.selectorAll', 'a[href*="/products/"]');
+  api.searchParams.set('data.products.attr', 'outerHTML');
+  api.searchParams.set('data.products.type', 'string');
 
   const response = await fetch(api, {
     headers: {
       Accept: 'application/json',
-      'User-Agent': 'AirCard-Blitz-Snapshot/1.0'
+      'User-Agent': 'AirCard-Blitz-Snapshot/1.1'
     }
   });
 
   const json = await response.json().catch(() => ({}));
-  if (!response.ok || json.status !== 'success' || typeof json?.data?.page !== 'string') {
+  const anchors = json?.data?.products;
+
+  if (!response.ok || json.status !== 'success' || !Array.isArray(anchors)) {
     throw new Error(
       'Microlink failed for ' + target + ': ' +
       (json?.message || json?.status || response.status)
     );
   }
 
-  return json.data.page;
+  return anchors;
 }
 
 for (let page = 1; page <= PAGE_COUNT; page += 1) {
   const target = ORIGIN + COLLECTION + (page > 1 ? '?page=' + page : '');
-  const html = await fetchMicrolinkHtml(target);
+  const anchors = await fetchMicrolinkProductAnchors(target);
 
-  const products = extractProducts(html, page);
+  console.log('PAGE', page, 'anchors =>', anchors.length);
+  const products = extractProducts(anchors, page);
   console.log('PAGE', page, '=>', products.length, 'products');
 
   for (const item of products) {
