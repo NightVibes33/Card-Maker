@@ -3376,6 +3376,14 @@ export default function Page() {
       setMessage('Another image import is still processing');
       return false;
     }
+    if (presetTransferInFlightRef.current) {
+      setMessage('Finish the preset operation before importing another image.');
+      return false;
+    }
+    if (cleanupInFlightRef.current) {
+      setMessage('Finish cleaning imported images before importing another image.');
+      return false;
+    }
 
     imageImportInFlightRef.current = true;
     setImageImportInProgress(true);
@@ -4088,6 +4096,10 @@ export default function Page() {
       setMessage('Finish the preset operation before cleaning imported images.');
       return;
     }
+    if (imageImportInFlightRef.current) {
+      setMessage('Finish the image import before cleaning imported images.');
+      return;
+    }
 
     cleanupInFlightRef.current = true;
     setCleanupInProgress(true);
@@ -4282,6 +4294,10 @@ export default function Page() {
     }
     if (cleanupInFlightRef.current) {
       setMessage('Finish cleaning imported images before importing a preset.');
+      return;
+    }
+    if (imageImportInFlightRef.current) {
+      setMessage('Finish the image import before importing a preset.');
       return;
     }
     if (file.size > MAX_PRESET_IMPORT_BYTES) {
