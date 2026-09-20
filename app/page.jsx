@@ -4684,6 +4684,13 @@ export default function Page() {
           onPointerUp={() => setShowOriginal(false)}
           onPointerCancel={() => setShowOriginal(false)}
           onPointerLeave={() => setShowOriginal(false)}
+          onKeyDown={(event) => {
+            if (event.key === ' ' || event.key === 'Enter') setShowOriginal(true);
+          }}
+          onKeyUp={(event) => {
+            if (event.key === ' ' || event.key === 'Enter') setShowOriginal(false);
+          }}
+          onBlur={() => setShowOriginal(false)}
         >
           {showOriginal ? 'After' : 'Before / After'}
         </button>
