@@ -1898,7 +1898,7 @@ export default function Page() {
     ].filter((item, index, all) => item?.id && all.findIndex((other) => other.id === item.id) === index);
 
     if (!pool.length) {
-      setMessage('Load some CUCU card skins first');
+      setMessage('Load some card skins first');
       return;
     }
 
@@ -2453,7 +2453,7 @@ export default function Page() {
               <IOSIcon name="search" size={19} />
               <input
                 value={searchInput}
-                aria-label="Search all CUCU card skins"
+                aria-label="Search all card skins"
                 enterKeyHint="search"
                 placeholder="Search 2,225+ card skins"
                 onChange={(event) => setSearchInput(event.target.value)}
