@@ -1521,6 +1521,14 @@ function isPersistableBackground(src = '') {
   return src.startsWith('/api/image?') || src.startsWith('idb://imports/');
 }
 
+function imageLayerSourceKeyForDesign(value) {
+  return JSON.stringify(
+    (value?.customLayers || [])
+      .filter((layer) => layer.type === 'image' && layer.src && !layer.hidden)
+      .map((layer) => ({ id: layer.id, src: layer.src }))
+  );
+}
+
 export default function Page() {
   const [tab, setTab] = useState('discover');
   const [studioTool, setStudioTool] = useState('position');
@@ -1589,33 +1597,27 @@ export default function Page() {
   );
 
   const imageLayerSourceKey = useMemo(
-    () => JSON.stringify(
-      (design.customLayers || [])
-        .filter((layer) => layer.type === 'image' && layer.src && !layer.hidden)
-        .map((layer) => ({ id: layer.id, src: layer.src }))
-    ),
-    [design.customLayers]
+    () => imageLayerSourceKeyForDesign(design),
+    [design]
   );
 
-  const renderAssetsReady = useMemo(() => {
-    if (design.background && (!image || loadedBackgroundKey !== design.background)) return false;
-    if (loadedImageLayerSourceKey !== imageLayerSourceKey) return false;
-    return (design.customLayers || []).every(
+  const assetsReadyForDesign = useCallback((candidate) => {
+    if (candidate.background && (!image || loadedBackgroundKey !== candidate.background)) return false;
+    const candidateLayerKey = imageLayerSourceKeyForDesign(candidate);
+    if (loadedImageLayerSourceKey !== candidateLayerKey) return false;
+    return (candidate.customLayers || []).every(
       (layer) =>
         layer.hidden ||
         layer.type !== 'image' ||
         !layer.src ||
         Boolean(layerImages[layer.id])
     );
-  }, [
-    design.background,
-    design.customLayers,
-    image,
-    imageLayerSourceKey,
-    layerImages,
-    loadedBackgroundKey,
-    loadedImageLayerSourceKey
-  ]);
+  }, [image, layerImages, loadedBackgroundKey, loadedImageLayerSourceKey]);
+
+  const renderAssetsReady = useMemo(
+    () => assetsReadyForDesign(design),
+    [assetsReadyForDesign, design]
+  );
 
   const replaceDesign = useCallback((nextDesign, shouldNormalize = true) => {
     const resolved = shouldNormalize ? normalizeDesignState(nextDesign) : nextDesign;
@@ -1990,6 +1992,7 @@ export default function Page() {
     const renderDesign = options.design || design;
     const renderGradient =
       GRADIENTS.find((item) => item.id === renderDesign.gradient) || GRADIENTS[0];
+    const renderImageLayerSourceKey = imageLayerSourceKeyForDesign(renderDesign);
     const originalTarget = options.originalTarget || (options.original ? 'all' : null);
     const artworkOriginal = originalTarget === 'all' || originalTarget === 'artwork';
     ctx.save();
@@ -2247,7 +2250,7 @@ export default function Page() {
         }
       } else if (layer.type === 'image') {
         const layerImage =
-          loadedImageLayerSourceKey === imageLayerSourceKey
+          loadedImageLayerSourceKey === renderImageLayerSourceKey
             ? layerImages[layer.id]
             : null;
         if (layerImage) {
@@ -3073,7 +3076,9 @@ export default function Page() {
     const now = Date.now();
     const id = makeId('project');
     const name = nameOverride.trim() || design.backgroundLabel || 'Untitled Card';
-    const preview = renderAssetsReady ? makeCanvas(384, 242).toDataURL('image/jpeg', 0.78) : '';
+    const preview = assetsReadyForDesign(designRef.current)
+      ? makeCanvas(384, 242).toDataURL('image/jpeg', 0.78)
+      : '';
     const project = {
       id,
       name,
@@ -3670,7 +3675,7 @@ export default function Page() {
     height = OUT_H,
     name = 'cardBackgroundCombined@3x.png'
   ) {
-    if (!renderAssetsReady) {
+    if (!assetsReadyForDesign(designRef.current)) {
       setMessage(
         backgroundLoadError ||
         layerLoadError ||
