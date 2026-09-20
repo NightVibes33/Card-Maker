@@ -1,5 +1,29 @@
 const base = process.env.SMOKE_BASE || 'http://127.0.0.1:3000';
 
+async function fetchJsonRetry(url, label, attempts = 4) {
+  let lastResponse = null;
+  let lastJson = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const response = await fetch(url);
+    const json = await response.json().catch(() => ({}));
+    lastResponse = response;
+    lastJson = json;
+
+    if (response.ok) return { response, json };
+
+    const transient = response.status === 429 || response.status >= 500;
+    if (!transient || attempt >= attempts) break;
+    await new Promise((resolve) => setTimeout(resolve, 900 * attempt));
+  }
+
+  throw new Error(
+    label + ' returned ' +
+    (lastResponse?.status || 'unknown status') +
+    (lastJson?.error ? ': ' + lastJson.error : '')
+  );
+}
+
 async function fetchSearch(query) {
   let last = null;
 
@@ -80,10 +104,8 @@ async function check(query, titlePattern) {
 }
 
 async function checkCucuCatalog() {
-  const firstResponse = await fetch(base + '/api/cucu?page=1&limit=24');
-  if (!firstResponse.ok) throw new Error('CUCU catalog page 1 returned ' + firstResponse.status);
-
-  const first = await firstResponse.json();
+  const firstResult = await fetchJsonRetry(base + '/api/cucu?page=1&limit=24', 'CUCU catalog page 1');
+  const first = firstResult.json;
   if (!Array.isArray(first.results) || first.results.length < 1) {
     throw new Error('CUCU catalog page 1 returned no products');
   }
@@ -111,10 +133,11 @@ async function checkCucuCatalog() {
   }
 
   const totalPages = Number(first.totalPages) || Math.ceil(first.total / 24);
-  const lastResponse = await fetch(base + '/api/cucu?page=' + totalPages + '&limit=24');
-  if (!lastResponse.ok) throw new Error('CUCU final page returned ' + lastResponse.status);
-
-  const last = await lastResponse.json();
+  const lastResult = await fetchJsonRetry(
+    base + '/api/cucu?page=' + totalPages + '&limit=24',
+    'CUCU final page'
+  );
+  const last = lastResult.json;
   if (!Array.isArray(last.results) || last.results.length < 1) {
     throw new Error('CUCU final catalog page returned no products');
   }
@@ -134,10 +157,8 @@ async function checkCucuCatalog() {
 }
 
 async function checkBlitzCatalog() {
-  const firstResponse = await fetch(base + '/api/blitz?page=1&limit=24');
-  if (!firstResponse.ok) throw new Error('Blitz catalog page 1 returned ' + firstResponse.status);
-
-  const first = await firstResponse.json();
+  const firstResult = await fetchJsonRetry(base + '/api/blitz?page=1&limit=24', 'Blitz catalog page 1');
+  const first = firstResult.json;
   if (!Array.isArray(first.results) || first.results.length < 1) {
     throw new Error('Blitz catalog page 1 returned no products');
   }
@@ -175,10 +196,11 @@ async function checkBlitzCatalog() {
   }
 
   const totalPages = Number(first.totalPages) || Math.ceil(first.total / 24);
-  const lastResponse = await fetch(base + '/api/blitz?page=' + totalPages + '&limit=24');
-  if (!lastResponse.ok) throw new Error('Blitz final page returned ' + lastResponse.status);
-
-  const last = await lastResponse.json();
+  const lastResult = await fetchJsonRetry(
+    base + '/api/blitz?page=' + totalPages + '&limit=24',
+    'Blitz final page'
+  );
+  const last = lastResult.json;
   if (!Array.isArray(last.results) || last.results.length < 1) {
     throw new Error('Blitz final catalog page returned no products');
   }
@@ -202,6 +224,6 @@ await check('Naruto', /naruto|konohagakure|akatsuki/i);
 await check('SpongeBob', /spongebob|bikini bottom|krusty/i);
 await check('Rick and Morty', /rick|morty|portal|meeseeks/i);
 await check('Wednesday', /wednesday/i);
-await checkCucuCatalog();
 await checkBlitzCatalog();
+await checkCucuCatalog();
 console.log('CUCU + Blitz direct-card catalog smoke tests passed; live storefront search checks completed.');
