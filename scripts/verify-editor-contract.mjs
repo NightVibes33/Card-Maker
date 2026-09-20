@@ -27,6 +27,7 @@ const pageChecks = [
   [/This artwork source is unavailable or unsupported\./, 'invalid catalog artwork never enters editor state'],
   [/if \(!hydrated \|\| !autosaveReady\) return undefined;/, 'autosave waits for safe draft hydration'],
   [/draftReadFailed = true/, 'draft read failures are tracked separately from an empty draft'],
+  [/autosaveSafe = !draftReadFailed;/, 'draft read failures keep autosave paused even when a fallback exists'],
   [/setSaveStatus\('Autosave paused'\)/, 'unsafe draft hydration pauses autosave instead of overwriting storage'],
   [/function pointInRotatedBounds\(/, 'rotated geometry hit testing exists'],
   [/function normalizeFreeRotation\(/, 'free rotations wrap smoothly through the ±180° boundary'],
