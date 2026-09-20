@@ -4243,6 +4243,7 @@ export default function Page() {
     const rect = event.currentTarget.getBoundingClientRect();
     const px = ((event.clientX - rect.left) / Math.max(1, rect.width)) * OUT_W;
     const py = ((event.clientY - rect.top) / Math.max(1, rect.height)) * OUT_H;
+    const hitPadding = Math.max(14, (22 * OUT_W) / Math.max(1, rect.width));
     const currentDesign = designRef.current;
     const customLayerMap = new Map((currentDesign.customLayers || []).map((layer) => [layer.id, layer]));
     const stack = normalizeLayerOrder(currentDesign).slice().reverse();
@@ -4258,7 +4259,7 @@ export default function Page() {
             currentDesign.contactlessRotation,
             Number(currentDesign.contactlessScale || 1),
             CONTACTLESS_BOUNDS,
-            14
+            hitPadding
           )
         ) {
           return 'contactless';
@@ -4280,7 +4281,7 @@ export default function Page() {
             currentDesign.chipRotation,
             1,
             { left: -chipW / 2, top: -chipH / 2, right: chipW / 2, bottom: chipH / 2 },
-            10
+            hitPadding
           )
         ) {
           return 'chip';
@@ -4319,8 +4320,8 @@ export default function Page() {
               layerScale,
               shapeWidth,
               shapeHeight,
-              14
-            )
+            hitPadding
+          )
           ) {
             return layer.id;
           }
@@ -4338,7 +4339,7 @@ export default function Page() {
             shapeWidth,
             shapeHeight,
             clamp(Number(layer.radius ?? 26), 0, Math.min(shapeWidth, shapeHeight) / 2),
-            14
+            hitPadding
           )
         ) {
           return layer.id;
@@ -4356,8 +4357,8 @@ export default function Page() {
           layer.rotation,
           layerScale,
           bounds,
-          14
-        )
+            hitPadding
+          )
       ) {
         return layer.id;
       }
