@@ -4430,13 +4430,23 @@ export default function Page() {
       }
 
       const failed = [];
-      await Promise.all(deletable.map(async (asset) => {
-        try {
-          await dbDelete('imports', asset.id);
-        } catch {
-          failed.push(asset.id);
+      let deleteCursor = 0;
+      const deleteWorker = async () => {
+        while (deleteCursor < deletable.length) {
+          const index = deleteCursor;
+          deleteCursor += 1;
+          const asset = deletable[index];
+          try {
+            await dbDelete('imports', asset.id);
+          } catch {
+            failed.push(asset.id);
+          }
         }
-      }));
+      };
+
+      await Promise.all(
+        Array.from({ length: Math.min(4, deletable.length) }, () => deleteWorker())
+      );
   
       const removed = new Set(deletable.map((asset) => asset.id).filter((id) => !failed.includes(id)));
       setImports((current) => current.filter((asset) => !removed.has(asset.id)));
