@@ -20,6 +20,7 @@ const MAX_IMAGE_IMPORT_BYTES = 30 * 1024 * 1024;
 const MAX_PRESET_IMPORT_BYTES = 64 * 1024 * 1024;
 const MAX_PRESET_EMBEDDED_BYTES = 30 * 1024 * 1024;
 const MAX_CUSTOM_LAYERS = 200;
+const MAX_VISIBLE_IMAGE_LAYERS = 12;
 const MAX_PRESET_ASSETS = 200;
 const MAX_IMAGE_PIXELS = 65_000_000;
 const MAX_IMAGE_DIMENSION = 12_000;
@@ -1605,11 +1606,15 @@ function importListItem(asset = {}) {
   };
 }
 
+function visibleImageLayers(value) {
+  return (value?.customLayers || []).filter(
+    (layer) => layer.type === 'image' && layer.src && !layer.hidden
+  );
+}
+
 function imageLayerSourceKeyForDesign(value) {
   return JSON.stringify(
-    (value?.customLayers || [])
-      .filter((layer) => layer.type === 'image' && layer.src && !layer.hidden)
-      .map((layer) => ({ id: layer.id, src: layer.src }))
+    visibleImageLayers(value).map((layer) => ({ id: layer.id, src: layer.src }))
   );
 }
 
@@ -2050,6 +2055,17 @@ export default function Page() {
       setLayerImages({});
       setLoadedImageLayerSourceKey('');
       setLayerLoadError('');
+
+      if (imageLayers.length > MAX_VISIBLE_IMAGE_LAYERS) {
+        const text =
+          'Too many visible image layers. Hide or delete image layers until ' +
+          MAX_VISIBLE_IMAGE_LAYERS +
+          ' or fewer remain.';
+        setLoadedImageLayerSourceKey(imageLayerSourceKey);
+        setLayerLoadError(text);
+        setMessage(text);
+        return;
+      }
 
       for (const layer of imageLayers) {
         let src = layer.src;
@@ -2797,6 +2813,10 @@ export default function Page() {
       setMessage('Layer limit reached. Delete a layer before adding another.');
       return;
     }
+    if (visibleImageLayers(designRef.current).length >= MAX_VISIBLE_IMAGE_LAYERS) {
+      setMessage('Visible image layer limit reached. Hide or delete an image layer before adding another.');
+      return;
+    }
     if (file.type && !file.type.startsWith('image/')) {
       setMessage('Choose an image file.');
       return;
@@ -3041,6 +3061,17 @@ export default function Page() {
   }
 
   function updateLayer(id, delta) {
+    const currentLayer = (designRef.current.customLayers || []).find((layer) => layer.id === id);
+    if (
+      currentLayer?.type === 'image' &&
+      currentLayer.hidden &&
+      delta?.hidden === false &&
+      visibleImageLayers(designRef.current).length >= MAX_VISIBLE_IMAGE_LAYERS
+    ) {
+      setMessage('Visible image layer limit reached. Hide another image layer before showing this one.');
+      return;
+    }
+
     const key = 'layer:' + id + ':' + Object.keys(delta || {}).sort().join('|');
     patch((current) => ({
       customLayers: (current.customLayers || []).map((layer) => {
@@ -3081,6 +3112,17 @@ export default function Page() {
       setMessage('Layer limit reached. Delete a layer before duplicating.');
       return;
     }
+
+    const sourceLayer = (designRef.current.customLayers || []).find((layer) => layer.id === id);
+    if (
+      sourceLayer?.type === 'image' &&
+      !sourceLayer.hidden &&
+      visibleImageLayers(designRef.current).length >= MAX_VISIBLE_IMAGE_LAYERS
+    ) {
+      setMessage('Visible image layer limit reached. Hide or delete an image layer before duplicating.');
+      return;
+    }
+
     patch((current) => {
       const source = (current.customLayers || []).find((layer) => layer.id === id);
       if (!source) return {};
@@ -3406,6 +3448,14 @@ export default function Page() {
       }
       if (Array.isArray(payload.design.customLayers) && payload.design.customLayers.length > MAX_CUSTOM_LAYERS) {
         throw new Error('Preset contains too many layers');
+      }
+      if (
+        Array.isArray(payload.design.customLayers) &&
+        payload.design.customLayers.filter(
+          (layer) => layer?.type === 'image' && layer.src && !layer.hidden
+        ).length > MAX_VISIBLE_IMAGE_LAYERS
+      ) {
+        throw new Error('Preset contains too many visible image layers');
       }
 
       let estimatedEmbeddedBytes = 0;
