@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { IMAGE_PROXY_VERSION } from '../../lib/imagePolicy';
 
 const STORES = [
   {
@@ -141,7 +142,8 @@ function normalizeImageUrl(raw, origin) {
 }
 
 function imageProxy(url) {
-  return '/api/image?url=' + encodeURIComponent(url);
+  return '/api/image?url=' + encodeURIComponent(url) +
+    '&v=' + encodeURIComponent(IMAGE_PROXY_VERSION);
 }
 
 async function fetchWithTimeout(url, options = {}, timeout = 7000) {
