@@ -304,6 +304,71 @@ function ArtworkRail({ title, items, onPick }) {
   );
 }
 
+function CucuCatalog({ items, total, loading, hasMore, onPick, onLoadMore }) {
+  return (
+    <section className="browseSection cucuCatalogSection" aria-label="CUCU Covers catalog">
+      <div className="browseHeading">
+        <h2>CUCU Covers</h2>
+        <span>{items.length.toLocaleString()} of {total.toLocaleString()}</span>
+      </div>
+
+      {items.length ? (
+        <div className="cucuGrid" role="list">
+          {items.map((item) => (
+            <article className="cucuGridItem" role="listitem" key={item.id}>
+              <button
+                type="button"
+                className="cucuGridPreview"
+                onClick={() => onPick(item)}
+                aria-label={'Use CUCU card cover ' + item.title}
+              >
+                <img src={item.image} alt={item.mediaAlt || item.title} loading="lazy" />
+              </button>
+              <div className="cucuGridMeta">
+                <strong>{item.title}</strong>
+                <a
+                  href={item.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={'Open CUCU listing for ' + item.title}
+                >
+                  Original ↗
+                </a>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="catalogEmpty">
+          {loading ? <span className="spinner" aria-hidden="true" /> : null}
+          <span>{loading ? 'Loading CUCU card covers…' : 'No clean CUCU previews loaded yet.'}</span>
+        </div>
+      )}
+
+      {hasMore ? (
+        <button
+          type="button"
+          className="secondaryAction catalogLoadMore"
+          disabled={loading}
+          onClick={onLoadMore}
+        >
+          {loading ? <span className="spinner" aria-hidden="true" /> : null}
+          <span>{loading ? 'Loading' : 'Load More'}</span>
+        </button>
+      ) : null}
+
+      <a
+        className="collectionSourceLink"
+        href="https://cucucovers.com/collections/all-card-covers"
+        target="_blank"
+        rel="noreferrer"
+      >
+        Open the full CUCU collection ↗
+      </a>
+    </section>
+  );
+}
+
 
 function loadSearchImage(src) {
   return new Promise((resolve, reject) => {
@@ -441,8 +506,8 @@ async function chooseCleanProductMedia(item) {
   };
 }
 
-async function prepareSearchResults(items) {
-  const queue = items.slice(0, 18);
+async function prepareCleanResults(items, maxItems = items.length) {
+  const queue = items.slice(0, maxItems);
   const resolved = new Array(queue.length);
   let cursor = 0;
 
@@ -455,7 +520,11 @@ async function prepareSearchResults(items) {
   }
 
   await Promise.all([worker(), worker(), worker(), worker()]);
-  return resolved.filter(Boolean).slice(0, 12);
+  return resolved.filter(Boolean);
+}
+
+async function prepareSearchResults(items) {
+  return (await prepareCleanResults(items, 18)).slice(0, 12);
 }
 
 export default function Page() {
@@ -469,6 +538,11 @@ export default function Page() {
   const [searching, setSearching] = useState(false);
   const [message, setMessage] = useState('Ready');
   const [source, setSource] = useState('');
+  const [cucuItems, setCucuItems] = useState([]);
+  const [cucuPage, setCucuPage] = useState(0);
+  const [cucuTotal, setCucuTotal] = useState(2199);
+  const [cucuHasMore, setCucuHasMore] = useState(true);
+  const [cucuLoading, setCucuLoading] = useState(false);
   const canvasRef = useRef(null);
   const uploadRef = useRef(null);
   const pointers = useRef(new Map());
@@ -721,6 +795,51 @@ export default function Page() {
     }
   }, [kind, patch, query, rememberArtwork, searching]);
 
+  const loadCucu = useCallback(async (nextPage = 1, replace = false) => {
+    if (cucuLoading) return;
+
+    setCucuLoading(true);
+    setMessage('Loading CUCU Covers…');
+
+    try {
+      const response = await fetch(
+        '/api/cucu?page=' + encodeURIComponent(nextPage) + '&limit=24',
+        { cache: 'no-store' }
+      );
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'CUCU catalog failed');
+
+      const rawList = Array.isArray(json.results) ? json.results : [];
+      setCucuTotal(Number(json.total) || 2199);
+      setCucuHasMore(Boolean(json.hasMore));
+
+      setMessage('Checking CUCU artwork…');
+      const cleanList = await prepareCleanResults(rawList);
+
+      setCucuItems((current) => {
+        const base = replace ? [] : current;
+        const merged = [...base, ...cleanList];
+        const seen = new Set();
+        return merged.filter((item) => {
+          if (!item?.id || seen.has(item.id)) return false;
+          seen.add(item.id);
+          return true;
+        });
+      });
+
+      setCucuPage(nextPage);
+      setMessage(
+        cleanList.length
+          ? cleanList.length + ' CUCU covers loaded'
+          : 'This CUCU page had no clean flat previews'
+      );
+    } catch (error) {
+      setMessage(error?.message || 'CUCU catalog failed');
+    } finally {
+      setCucuLoading(false);
+    }
+  }, [cucuLoading]);
+
   function useArtwork(item) {
     patch({
       background: item.image,
@@ -884,7 +1003,8 @@ export default function Page() {
                 {[
                   ['anime', 'Anime'],
                   ['cartoon', 'Cartoons'],
-                  ['tv', 'TV']
+                  ['tv', 'TV'],
+                  ['cucu', 'CUCU']
                 ].map(([value, label]) => (
                   <button
                     type="button"
@@ -892,44 +1012,73 @@ export default function Page() {
                     role="tab"
                     aria-selected={kind === value}
                     className={kind === value ? 'selected' : ''}
-                    onClick={() => setKind(value)}
+                    onClick={() => {
+                      setKind(value);
+                      if (value === 'cucu' && !cucuItems.length) loadCucu(1, true);
+                    }}
                   >
                     {label}
                   </button>
                 ))}
               </div>
 
-              <div className="searchField">
-                <IOSIcon name="search" size={19} />
-                <input
-                  value={query}
-                  aria-label="Search artwork"
-                  enterKeyHint="search"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  placeholder={kind === 'anime' ? 'Search anime card skins' : kind === 'cartoon' ? 'Search cartoon card skins' : 'Search TV card skins'}
-                  onChange={(event) => setQuery(event.target.value)}
-                  onKeyDown={(event) => event.key === 'Enter' && runSearch()}
-                />
-                {query ? (
-                  <button type="button" className="clearSearch" onClick={() => setQuery('')} aria-label="Clear search">
-                    <IOSIcon name="x" size={16} />
+              {kind === 'cucu' ? (
+                <div className="cucuCategoryIntro">
+                  <div>
+                    <strong>All Card Covers</strong>
+                    <span>{cucuTotal.toLocaleString()} designs indexed</span>
+                  </div>
+                  <p>Directly backed by CUCU Covers’ All Card Covers collection. Pages are loaded on demand and obvious storefront mockups are screened before use.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="searchField">
+                    <IOSIcon name="search" size={19} />
+                    <input
+                      value={query}
+                      aria-label="Search artwork"
+                      enterKeyHint="search"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      placeholder={kind === 'anime' ? 'Search anime card skins' : kind === 'cartoon' ? 'Search cartoon card skins' : 'Search TV card skins'}
+                      onChange={(event) => setQuery(event.target.value)}
+                      onKeyDown={(event) => event.key === 'Enter' && runSearch()}
+                    />
+                    {query ? (
+                      <button type="button" className="clearSearch" onClick={() => setQuery('')} aria-label="Clear search">
+                        <IOSIcon name="x" size={16} />
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <button type="button" className="primaryAction searchAction" disabled={searching || query.trim().length < 2} onClick={() => runSearch()}>
+                    {searching ? <span className="spinner" aria-hidden="true" /> : null}
+                    <span>{searching ? 'Searching' : 'Search'}</span>
                   </button>
-                ) : null}
-              </div>
 
-              <button type="button" className="primaryAction searchAction" disabled={searching || query.trim().length < 2} onClick={() => runSearch()}>
-                {searching ? <span className="spinner" aria-hidden="true" /> : null}
-                <span>{searching ? 'Searching' : 'Search'}</span>
-              </button>
-
-              {source ? <p className="sourceNote">Catalog: {source} · mockups + posters filtered</p> : null}
+                  {source ? <p className="sourceNote">Catalog: {source} · mockups + posters filtered</p> : null}
+                </>
+              )}
             </section>
 
-            <ArtworkRail title="Results" items={results} onPick={useArtwork} />
-            <ArtworkRail title="Recent" items={recent} onPick={useArtwork} />
+            {kind === 'cucu' ? (
+              <>
+                <CucuCatalog
+                  items={cucuItems}
+                  total={cucuTotal}
+                  loading={cucuLoading}
+                  hasMore={cucuHasMore}
+                  onPick={useArtwork}
+                  onLoadMore={() => loadCucu(cucuPage + 1)}
+                />
+                <ArtworkRail title="Recent" items={recent} onPick={useArtwork} />
+              </>
+            ) : (
+              <>
+                <ArtworkRail title="Results" items={results} onPick={useArtwork} />
+                <ArtworkRail title="Recent" items={recent} onPick={useArtwork} />
 
-            <section className="browseSection">
+                <section className="browseSection">
               <div className="browseHeading"><h2>Quick Picks</h2><span>Live search</span></div>
               <div className="quickPickList">
                 {QUICK_PICKS.map((item) => (
@@ -942,10 +1091,10 @@ export default function Page() {
                   </button>
                 ))}
               </div>
-            </section>
+                </section>
 
-            <section className="browseSection">
-              <div className="browseHeading"><h2>Blank Styles</h2><span>{GRADIENTS.length}</span></div>
+                <section className="browseSection">
+                  <div className="browseHeading"><h2>Blank Styles</h2><span>{GRADIENTS.length}</span></div>
               <div className="gradientRail" role="list">
                 {GRADIENTS.map((item) => (
                   <button
@@ -963,10 +1112,19 @@ export default function Page() {
               </div>
             </section>
 
-            <button type="button" className="secondaryAction uploadAction" onClick={() => uploadRef.current?.click()}>
-              <IOSIcon name="photo" size={21} />
-              <span>Choose Photo</span>
-            </button>
+                <button type="button" className="secondaryAction uploadAction" onClick={() => uploadRef.current?.click()}>
+                  <IOSIcon name="photo" size={21} />
+                  <span>Choose Photo</span>
+                </button>
+              </>
+            )}
+
+            {kind === 'cucu' ? (
+              <button type="button" className="secondaryAction uploadAction" onClick={() => uploadRef.current?.click()}>
+                <IOSIcon name="photo" size={21} />
+                <span>Choose Photo</span>
+              </button>
+            ) : null}
             <input ref={uploadRef} type="file" accept="image/*" hidden onChange={uploadImage} />
           </div>
         )}
