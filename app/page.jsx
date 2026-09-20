@@ -1762,11 +1762,34 @@ function estimateDataUrlBytes(value = '') {
   return Math.max(0, Math.floor((payloadLength * 3) / 4) - padding);
 }
 
+function safeDisplayText(value, fallback, maxLength = 120) {
+  const raw =
+    typeof value === 'string' || typeof value === 'number'
+      ? String(value).trim()
+      : '';
+  return (raw || fallback).slice(0, maxLength);
+}
+
+function normalizeStoredArtworkItem(item) {
+  if (!item || typeof item !== 'object' || !item.id) return null;
+  const image = normalizePersistedArtworkSource(item.image, 3072);
+  if (!image || image.startsWith('idb://imports/')) return null;
+
+  return {
+    ...item,
+    id: safeDisplayText(item.id, '', 160),
+    title: safeDisplayText(item.title, 'Card Skin', 160),
+    image,
+    thumbnail: item.thumbnail ? proxyImageWidth(item.thumbnail, 560) : proxyImageWidth(image, 560),
+    sourceCrop: normalizeCrop(item.sourceCrop, 0.1)
+  };
+}
+
 function importListItem(asset = {}) {
   return {
-    id: asset.id,
-    name: asset.name || 'Imported image',
-    type: asset.type || 'image/*',
+    id: safeDisplayText(asset.id, '', 160),
+    name: safeDisplayText(asset.name, 'Imported image', 160),
+    type: safeDisplayText(asset.type, 'image/*', 80),
     createdAt: Number(asset.createdAt || Date.now())
   };
 }
@@ -2058,31 +2081,59 @@ export default function Page() {
         }
 
         const validFavorites = storedFavorites
-          .filter((entry) => entry?.item?.id)
+          .map((entry) => ({
+            ...entry,
+            item: normalizeStoredArtworkItem(entry?.item)
+          }))
+          .filter((entry) => entry.item?.id)
           .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
         setFavorites(validFavorites.map((entry) => entry.item));
         setFavoriteIds(new Set(validFavorites.map((entry) => entry.item.id)));
         setProjects(
           storedProjects
             .filter((entry) => entry?.id && entry?.design && typeof entry.design === 'object')
-            .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))
+            .map((entry) => ({
+              ...entry,
+              id: safeDisplayText(entry.id, '', 160),
+              name: safeDisplayText(entry.name, 'Design', 160),
+              preview: typeof entry.preview === 'string' ? entry.preview : '',
+              createdAt: Number(entry.createdAt || 0),
+              updatedAt: Number(entry.updatedAt || entry.createdAt || 0)
+            }))
+            .sort((a, b) => b.updatedAt - a.updatedAt)
         );
         setImports(
           storedImports
-            .filter((entry) => entry?.id)
+            .map(importListItem)
+            .filter((entry) => entry.id)
             .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
         );
         setExportHistory(
           storedExports
             .filter((entry) => entry?.id)
-            .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
+            .map((entry) => ({
+              ...entry,
+              id: safeDisplayText(entry.id, '', 160),
+              name: safeDisplayText(entry.name, 'Export', 160),
+              designName: safeDisplayText(entry.designName, 'Untitled Card', 160),
+              action: safeDisplayText(entry.action, 'export', 80),
+              width: Math.max(0, Number(entry.width || 0)),
+              height: Math.max(0, Number(entry.height || 0)),
+              createdAt: Number(entry.createdAt || 0)
+            }))
+            .sort((a, b) => b.createdAt - a.createdAt)
             .slice(0, 40)
         );
 
         try {
           const storedRecent = JSON.parse(localStorage.getItem('aircard-recent-artwork-v1') || '[]');
           if (Array.isArray(storedRecent)) {
-            setRecent(storedRecent.filter((item) => item?.id).slice(0, 20));
+            setRecent(
+              storedRecent
+                .map(normalizeStoredArtworkItem)
+                .filter(Boolean)
+                .slice(0, 20)
+            );
           }
         } catch {
           try {
