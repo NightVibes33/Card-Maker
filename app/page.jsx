@@ -1973,6 +1973,7 @@ export default function Page() {
   const [projectSaveInProgress, setProjectSaveInProgress] = useState(false);
   const [imports, setImports] = useState([]);
   const [cleanupInProgress, setCleanupInProgress] = useState(false);
+  const [presetTransferInProgress, setPresetTransferInProgress] = useState(false);
   const [exportInProgress, setExportInProgress] = useState(false);
   const [exportHistory, setExportHistory] = useState([]);
   const [expertMode, setExpertMode] = useState(false);
@@ -4380,6 +4381,7 @@ export default function Page() {
     }
 
     presetTransferInFlightRef.current = true;
+    setPresetTransferInProgress(true);
     setMessage('Preparing design preset…');
 
     let url = '';
@@ -4440,6 +4442,7 @@ export default function Page() {
       anchor?.remove();
       if (url) setTimeout(() => URL.revokeObjectURL(url), 10000);
       presetTransferInFlightRef.current = false;
+      setPresetTransferInProgress(false);
     }
   }
 
@@ -4470,6 +4473,7 @@ export default function Page() {
     const generation = ++presetImportGenerationRef.current;
     presetImportActiveRef.current = true;
     presetTransferInFlightRef.current = true;
+    setPresetTransferInProgress(true);
     setMessage('Importing design preset…');
 
     const ensureCurrentPresetImport = () => {
@@ -4612,6 +4616,7 @@ export default function Page() {
     } finally {
       presetImportActiveRef.current = false;
       presetTransferInFlightRef.current = false;
+      setPresetTransferInProgress(false);
     }
   }
 
@@ -5473,7 +5478,7 @@ export default function Page() {
             <div ref={loadMoreRef} className="infiniteSentinel" aria-hidden="true" />
 
             <div className="discoverImportRow">
-              <button type="button" className="secondaryAction uploadAction" disabled={imageImportInProgress} onClick={() => uploadRef.current?.click()}>
+              <button type="button" className="secondaryAction uploadAction" disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={() => uploadRef.current?.click()}>
                 <IOSIcon name="photo" size={21} />
                 <span>Import Photo or File</span>
               </button>
@@ -5589,7 +5594,7 @@ export default function Page() {
                         <span>{design.flipX ? 'Unflip' : 'Flip'}</span>
                       </button>
                     </div>
-                    <button type="button" className="actionRow" disabled={imageImportInProgress} onClick={() => uploadRef.current?.click()}>
+                    <button type="button" className="actionRow" disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={() => uploadRef.current?.click()}>
                       <span><strong>Replace Artwork</strong><small>Photos or Files</small></span>
                       <IOSIcon name="photo" size={19} />
                     </button>
@@ -5854,7 +5859,7 @@ export default function Page() {
 <Group title="CUSTOM LAYERS" footer="Image, text, and shape layers are embedded into the final AirCard PNG.">
                   <div className="layerAddRow">
                     <button type="button" onClick={addTextLayer}>+ Text</button>
-                    <button type="button" disabled={imageImportInProgress} onClick={() => layerUploadRef.current?.click()}>+ Image / Logo</button>
+                    <button type="button" disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={() => layerUploadRef.current?.click()}>+ Image / Logo</button>
                     <button type="button" onClick={addShapeLayer}>+ Shape</button>
                     <button type="button" onClick={addChipLayer}>+ Chip</button>
                     <button type="button" onClick={addContactlessLayer}>+ Contactless</button>
@@ -6165,12 +6170,22 @@ export default function Page() {
             </section>
 
             <Group title="DESIGN PRESETS">
-              <button type="button" className="actionRow" onClick={exportPresetJson}>
-                <span><strong>Export Design JSON</strong><small>Share the full editable design state</small></span>
+              <button
+                type="button"
+                className="actionRow"
+                disabled={presetTransferInProgress || cleanupInProgress || imageImportInProgress}
+                onClick={exportPresetJson}
+              >
+                <span><strong>{presetTransferInProgress ? 'Preset Operation…' : 'Export Design JSON'}</strong><small>Share the full editable design state</small></span>
                 <IOSIcon name="export" size={18} />
               </button>
-              <button type="button" className="actionRow" onClick={() => presetImportRef.current?.click()}>
-                <span><strong>Import Design JSON</strong><small>Restore a shared AirCard preset</small></span>
+              <button
+                type="button"
+                className="actionRow"
+                disabled={presetTransferInProgress || cleanupInProgress || imageImportInProgress}
+                onClick={() => presetImportRef.current?.click()}
+              >
+                <span><strong>{presetTransferInProgress ? 'Preset Operation…' : 'Import Design JSON'}</strong><small>Restore a shared AirCard preset</small></span>
                 <IOSIcon name="chevron" size={17} />
               </button>
               <input ref={presetImportRef} type="file" accept=".json,application/json" hidden onChange={importPresetJson} />
@@ -6182,7 +6197,12 @@ export default function Page() {
                 <span><strong>Install Card Studio</strong><small>Add the PWA to your iPhone Home Screen</small></span>
                 <IOSIcon name="chevron" size={17} />
               </button>
-              <button type="button" className="actionRow" disabled={cleanupInProgress} onClick={cleanupUnusedImports}>
+              <button
+                type="button"
+                className="actionRow"
+                disabled={cleanupInProgress || presetTransferInProgress || imageImportInProgress}
+                onClick={cleanupUnusedImports}
+              >
                 <span><strong>{cleanupInProgress ? 'Cleaning Imports…' : 'Clean Unused Imports'}</strong><small>Remove imported image blobs not used by this card or saved projects</small></span>
                 <IOSIcon name="trash" size={17} />
               </button>
