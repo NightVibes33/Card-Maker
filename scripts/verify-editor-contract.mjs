@@ -155,6 +155,9 @@ if (/for \(let i = 0; i < (?:3600|900); i \+= 1\)/.test(page)) {
   throw new Error('Editor contract failed: grain must not use per-frame thousands-of-rectangles loops');
 }
 
+requireMatch(css, /scroll-padding-bottom:calc\(88px \+ var\(--safe-bottom\)\)/, 'focused controls stay clear of the fixed bottom tab bar');
+requireMatch(css, /scroll-padding-top:calc\(var\(--safe-top\) \+ 390px\)/, 'focused controls stay clear of the sticky editor preview');
+
 const touchChecks = [
   [/\.studioToolBar button\{[^}]*min-height:44px/s, 'Studio tool buttons'],
   [/\.previewModeToggle button\{[^}]*min-height:44px/s, 'Preview mode buttons'],
