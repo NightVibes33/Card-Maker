@@ -6,23 +6,22 @@ const OUT_W = 1536;
 const OUT_H = 969;
 const CARD_RATIO = OUT_W / OUT_H;
 
-const QUICK_PICKS = [
-  { title: 'Dragon Ball Z', kind: 'anime', query: 'Dragon Ball Z', subtitle: 'Anime' },
-  { title: 'Naruto', kind: 'anime', query: 'Naruto', subtitle: 'Anime' },
-  { title: 'Jujutsu Kaisen', kind: 'anime', query: 'Jujutsu Kaisen', subtitle: 'Anime' },
-  { title: 'Demon Slayer', kind: 'anime', query: 'Demon Slayer', subtitle: 'Anime' },
-  { title: 'One Piece', kind: 'anime', query: 'One Piece', subtitle: 'Anime' },
-  { title: 'Tokyo Ghoul', kind: 'anime', query: 'Tokyo Ghoul', subtitle: 'Anime' },
-  { title: 'Attack on Titan', kind: 'anime', query: 'Attack on Titan', subtitle: 'Anime' },
-  { title: 'SpongeBob', kind: 'cartoon', query: 'SpongeBob SquarePants', subtitle: 'Cartoon' },
-  { title: 'Adventure Time', kind: 'cartoon', query: 'Adventure Time', subtitle: 'Cartoon' },
-  { title: 'Regular Show', kind: 'cartoon', query: 'Regular Show', subtitle: 'Cartoon' },
-  { title: 'Rick and Morty', kind: 'cartoon', query: 'Rick and Morty', subtitle: 'Cartoon' },
-  { title: 'Breaking Bad', kind: 'tv', query: 'Breaking Bad', subtitle: 'TV Show' },
-  { title: 'Stranger Things', kind: 'tv', query: 'Stranger Things', subtitle: 'TV Show' },
-  { title: 'The Boys', kind: 'tv', query: 'The Boys', subtitle: 'TV Show' },
-  { title: 'Fallout', kind: 'tv', query: 'Fallout', subtitle: 'TV Show' },
-  { title: 'Wednesday', kind: 'tv', query: 'Wednesday', subtitle: 'TV Show' }
+const CUCU_CATEGORIES = [
+  ['all', 'All Card Skins'],
+  ['best', 'Best Sellers'],
+  ['new', 'New Arrivals'],
+  ['anime', 'Anime'],
+  ['cars', 'Cars'],
+  ['sports', 'Sports'],
+  ['artistic', 'Artistic'],
+  ['cute', 'Cute & Kawaii'],
+  ['pets', 'Pets'],
+  ['classic', 'Classic Art'],
+  ['funny', 'Funny'],
+  ['memes', 'Memes'],
+  ['retro', 'Retro & Nostalgic'],
+  ['animals', 'Animals'],
+  ['crypto', 'Crypto']
 ];
 
 const GRADIENTS = [
@@ -292,11 +291,7 @@ function ArtworkRail({ title, items, onPick }) {
                 <strong>{item.title}</strong>
                 <small>{item.source || item.subtitle}</small>
               </div>
-              {item.sourceUrl ? (
-                <a href={item.sourceUrl} target="_blank" rel="noreferrer" aria-label={'Open original listing for ' + item.title}>
-                  Original ↗
-                </a>
-              ) : null}
+
             </div>
           </article>
         ))}
@@ -330,13 +325,13 @@ function CatalogArtwork({ item, alt }) {
 
 function StoreCatalog({
   storeName,
+  categoryLabel,
   items,
   total,
   loading,
   hasMore,
   onPick,
-  onLoadMore,
-  collectionUrl
+  onLoadMore
 }) {
   const countLabel = total > 0
     ? items.length.toLocaleString() + ' of ' + total.toLocaleString()
@@ -345,7 +340,10 @@ function StoreCatalog({
   return (
     <section className="browseSection storeCatalogSection" aria-label={storeName + ' catalog'}>
       <div className="browseHeading">
-        <h2>{storeName}</h2>
+        <div>
+          <h2>{categoryLabel || storeName}</h2>
+          <small className="catalogSourceName">{storeName}</small>
+        </div>
         <span>{countLabel}</span>
       </div>
 
@@ -357,20 +355,12 @@ function StoreCatalog({
                 type="button"
                 className="storeCatalogPreview"
                 onClick={() => onPick(item)}
-                aria-label={'Use ' + storeName + ' card cover ' + item.title}
+                aria-label={'Use ' + item.title}
               >
                 <CatalogArtwork item={item} alt={item.mediaAlt || item.title} />
               </button>
               <div className="storeCatalogMeta">
                 <strong>{item.title}</strong>
-                <a
-                  href={item.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={'Open original listing for ' + item.title}
-                >
-                  Original ↗
-                </a>
               </div>
             </article>
           ))}
@@ -378,7 +368,7 @@ function StoreCatalog({
       ) : (
         <div className="catalogEmpty">
           {loading ? <span className="spinner" aria-hidden="true" /> : null}
-          <span>{loading ? 'Loading ' + storeName + ' card covers…' : 'No usable card covers loaded yet.'}</span>
+          <span>{loading ? 'Loading card skins…' : 'No usable card skins loaded yet.'}</span>
         </div>
       )}
 
@@ -393,19 +383,9 @@ function StoreCatalog({
           <span>{loading ? 'Loading' : 'Load More'}</span>
         </button>
       ) : null}
-
-      <a
-        className="collectionSourceLink"
-        href={collectionUrl}
-        target="_blank"
-        rel="noreferrer"
-      >
-        Open the original {storeName} collection ↗
-      </a>
     </section>
   );
 }
-
 
 function loadSearchImage(src) {
   return new Promise((resolve, reject) => {
@@ -630,13 +610,15 @@ export default function Page() {
   const [tab, setTab] = useState('browse');
   const [design, setDesign] = useState(DEFAULTS);
   const [image, setImage] = useState(null);
-  const [kind, setKind] = useState('anime');
+  const [kind, setKind] = useState('cucu');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [recent, setRecent] = useState([]);
   const [searching, setSearching] = useState(false);
   const [message, setMessage] = useState('Ready');
   const [source, setSource] = useState('');
+  const [cucuCategory, setCucuCategory] = useState('all');
+  const [cucuCategoryLabel, setCucuCategoryLabel] = useState('All Card Skins');
   const [cucuItems, setCucuItems] = useState([]);
   const [cucuPage, setCucuPage] = useState(0);
   const [cucuTotal, setCucuTotal] = useState(2225);
@@ -905,7 +887,7 @@ export default function Page() {
     }
   }, [kind, patch, query, rememberArtwork, searching]);
 
-  const loadCucu = useCallback(async (nextPage = 1, replace = false) => {
+  const loadCucu = useCallback(async (nextPage = 1, replace = false, category = cucuCategory) => {
     if (cucuLoading) return;
 
     setCucuLoading(true);
@@ -913,15 +895,15 @@ export default function Page() {
 
     try {
       const response = await fetch(
-        '/api/cucu?page=' + encodeURIComponent(nextPage) + '&limit=24',
-        { cache: 'no-store' }
+        '/api/cucu?category=' + encodeURIComponent(category) + '&page=' + encodeURIComponent(nextPage) + '&limit=24'
       );
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'CUCU catalog failed');
 
       const rawList = Array.isArray(json.results) ? json.results : [];
-      setCucuTotal(Number(json.total) || 2225);
+      setCucuTotal(Number(json.total) || 0);
       setCucuHasMore(Boolean(json.hasMore));
+      setCucuCategoryLabel(json.categoryLabel || CUCU_CATEGORIES.find(([key]) => key === category)?.[1] || 'Card Skins');
 
       setMessage('Checking CUCU artwork…');
       const cleanList = await prepareCleanResults(rawList);
@@ -948,7 +930,7 @@ export default function Page() {
     } finally {
       setCucuLoading(false);
     }
-  }, [cucuLoading]);
+  }, [cucuCategory, cucuLoading]);
 
   const loadBlitz = useCallback(async (nextPage = 1, replace = false) => {
     if (blitzLoading) return;
@@ -958,8 +940,7 @@ export default function Page() {
 
     try {
       const response = await fetch(
-        '/api/blitz?page=' + encodeURIComponent(nextPage) + '&limit=24',
-        { cache: 'no-store' }
+        '/api/blitz?page=' + encodeURIComponent(nextPage) + '&limit=24'
       );
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Blitz catalog failed');
@@ -994,6 +975,15 @@ export default function Page() {
       setBlitzLoading(false);
     }
   }, [blitzLoading]);
+
+  useEffect(() => {
+    if (kind === 'cucu' && cucuPage === 0 && !cucuLoading) {
+      loadCucu(1, true, cucuCategory);
+    }
+    if (kind === 'blitz' && blitzPage === 0 && !blitzLoading) {
+      loadBlitz(1, true);
+    }
+  }, [kind, cucuCategory, cucuPage, cucuLoading, blitzPage, blitzLoading, loadCucu, loadBlitz]);
 
   function useArtwork(item) {
     patch({
@@ -1155,12 +1145,9 @@ export default function Page() {
       <div className="screenContent">
         {tab === 'browse' && (
           <div className="tabScreen">
-            <section className="searchSection" aria-label="Artwork search">
-              <div className="segmentedControl" role="tablist" aria-label="Artwork type">
+            <section className="searchSection sourceSection" aria-label="Card skin source">
+              <div className="sourceSegmented" role="tablist" aria-label="Card skin source">
                 {[
-                  ['anime', 'Anime'],
-                  ['cartoon', 'Cartoon'],
-                  ['tv', 'TV'],
                   ['cucu', 'CUCU'],
                   ['blitz', 'Blitz']
                 ].map(([value, label]) => (
@@ -1170,146 +1157,108 @@ export default function Page() {
                     role="tab"
                     aria-selected={kind === value}
                     className={kind === value ? 'selected' : ''}
-                    onClick={() => {
-                      setKind(value);
-                      if (value === 'cucu' && !cucuItems.length) loadCucu(1, true);
-                      if (value === 'blitz' && !blitzItems.length) loadBlitz(1, true);
-                    }}
+                    onClick={() => setKind(value)}
                   >
                     {label}
                   </button>
                 ))}
               </div>
 
-              {kind === 'cucu' || kind === 'blitz' ? (
-                <div className="catalogCategoryIntro">
-                  <div>
-                    <strong>{kind === 'cucu' ? 'All Card Covers' : 'Full Card Covers'}</strong>
-                    <span>
-                      {kind === 'cucu'
-                        ? cucuTotal.toLocaleString() + ' designs indexed'
-                        : blitzTotal > 0
-                          ? blitzTotal.toLocaleString() + ' designs indexed'
-                          : 'Loading catalog…'}
-                    </span>
-                  </div>
-                  <p>
+              <div className="catalogCategoryIntro">
+                <div>
+                  <strong>{kind === 'cucu' ? 'CUCU Covers' : 'Blitz Covers'}</strong>
+                  <span>
                     {kind === 'cucu'
-                      ? 'Uses CUCU’s raw Shopify CDN card-art assets and crops the actual printed-card region out of the product canvas.'
-                      : 'Uses Blitz Covers’ full-card collection and its direct Shopify product assets, with the same raw-art extraction used for CUCU.'}
-                  </p>
+                      ? (cucuTotal > 0 ? cucuTotal.toLocaleString() + ' in this collection' : 'Real storefront collections')
+                      : (blitzTotal > 0 ? blitzTotal.toLocaleString() + ' indexed full-card skins' : 'Indexed full-card skins')}
+                  </span>
                 </div>
-              ) : (
-                <>
-                  <div className="searchField">
-                    <IOSIcon name="search" size={19} />
-                    <input
-                      value={query}
-                      aria-label="Search artwork"
-                      enterKeyHint="search"
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      placeholder={kind === 'anime' ? 'Search anime card skins' : kind === 'cartoon' ? 'Search cartoon card skins' : 'Search TV card skins'}
-                      onChange={(event) => setQuery(event.target.value)}
-                      onKeyDown={(event) => event.key === 'Enter' && runSearch()}
-                    />
-                    {query ? (
-                      <button type="button" className="clearSearch" onClick={() => setQuery('')} aria-label="Clear search">
-                        <IOSIcon name="x" size={16} />
-                      </button>
-                    ) : null}
-                  </div>
-
-                  <button type="button" className="primaryAction searchAction" disabled={searching || query.trim().length < 2} onClick={() => runSearch()}>
-                    {searching ? <span className="spinner" aria-hidden="true" /> : null}
-                    <span>{searching ? 'Searching' : 'Search'}</span>
-                  </button>
-
-                  {source ? <p className="sourceNote">Catalog: {source} · mockups + posters filtered</p> : null}
-                </>
-              )}
+                <p>
+                  Images are served through Card Studio’s cache. Selecting a design stays inside the app.
+                </p>
+              </div>
             </section>
 
             {kind === 'cucu' ? (
               <>
+                <section className="browseSection realCategorySection" aria-label="CUCU card skin collections">
+                  <div className="browseHeading">
+                    <h2>Collections</h2>
+                    <span>CUCU</span>
+                  </div>
+                  <div className="categoryScroller" role="tablist" aria-label="CUCU collection">
+                    {CUCU_CATEGORIES.map(([value, label]) => (
+                      <button
+                        type="button"
+                        role="tab"
+                        key={value}
+                        aria-selected={cucuCategory === value}
+                        className={cucuCategory === value ? 'categoryChip selected' : 'categoryChip'}
+                        onClick={() => {
+                          if (value === cucuCategory) return;
+                          setCucuCategory(value);
+                          setCucuCategoryLabel(label);
+                          setCucuItems([]);
+                          setCucuPage(0);
+                          setCucuTotal(0);
+                          setCucuHasMore(true);
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
                 <StoreCatalog
                   storeName="CUCU Covers"
+                  categoryLabel={cucuCategoryLabel}
                   items={cucuItems}
                   total={cucuTotal}
                   loading={cucuLoading}
                   hasMore={cucuHasMore}
                   onPick={useArtwork}
-                  onLoadMore={() => loadCucu(cucuPage + 1)}
-                  collectionUrl="https://cucucovers.com/collections/all-card-covers"
+                  onLoadMore={() => loadCucu(cucuPage + 1, false, cucuCategory)}
                 />
-                <ArtworkRail title="Recent" items={recent} onPick={useArtwork} />
-              </>
-            ) : kind === 'blitz' ? (
-              <>
-                <StoreCatalog
-                  storeName="Blitz Covers"
-                  items={blitzItems}
-                  total={blitzTotal}
-                  loading={blitzLoading}
-                  hasMore={blitzHasMore}
-                  onPick={useArtwork}
-                  onLoadMore={() => loadBlitz(blitzPage + 1)}
-                  collectionUrl="https://blitzcovers.com/collections/credit-card-cover"
-                />
-                <ArtworkRail title="Recent" items={recent} onPick={useArtwork} />
               </>
             ) : (
-              <>
-                <ArtworkRail title="Results" items={results} onPick={useArtwork} />
-                <ArtworkRail title="Recent" items={recent} onPick={useArtwork} />
-
-                <section className="browseSection">
-                  <div className="browseHeading"><h2>Quick Picks</h2><span>Live search</span></div>
-                  <div className="quickPickList">
-                    {QUICK_PICKS.map((item) => (
-                      <button type="button" className="quickPickRow" key={item.title} onClick={() => useQuickPick(item)}>
-                        <span>
-                          <strong>{item.title}</strong>
-                          <small>{item.subtitle}</small>
-                        </span>
-                        <IOSIcon name="chevron" size={17} />
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="browseSection">
-                  <div className="browseHeading"><h2>Blank Styles</h2><span>{GRADIENTS.length}</span></div>
-                  <div className="gradientRail" role="list">
-                    {GRADIENTS.map((item) => (
-                      <button
-                        type="button"
-                        role="listitem"
-                        key={item.id}
-                        className={design.gradient === item.id && !design.background ? 'gradientSwatch selected' : 'gradientSwatch'}
-                        style={{ background: 'linear-gradient(135deg,' + item.a + ',' + item.b + ',' + item.c + ')' }}
-                        onClick={() => patch({ gradient: item.id, background: '', backgroundLabel: item.name, sourceCrop: null })}
-                        aria-label={'Use ' + item.name + ' background'}
-                      >
-                        <span>{item.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                <button type="button" className="secondaryAction uploadAction" onClick={() => uploadRef.current?.click()}>
-                  <IOSIcon name="photo" size={21} />
-                  <span>Choose Photo</span>
-                </button>
-              </>
+              <StoreCatalog
+                storeName="Blitz Covers"
+                categoryLabel="Full Card Skins"
+                items={blitzItems}
+                total={blitzTotal}
+                loading={blitzLoading}
+                hasMore={blitzHasMore}
+                onPick={useArtwork}
+                onLoadMore={() => loadBlitz(blitzPage + 1)}
+              />
             )}
 
-            {kind === 'cucu' || kind === 'blitz' ? (
-              <button type="button" className="secondaryAction uploadAction" onClick={() => uploadRef.current?.click()}>
-                <IOSIcon name="photo" size={21} />
-                <span>Choose Photo</span>
-              </button>
-            ) : null}
+            <ArtworkRail title="Recent" items={recent} onPick={useArtwork} />
+
+            <section className="browseSection">
+              <div className="browseHeading"><h2>Your Designs</h2><span>Local</span></div>
+              <div className="gradientRail" role="list">
+                {GRADIENTS.map((item) => (
+                  <button
+                    type="button"
+                    role="listitem"
+                    key={item.id}
+                    className={design.gradient === item.id && !design.background ? 'gradientSwatch selected' : 'gradientSwatch'}
+                    style={{ background: 'linear-gradient(135deg,' + item.a + ',' + item.b + ',' + item.c + ')' }}
+                    onClick={() => patch({ gradient: item.id, background: '', backgroundLabel: item.name, sourceCrop: null })}
+                    aria-label={'Use ' + item.name + ' background'}
+                  >
+                    <span>{item.name}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <button type="button" className="secondaryAction uploadAction" onClick={() => uploadRef.current?.click()}>
+              <IOSIcon name="photo" size={21} />
+              <span>Choose Photo</span>
+            </button>
             <input ref={uploadRef} type="file" accept="image/*" hidden onChange={uploadImage} />
           </div>
         )}
