@@ -3018,6 +3018,48 @@ export default function Page() {
     setMessage('Design deleted');
   }
 
+  async function cleanupUnusedImports() {
+    const referenced = new Set();
+
+    const addDesignRefs = (value) => {
+      if (!value || typeof value !== 'object') return;
+      if (value.background?.startsWith('idb://imports/')) {
+        referenced.add(value.background.slice('idb://imports/'.length));
+      }
+      for (const layer of value.customLayers || []) {
+        if (layer?.src?.startsWith('idb://imports/')) {
+          referenced.add(layer.src.slice('idb://imports/'.length));
+        }
+      }
+    };
+
+    addDesignRefs(designRef.current);
+    for (const project of projects) addDesignRefs(project?.design);
+
+    const unused = imports.filter((asset) => asset?.id && !referenced.has(asset.id));
+    if (!unused.length) {
+      setMessage('No unused imported images to clean up');
+      return;
+    }
+
+    const failed = [];
+    await Promise.all(unused.map(async (asset) => {
+      try {
+        await dbDelete('imports', asset.id);
+      } catch {
+        failed.push(asset.id);
+      }
+    }));
+
+    const removed = new Set(unused.map((asset) => asset.id).filter((id) => !failed.includes(id)));
+    setImports((current) => current.filter((asset) => !removed.has(asset.id)));
+    setMessage(
+      failed.length
+        ? 'Removed ' + removed.size + ' unused imports; ' + failed.length + ' could not be removed'
+        : 'Removed ' + removed.size + ' unused imported image' + (removed.size === 1 ? '' : 's')
+    );
+  }
+
   async function serializePreset() {
     const payload = {
       version: 2,
@@ -3417,6 +3459,14 @@ export default function Page() {
     };
     await dbPut('exports', record).catch(() => {});
     setExportHistory((current) => [record, ...current].slice(0, 40));
+
+    dbGetAll('exports')
+      .then((records) => records
+        .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
+        .slice(100)
+      )
+      .then((stale) => Promise.all(stale.map((entry) => dbDelete('exports', entry.id).catch(() => {}))))
+      .catch(() => {});
   }
 
   function makePngFile(width, height, name) {
@@ -4481,6 +4531,10 @@ export default function Page() {
               <button type="button" className="actionRow" onClick={() => setInstallHelp(true)}>
                 <span><strong>Install Card Studio</strong><small>Add the PWA to your iPhone Home Screen</small></span>
                 <IOSIcon name="chevron" size={17} />
+              </button>
+              <button type="button" className="actionRow" onClick={cleanupUnusedImports}>
+                <span><strong>Clean Unused Imports</strong><small>Remove imported image blobs not used by this card or saved projects</small></span>
+                <IOSIcon name="trash" size={17} />
               </button>
             </Group>
 
