@@ -24,8 +24,8 @@ const STORES = [
 ];
 
 const QUERY_ALIASES = new Map([
-  ['spongebob', ['Bikini Bottom', 'Patrick', 'Krusty Krab']],
-  ['spongebob squarepants', ['Bikini Bottom', 'Patrick', 'Krusty Krab']],
+  ['spongebob', ['Bikini Bottom', 'Krusty Krab']],
+  ['spongebob squarepants', ['Bikini Bottom', 'Krusty Krab']],
   ['breaking bad', ['Walter White', 'Heisenberg']],
   ['hunter x hunter', ['HxH', 'Hunter Hunter']],
   ['dragon ball z', ['Goku', 'Vegeta', 'Dragon Ball']],
@@ -264,21 +264,42 @@ async function collectionSearch(store, term) {
   return results.slice(0, 24);
 }
 
-async function catalogSearch(store, term) {
-  try {
+const CATALOG_CACHE = new Map();
+
+async function getCatalog(store) {
+  const now = Date.now();
+  const cached = CATALOG_CACHE.get(store.origin);
+  if (cached && cached.expires > now) return cached.promise;
+
+  const promise = (async () => {
     const endpoint = store.origin + '/products.json?limit=250';
-    const response = await fetch(endpoint, {
-      headers: {
-        'User-Agent': 'AirCard-Card-Studio/3.0 (+https://github.com/NightVibes33/Card-Maker)',
-        Accept: 'application/json'
-      },
-      next: { revalidate: 3600 }
-    });
+    const response = await fetchWithTimeout(endpoint, {
+      headers: { Accept: 'application/json' }
+    }, 9000);
 
     if (!response.ok) return [];
     const json = await response.json();
+    return json?.products || [];
+  })();
 
-    return (json?.products || [])
+  CATALOG_CACHE.set(store.origin, {
+    expires: now + 10 * 60 * 1000,
+    promise
+  });
+
+  try {
+    return await promise;
+  } catch (error) {
+    CATALOG_CACHE.delete(store.origin);
+    throw error;
+  }
+}
+
+async function catalogSearch(store, term) {
+  try {
+    const products = await getCatalog(store);
+
+    return products
       .filter((product) => {
         const title = cleanText(product.title || '');
         const searchable = [
