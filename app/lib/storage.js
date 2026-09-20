@@ -93,7 +93,7 @@ function openDb() {
 
 export async function dbPut(store, value) {
   const db = await openDb();
-  if (!db) return value;
+  if (!db) throw new Error('IndexedDB unavailable');
 
   return new Promise((resolve, reject) => {
     const stores = store === 'imports' ? ['imports', 'importMeta'] : [store];
@@ -136,7 +136,7 @@ export async function dbGetAll(store) {
 
 export async function dbDelete(store, id) {
   const db = await openDb();
-  if (!db) return;
+  if (!db) throw new Error('IndexedDB unavailable');
 
   return new Promise((resolve, reject) => {
     const stores = store === 'imports' ? ['imports', 'importMeta'] : [store];
