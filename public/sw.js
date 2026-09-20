@@ -119,6 +119,11 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
 
+  if (url.pathname === '/manifest.webmanifest') {
+    event.respondWith(cacheFirst(event.request, SHELL_CACHE));
+    return;
+  }
+
   if (url.pathname === '/api/image') {
     const requestedWidth = Number(url.searchParams.get('w') || 0);
     const cacheName = requestedWidth > 0 && requestedWidth <= 800
