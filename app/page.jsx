@@ -1335,14 +1335,22 @@ async function prepareLocalImageBlob(blob) {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
 
-  const outputType = /^image\/(?:jpe?g|heic|heif)$/i.test(blob.type || '')
+  const sourceType = String(blob.type || '').toLowerCase();
+  const outputType = /^image\/(?:jpe?g|heic|heif)$/.test(sourceType)
     ? 'image/jpeg'
-    : 'image/png';
+    : /^image\/(?:webp|avif)$/.test(sourceType)
+      ? 'image/webp'
+      : 'image/png';
+  const outputQuality = outputType === 'image/jpeg'
+    ? 0.94
+    : outputType === 'image/webp'
+      ? 0.92
+      : undefined;
   const optimizedBlob = await new Promise((resolve, reject) => {
     canvas.toBlob(
       (result) => result ? resolve(result) : reject(new Error('Image optimization failed')),
       outputType,
-      outputType === 'image/jpeg' ? 0.94 : undefined
+      outputQuality
     );
   }).finally(() => {
     canvas.width = 1;
