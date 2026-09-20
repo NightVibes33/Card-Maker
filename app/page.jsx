@@ -4169,14 +4169,12 @@ export default function Page() {
     // A project boundary must also replace the synchronous recovery snapshot
     // immediately. Otherwise an iOS suspend/reload in the autosave debounce
     // window can resurrect the previous project's chip/position/effect state.
-    if (hydrated) {
-      try {
-        const now = Date.now();
-        localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(next));
-        localStorage.setItem('aircard-sticker-fvp-v3-updated-at', String(now));
-        if (!autosaveReady) autosavePausedBaselineRef.current = next;
-      } catch {}
-    }
+    try {
+      const now = Date.now();
+      localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(next));
+      localStorage.setItem('aircard-sticker-fvp-v3-updated-at', String(now));
+      if (!autosaveReady) autosavePausedBaselineRef.current = next;
+    } catch {}
 
     // Queue the IndexedDB replacement too. Saved named projects remain
     // untouched; only the current working draft is replaced.
