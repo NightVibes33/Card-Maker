@@ -1546,6 +1546,14 @@ button:disabled{opacity:.38}
   height:100%;
   object-fit:cover;
 }
+.catalogArtworkFallback{
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-items:center;
+  background:var(--tertiary-bg);
+  color:var(--secondary-label);
+}
 .catalogArtworkFrame>.croppedCatalogImage{
   position:absolute;
   max-width:none;
