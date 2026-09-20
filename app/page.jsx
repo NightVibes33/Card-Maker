@@ -3141,44 +3141,78 @@ export default function Page() {
 
             {studioTool === 'adjust' ? (
               <>
+                <div className="editingTargetBar">
+                  <span>
+                    <strong>Editing {activeImageLabel}</strong>
+                    <small>{selectedImageLayer ? 'Imported image layer' : 'Card artwork'}</small>
+                  </span>
+                  {selectedImageLayer ? (
+                    <button type="button" onClick={() => setSelectedElement('artwork')}>Back to Artwork</button>
+                  ) : null}
+                </div>
+
                 <section className="presetSection">
                   <h3 className="sectionLabel">PRESETS</h3>
                   <div className="presetScroller">
                     {Object.keys(ADJUSTMENT_PRESETS).map((name) => (
-                      <button type="button" key={name} onClick={() => applyAdjustmentPreset(name)}>{name}</button>
+                      <button type="button" key={name} disabled={!activeImageAvailable} onClick={() => applyAdjustmentPreset(name)}>{name}</button>
                     ))}
                   </div>
                 </section>
-                <Group title="IMAGE">
-                  <SliderRow label="Exposure" value={design.exposure} min={-1} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ exposure: value })} />
-                  <SliderRow label="Brightness" value={design.brightness} min={0.4} max={1.7} step={0.01} disabled={!design.background} onChange={(value) => patch({ brightness: value })} />
-                  <SliderRow label="Contrast" value={design.contrast} min={0.45} max={1.8} step={0.01} disabled={!design.background} onChange={(value) => patch({ contrast: value })} />
-                  <SliderRow label="Saturation" value={design.saturation} min={0} max={2.4} step={0.01} disabled={!design.background} onChange={(value) => patch({ saturation: value })} />
-                  <SliderRow label="Highlights" value={design.highlights} min={-1} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ highlights: value })} />
-                  <SliderRow label="Shadows" value={design.shadows} min={-1} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ shadows: value })} />
-                  <SliderRow label="Temperature" value={design.temperature} min={-1} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ temperature: value })} />
-                  <SliderRow label="Tint" value={design.tint} min={-1} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ tint: value })} />
-                  <SliderRow label="Sharpness" value={design.sharpness} min={-1} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ sharpness: value })} />
-                  <SliderRow label="Blur" value={design.blur} min={0} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ blur: value })} />
-                  <button type="button" className="settingsResetButton" disabled={!design.background} onClick={() => applyAdjustmentPreset('Original')}>Reset Adjustments</button>
+
+                <Group title={'IMAGE · ' + activeImageLabel}>
+                  <SliderRow label="Exposure" value={activeImageSettings.exposure} min={-1} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ exposure: value })} />
+                  <SliderRow label="Brightness" value={activeImageSettings.brightness} min={0.4} max={1.7} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ brightness: value })} />
+                  <SliderRow label="Contrast" value={activeImageSettings.contrast} min={0.45} max={1.8} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ contrast: value })} />
+                  <SliderRow label="Saturation" value={activeImageSettings.saturation} min={0} max={2.4} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ saturation: value })} />
+                  <SliderRow label="Highlights" value={activeImageSettings.highlights} min={-1} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ highlights: value })} />
+                  <SliderRow label="Shadows" value={activeImageSettings.shadows} min={-1} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ shadows: value })} />
+                  <SliderRow label="Temperature" value={activeImageSettings.temperature} min={-1} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ temperature: value })} />
+                  <SliderRow label="Tint" value={activeImageSettings.tint} min={-1} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ tint: value })} />
+                  <SliderRow label="Sharpness" value={activeImageSettings.sharpness} min={-1} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ sharpness: value })} />
+                  <SliderRow label="Blur" value={activeImageSettings.blur} min={0} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ blur: value })} />
+                  <button type="button" className="settingsResetButton" disabled={!activeImageAvailable} onClick={() => applyAdjustmentPreset('Original')}>Reset Adjustments</button>
                 </Group>
               </>
             ) : null}
 
             {studioTool === 'effects' ? (
-              <Group title="EFFECTS">
-                <SliderRow label="Vignette intensity" value={design.vignette} min={0} max={0.8} step={0.01} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ vignette: value })} />
-                <SliderRow label="Grain" value={design.grain} min={0} max={0.22} step={0.005} onChange={(value) => patch({ grain: value })} />
-                <SliderRow label="Gloss" value={design.gloss} min={0} max={0.8} step={0.01} onChange={(value) => patch({ gloss: value })} />
-                <SliderRow label="Dark Overlay" value={design.overlay} min={0} max={0.75} step={0.01} onChange={(value) => patch({ overlay: value })} />
-                <SliderRow label="Fade" value={design.fade} min={0} max={1} step={0.01} onChange={(value) => patch({ fade: value })} />
-                <label className="colorRow">
-                  <span>Color Tint</span>
-                  <input aria-label="Effect tint color" type="color" value={design.effectTint} onChange={(event) => patch({ effectTint: event.target.value })} />
-                </label>
-                <SliderRow label="Tint Strength" value={design.effectTintStrength} min={0} max={1} step={0.01} onChange={(value) => patch({ effectTintStrength: value })} />
-                <button type="button" className="settingsResetButton" onClick={() => patch({ overlay: 0.1, vignette: 0.24, gloss: 0.2, grain: 0.035, fade: 0, effectTintStrength: 0 })}>Reset Effects</button>
-              </Group>
+              <>
+                <div className="editingTargetBar">
+                  <span>
+                    <strong>Editing {activeImageLabel}</strong>
+                    <small>{selectedImageLayer ? 'Effects apply only to this imported layer' : 'Effects apply to card artwork'}</small>
+                  </span>
+                  {selectedImageLayer ? (
+                    <button type="button" onClick={() => setSelectedElement('artwork')}>Back to Artwork</button>
+                  ) : null}
+                </div>
+
+                <Group title={'EFFECTS · ' + activeImageLabel}>
+                  <SliderRow label="Vignette intensity" value={activeImageSettings.vignette} min={0} max={0.8} step={0.01} disabled={!activeImageAvailable} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patchImageTarget({ vignette: value })} />
+                  <SliderRow label="Grain" value={activeImageSettings.grain} min={0} max={0.22} step={0.005} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ grain: value })} />
+                  <SliderRow label="Gloss" value={activeImageSettings.gloss} min={0} max={0.8} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ gloss: value })} />
+                  <SliderRow label="Dark Overlay" value={activeImageSettings.overlay} min={0} max={0.75} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ overlay: value })} />
+                  <SliderRow label="Fade" value={activeImageSettings.fade} min={0} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ fade: value })} />
+                  <label className={'colorRow ' + (!activeImageAvailable ? 'disabledRow' : '')}>
+                    <span>Color Tint</span>
+                    <input aria-label="Effect tint color" type="color" disabled={!activeImageAvailable} value={activeImageSettings.effectTint || '#7b61ff'} onChange={(event) => patchImageTarget({ effectTint: event.target.value })} />
+                  </label>
+                  <SliderRow label="Tint Strength" value={activeImageSettings.effectTintStrength} min={0} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ effectTintStrength: value })} />
+                  <button
+                    type="button"
+                    className="settingsResetButton"
+                    disabled={!activeImageAvailable}
+                    onClick={() => patchImageTarget(
+                      selectedImageLayer
+                        ? { vignette: 0, grain: 0, gloss: 0, overlay: 0, fade: 0, effectTintStrength: 0 }
+                        : { overlay: 0.1, vignette: 0.24, gloss: 0.2, grain: 0.035, fade: 0, effectTintStrength: 0 }
+                    )}
+                  >
+                    Reset Effects
+                  </button>
+                </Group>
+              </>
             ) : null}
 
             {studioTool === 'card' ? (
@@ -3327,7 +3361,7 @@ export default function Page() {
                       </>
                     ) : null}
                     {selectedLayer.type === 'image' ? (
-                      <SliderRow label="Image Width" value={selectedLayer.width || 320} min={20} max={1300} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
+                      <SliderRow label="Image Width" value={selectedLayer.width || 640} min={20} max={1800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
                     ) : null}
                     {selectedLayer.type === 'chip' ? (
                       <div className="tonePicker" role="radiogroup" aria-label="Custom chip finish">
@@ -3368,7 +3402,7 @@ export default function Page() {
                           </>
                         ) : null}
                         {selectedLayer.type === 'image' ? (
-                          <NumericField label="Exact Image Width" value={selectedLayer.width || 320} min={20} max={1300} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
+                          <NumericField label="Exact Image Width" value={selectedLayer.width || 640} min={20} max={1800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
                         ) : null}
                       </div>
                     ) : null}
