@@ -5323,6 +5323,7 @@ export default function Page() {
           ref={canvasRef}
           width={EDITOR_PREVIEW_W}
           height={EDITOR_PREVIEW_H}
+          style={{ touchAction: previewMode === 'flat' ? 'none' : 'pan-y' }}
           onPointerDown={previewMode === 'flat' ? pointerDown : undefined}
           onPointerMove={previewMode === 'flat' ? pointerMove : undefined}
           onPointerUp={previewMode === 'flat' ? pointerUp : undefined}
