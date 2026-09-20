@@ -144,6 +144,28 @@ button:disabled{opacity:.38}
 .screenContent{padding:0 16px}
 .tabScreen{padding:6px 0 26px}
 .searchSection{display:flex;flex-direction:column;gap:10px}
+.sourceSegmented{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:2px;
+  min-height:40px;
+  padding:2px;
+  border-radius:11px;
+  background:var(--tertiary-bg);
+}
+.sourceSegmented button{
+  min-height:36px;
+  border:0;
+  border-radius:9px;
+  background:transparent;
+  color:var(--label);
+  font-size:14px;
+  font-weight:700;
+}
+.sourceSegmented button.selected{
+  background:var(--secondary-bg);
+  box-shadow:0 1px 4px rgba(0,0,0,.14),0 0 0 .5px rgba(0,0,0,.06);
+}
 .segmentedControl{
   display:grid;
   grid-template-columns:repeat(5,1fr);
@@ -275,6 +297,43 @@ button:disabled{opacity:.38}
   color:var(--secondary-label);
   font-size:12px;
 }
+.browseHeading>div{min-width:0}
+.catalogSourceName{
+  display:block;
+  margin-top:2px;
+  color:var(--secondary-label);
+  font-size:12px;
+  font-weight:500;
+}
+.realCategorySection{margin-top:20px}
+.categoryScroller{
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  margin:0 -16px;
+  padding:1px 16px 5px;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+}
+.categoryScroller::-webkit-scrollbar{display:none}
+.categoryChip{
+  flex:0 0 auto;
+  min-height:38px;
+  border:0;
+  border-radius:19px;
+  padding:0 14px;
+  background:var(--secondary-bg);
+  color:var(--label);
+  box-shadow:inset 0 0 0 .5px var(--separator);
+  font-size:13px;
+  font-weight:650;
+  white-space:nowrap;
+}
+.categoryChip.selected{
+  background:var(--label);
+  color:var(--system-bg);
+  box-shadow:none;
+}
 .artRail,.gradientRail{
   display:flex;
   gap:12px;
@@ -334,16 +393,6 @@ button:disabled{opacity:.38}
   color:var(--secondary-label);
   font-size:12px;
 }
-.artSkinMeta a{
-  flex:0 0 auto;
-  min-height:30px;
-  display:flex;
-  align-items:center;
-  color:var(--blue);
-  text-decoration:none;
-  font-size:12px;
-  font-weight:600;
-}
 .storeCatalogSection{margin-top:22px}
 .storeCatalogGrid{
   display:grid;
@@ -389,30 +438,9 @@ button:disabled{opacity:.38}
   font-size:13px;
   line-height:1.25;
 }
-.storeCatalogMeta a{
-  display:inline-flex;
-  align-items:center;
-  min-height:28px;
-  margin-top:2px;
-  color:var(--blue);
-  text-decoration:none;
-  font-size:11px;
-  font-weight:600;
-}
 .catalogLoadMore{
   width:100%;
   margin-top:20px;
-}
-.collectionSourceLink{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  min-height:44px;
-  margin-top:8px;
-  color:var(--blue);
-  text-decoration:none;
-  font-size:13px;
-  font-weight:600;
 }
 .catalogEmpty{
   min-height:86px;
