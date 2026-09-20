@@ -1,37 +1,84 @@
-# AirCard Card Skin Studio
+# AirCard Card Studio
 
-iPhone-first card skin editor for AirCard-iOS.
+iPhone-first premade card-skin search and editor for AirCard-iOS.
 
-## What is real in this build
+## Search rules
 
-- 1536×969 cardBackgroundCombined@3x.png export.
-- 1024×646 cardBackgroundCombined@2x.png export.
-- Real full-resolution Canvas rendering, not a screenshot of the preview.
-- Draggable/pinch-zoom artwork on iPhone.
-- EMV chip renderer with gold, silver, black, and rose finishes.
-- Contactless symbol with position and scale controls.
-- Brightness, saturation, contrast, blur, vignette, gloss, grain, pan, zoom, and rotation.
-- Optional decorative card number, holder, expiry, and badge layers.
-- iOS Share Sheet support.
-- One-tap live show templates for popular anime, cartoons, and TV series.
-- Anime search: Jikan with AniList fallback.
-- TV/cartoon search: TVmaze.
-- Same-origin image proxy so searched artwork can be composited and exported from Canvas.
-- GitHub CI boots the built Next.js app and verifies anime, TV, and cartoon search plus image-proxy loading.
+Search results are real premade credit/debit-card skin products from online card-skin storefronts.
+
+Current providers:
+- Anime Town Creations
+- Stickyink Designs
+- CUCU Covers
+- Styled Cards
+
+The search API rejects:
+- Jikan, AniList, TVmaze, and entertainment-poster fallbacks
+- generic movie/TV/anime poster artwork
+- unrelated card-skin products that do not match the requested franchise
+- "design your own" / custom products when the user asked for premade skins
+- obvious size-guide, materials, instructions, customer-photo, half-cover, window-cover, video, logo, and watermark media descriptors
+
+Every accepted search result must resolve to a real storefront /products/... page and pass product + franchise relevance checks.
+
+CI currently proves:
+- Naruto resolves to a Naruto premade card skin
+- SpongeBob resolves to a SpongeBob/Bikini Bottom premade card skin
+- both selected product images load through the image proxy
+
+Important: the app performs source and metadata filtering. It does not claim pixel-level computer-vision proof that every upstream image is watermark/logo-free.
+
+## iPhone UI
+
+The interface is intentionally modeled around iOS interaction conventions:
+- safe-area-aware layout
+- 44pt+ touch targets
+- large-title hierarchy
+- four-section bottom tab bar
+- native-style segmented controls, search, switches, and inset grouped settings
+- semantic light/dark colors
+- reduced-motion, reduced-transparency, and increased-contrast support
+- touch-first drag and two-finger pinch editing
+- authored SVG interface icons
+
+## Card editor
+
+- Full-resolution Canvas rendering
+- One-finger pan and two-finger pinch zoom
+- Fill/Fit
+- X/Y positioning and rotation
+- Brightness, saturation, contrast, blur, vignette, gloss, and grain
+- EMV chip renderer with gold, silver, black, and rose finishes
+- Contactless symbol
+- Optional decorative card number, holder, expiry, and badge layers
+- Local Photos/Files import
+- Real product-source link shown with each searched skin
+
+## AirCard export
+
+- 1536×969 `cardBackgroundCombined@3x.png`
+- 1024×646 `cardBackgroundCombined@2x.png`
+- target-size Canvas rendering rather than screenshot scaling
+- iOS Share Sheet support
+- normal PNG download fallback
 
 ## Local
 
+```bash
 npm install
 npm run dev
+```
 
 ## Production validation
 
+```bash
 npm run build
 npm start -- -p 3000
 node scripts/smoke.mjs
+```
 
-No environment variables are required for the current public search providers.
+No API keys are required for the current storefront sources.
 
 ## Deploy
 
-Import NightVibes33/Card-Maker into Vercel as a Next.js project.
+Import `NightVibes33/Card-Maker` into Vercel as a Next.js project. The connected Vercel team currently has no Card-Maker project, so Git pushes cannot deploy until that import exists.
