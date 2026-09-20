@@ -2281,7 +2281,12 @@ export default function Page() {
               ...entry,
               id: safeDisplayText(entry.id, '', 160),
               name: safeDisplayText(entry.name, 'Design', 160),
-              preview: typeof entry.preview === 'string' ? entry.preview : '',
+              preview:
+                typeof entry.preview === 'string' &&
+                entry.preview.length <= 2_000_000 &&
+                /^data:image\/(?:jpeg|png|webp);base64,/i.test(entry.preview)
+                  ? entry.preview
+                  : '',
               createdAt: Number(entry.createdAt || 0),
               updatedAt: Number(entry.updatedAt || entry.createdAt || 0)
             }))
