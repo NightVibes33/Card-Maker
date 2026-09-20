@@ -56,6 +56,7 @@ export async function dbPut(store, value) {
     tx.objectStore(store).put(value);
     tx.oncomplete = () => resolve(value);
     tx.onerror = () => reject(tx.error || new Error('IndexedDB write failed'));
+    tx.onabort = () => reject(tx.error || new Error('IndexedDB write aborted'));
   });
 }
 
@@ -92,6 +93,7 @@ export async function dbDelete(store, id) {
     tx.objectStore(store).delete(id);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error || new Error('IndexedDB delete failed'));
+    tx.onabort = () => reject(tx.error || new Error('IndexedDB delete aborted'));
   });
 }
 
