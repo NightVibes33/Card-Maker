@@ -5,11 +5,15 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "verify:v2": "node scripts/verify-v2-contract.mjs"
   },
   "dependencies": {
     "next": "^16.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "yaml": "^2.8.1"
   }
 }
