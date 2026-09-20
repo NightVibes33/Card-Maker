@@ -593,6 +593,104 @@ try {
   await context.close();
 }
 
+const corruptContext = await browser.newContext({
+  viewport: { width: 390, height: 844 },
+  deviceScaleFactor: 3,
+  isMobile: true,
+  hasTouch: true,
+  serviceWorkers: 'block'
+});
+await corruptContext.addInitScript(() => {
+  try {
+    localStorage.setItem('aircard-install-dismissed-v2', '1');
+  } catch {}
+});
+const corruptPage = await corruptContext.newPage();
+const corruptErrors = [];
+corruptPage.on('pageerror', (error) => {
+  corruptErrors.push(String(error?.stack || error?.message || error));
+});
+
+try {
+  await corruptPage.route('**/api/cucu**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ results: [], total: 0, hasMore: false })
+    });
+  });
+
+  await corruptPage.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await corruptPage.locator('main.studio').waitFor({ state: 'visible', timeout: 15000 });
+
+  await corruptPage.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('aircard-studio-v2', 2);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('IndexedDB open failed'));
+    });
+
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(['favorites', 'projects', 'importMeta', 'exports'], 'readwrite');
+      tx.objectStore('favorites').put({
+        id: 'corrupt-favorite',
+        item: { id: 'bad-favorite', title: { bad: true }, image: 'javascript:alert(1)' },
+        updatedAt: 'not-a-number'
+      });
+      tx.objectStore('projects').put({
+        id: 'corrupt-project',
+        name: { bad: true },
+        design: {
+          gradient: 'bad',
+          customLayers: 'not-an-array',
+          layerOrder: 'not-an-array'
+        },
+        preview: 'javascript:not-an-image',
+        createdAt: 'not-a-number',
+        updatedAt: 'not-a-number'
+      });
+      tx.objectStore('importMeta').put({
+        id: 'stale-import-meta',
+        name: { bad: true },
+        type: { bad: true },
+        createdAt: 'not-a-number'
+      });
+      tx.objectStore('exports').put({
+        id: 'corrupt-export',
+        name: { bad: true },
+        designName: { bad: true },
+        action: { bad: true },
+        width: 'not-a-number',
+        height: 'not-a-number',
+        createdAt: 'not-a-number'
+      });
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => reject(tx.error || new Error('IndexedDB seed failed'));
+      tx.onabort = () => reject(tx.error || new Error('IndexedDB seed aborted'));
+    });
+  });
+
+  await corruptPage.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
+  await corruptPage.locator('main.studio').waitFor({ state: 'visible', timeout: 15000 });
+  await corruptPage.getByRole('tab', { name: 'Library', exact: true }).click();
+
+  const libraryText = await corruptPage.locator('#panel-library').innerText();
+  assert.ok(!/NaN|Invalid Date/i.test(libraryText), 'corrupt numeric metadata must normalize before Library rendering');
+  assert.equal(
+    await corruptPage.locator('img[src^="javascript:"]').count(),
+    0,
+    'corrupt stored previews/artwork must never become executable image sources'
+  );
+  assert.equal(corruptErrors.length, 0, 'corrupt local rows must not cause page errors');
+
+  console.log('PASS mobile WebKit corrupt-local-storage recovery');
+} finally {
+  await corruptContext.close();
+}
+
 const offlineContext = await browser.newContext({
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 3,
