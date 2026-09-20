@@ -29,6 +29,7 @@ const ART_CACHE = 'card-studio-art-v4';
 const ART_CACHE_LIMIT = 40;
 const THUMB_CACHE = 'card-studio-thumb-v1';
 const THUMB_CACHE_LIMIT = 160;
+const CACHE_ARTWORK_TIMEOUT_MS = 12000;
 
 let dbPromise = null;
 
@@ -233,7 +234,18 @@ export async function cacheArtwork(url) {
     const existing = await cache.match(url);
     if (existing) return true;
 
-    const response = await fetch(url, { credentials: 'same-origin' });
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), CACHE_ARTWORK_TIMEOUT_MS);
+    let response;
+    try {
+      response = await fetch(url, {
+        credentials: 'same-origin',
+        signal: controller.signal
+      });
+    } finally {
+      window.clearTimeout(timer);
+    }
+
     if (!response.ok || !(response.headers.get('content-type') || '').startsWith('image/')) {
       return false;
     }
