@@ -2768,6 +2768,8 @@ export default function Page() {
     );
     ctx.save();
     ctx.clearRect(0, 0, width, height);
+    ctx.imageSmoothingEnabled = true;
+    if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high';
     ctx.scale(width / OUT_W, height / OUT_H);
 
     const base = ctx.createLinearGradient(0, 0, OUT_W, OUT_H);
