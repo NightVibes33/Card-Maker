@@ -68,8 +68,10 @@ async function fetchWithTimeout(url, options = {}, timeout = 12000) {
       signal: controller.signal,
       cache: 'no-store',
       headers: {
-        'User-Agent': 'AirCard-Card-Studio/4.1 (+https://github.com/NightVibes33/Card-Maker)',
-        Accept: options.headers?.Accept || '*/*',
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1',
+        'Accept-Language': 'en-US,en;q=0.9',
+        Referer: ORIGIN + '/',
+        Accept: options.headers?.Accept || 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
         ...options.headers
       }
     });
