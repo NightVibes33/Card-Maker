@@ -307,8 +307,8 @@ features:
   offline_static_and_art_cache:
     file: public/sw.js
     contains:
-      - "aircard-art-v2"
-      - "aircard-static-v2"
+      - "card-studio-art-v3"
+      - "card-studio-static-v3"
       - "/_next/static/"
       - "cacheFirst"
       - "staleWhileRevalidate"
