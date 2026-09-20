@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { webkit } from 'playwright';
+import sharp from 'sharp';
 
 const baseUrl = process.env.CARD_STUDIO_URL || 'http://127.0.0.1:3000';
 const browser = await webkit.launch({ headless: true });
@@ -361,6 +362,13 @@ try {
     save2x.click()
   ]);
   assert.equal(download.suggestedFilename(), 'cardBackgroundCombined@2x.png');
+
+  const downloadPath = await download.path();
+  assert.ok(downloadPath, 'exported PNG must have a local download path');
+  const exportMeta = await sharp(downloadPath).metadata();
+  assert.equal(exportMeta.format, 'png');
+  assert.equal(exportMeta.width, 1024);
+  assert.equal(exportMeta.height, 646);
 
   if (pageErrors.length) {
     throw new Error('Page errors:\n' + pageErrors.join('\n\n'));
