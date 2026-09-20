@@ -950,6 +950,30 @@ function IOSIcon({ name, size = 24 }) {
   if (name === 'reset') {
     return <svg {...common}><path d="M5.2 8.2A8 8 0 1 1 4 14"/><path d="M5.2 8.2V3.8M5.2 8.2h4.4"/></svg>;
   }
+  if (name === 'undo') {
+    return <svg {...common}><path d="M9 7 5 11l4 4"/><path d="M5 11h7.2a6 6 0 0 1 6 6"/></svg>;
+  }
+  if (name === 'redo') {
+    return <svg {...common}><path d="m15 7 4 4-4 4"/><path d="M19 11h-7.2a6 6 0 0 0-6 6"/></svg>;
+  }
+  if (name === 'compare') {
+    return <svg {...common}><path d="M4 6h16M4 18h16"/><path d="M9 4v16M15 4v16"/></svg>;
+  }
+  if (name === 'crop') {
+    return <svg {...common}><path d="M7 3v14a2 2 0 0 0 2 2h12"/><path d="M3 7h14a2 2 0 0 1 2 2v12"/></svg>;
+  }
+  if (name === 'position') {
+    return <svg {...common}><path d="M12 3v18M3 12h18"/><path d="m9 6 3-3 3 3M18 9l3 3-3 3M15 18l-3 3-3-3M6 15l-3-3 3-3"/></svg>;
+  }
+  if (name === 'adjust') {
+    return <svg {...common}><path d="M4 7h8M16 7h4M4 17h3M11 17h9M4 12h3M11 12h9"/><circle cx="14" cy="7" r="2"/><circle cx="9" cy="17" r="2"/><circle cx="9" cy="12" r="2"/></svg>;
+  }
+  if (name === 'effects') {
+    return <svg {...common}><path d="m12 3 1.5 4.2L18 9l-4.5 1.8L12 15l-1.5-4.2L6 9l4.5-1.8L12 3Z"/><path d="m18.5 15 .8 2.2L21.5 18l-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z"/></svg>;
+  }
+  if (name === 'card') {
+    return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/></svg>;
+  }
   if (name === 'search') {
     return <svg {...common}><circle cx="10.2" cy="10.2" r="5.8"/><path d="m14.5 14.5 4.8 4.8"/></svg>;
   }
@@ -6366,7 +6390,7 @@ export default function Page() {
   }, [design]);
 
   const preview = (
-    <section className={'previewShell editingPreview ' + (previewMode === 'physical' ? 'physicalPreview' : '')}>
+    <section className={'previewShell editingPreview ' + (tab === 'studio' ? 'studioPreview ' : 'exportPreview ') + (previewMode === 'physical' ? 'physicalPreview' : '')}>
       <div className="studioFloatingBar" aria-label="Studio history and comparison controls">
         {tab === 'studio' ? (
           <button
@@ -6381,8 +6405,8 @@ export default function Page() {
           </button>
         ) : null}
         <div className="historyButtons">
-          <button type="button" onClick={undo} disabled={!undoRef.current.length} aria-label="Undo">↶</button>
-          <button type="button" onClick={redo} disabled={!redoRef.current.length} aria-label="Redo">↷</button>
+          <button type="button" onClick={undo} disabled={!undoRef.current.length} aria-label="Undo"><IOSIcon name="undo" size={18} /></button>
+          <button type="button" onClick={redo} disabled={!redoRef.current.length} aria-label="Redo"><IOSIcon name="redo" size={18} /></button>
         </div>
         <span className={'savePill ' + (saveStatus === 'Saved' ? 'isSaved' : '')}>{saveStatus}</span>
         {selectedElement !== 'artwork' ? (
@@ -6413,7 +6437,8 @@ export default function Page() {
           }}
           onBlur={() => setShowOriginal(false)}
         >
-          {showOriginal ? 'After' : 'Before / After'}
+          <IOSIcon name="compare" size={16} />
+          <span>{showOriginal ? 'After' : 'Before / After'}</span>
         </button>
       </div>
 
@@ -6670,12 +6695,14 @@ export default function Page() {
                     )}
                     onClick={() => activateStudioTool(value)}
                   >
-                    {label}
+                    <IOSIcon name={value} size={18} />
+                    <span>{label}</span>
                   </button>
                 ))}
               </div>
 
               <div className="studioModeActions">
+                <span className="studioModeLabel">Preview</span>
                 <div className="previewModeToggle" role="group" aria-label="Preview style">
                   <button type="button" aria-pressed={previewMode === 'flat'} className={previewMode === 'flat' ? 'active' : ''} onClick={() => setPreviewMode('flat')}>Flat</button>
                   <button type="button" aria-pressed={previewMode === 'physical'} className={previewMode === 'physical' ? 'active' : ''} onClick={() => setPreviewMode('physical')}>Physical</button>
@@ -6684,7 +6711,7 @@ export default function Page() {
             </div>
 
             {studioTool === 'crop' ? (
-              <Group title={'CROP · ' + activeImageLabel}>
+              <Group title="Crop">
                 <div className="editingTargetBar">
                   <span>
                     <strong>Editing {activeImageLabel}</strong>
@@ -6795,7 +6822,7 @@ export default function Page() {
 
             {studioTool === 'position' ? (
               <>
-                <Group title={'POSITION · ' + (selectedLayer ? (selectedLayer.name || selectedLayer.type) : selectedElement === 'chip' ? 'EMV Chip' : selectedElement === 'contactless' ? 'Contactless' : 'Artwork')} footer="Tap an object on the card to select it. Drag to move. Two fingers scale and rotate.">
+                <Group title="Transform" footer="Tap an object on the card to select it. Drag to move. Two fingers scale and rotate.">
                   <div className="editingTargetBar">
                     <span>
                       <strong>{selectedLayer ? (selectedLayer.name || selectedLayer.type) : selectedElement === 'chip' ? 'EMV Chip' : selectedElement === 'contactless' ? 'Contactless' : 'Artwork'}</strong>
@@ -6867,7 +6894,7 @@ export default function Page() {
                 </Group>
 
                 {expertMode ? (
-                  <Group title="EXPERT VALUES" footer="Exact numerical access to every global transform, adjustment, effect, and card-hardware parameter.">
+                  <Group title="Precision" footer="Exact numerical access to every global transform, adjustment, effect, and card-hardware parameter.">
                     <NumericField label="Zoom" value={design.zoom} min={0.5} max={5} onChange={(value) => patch({ zoom: value })} />
                     <NumericField label="Artwork X" value={design.x} min={-1.5} max={1.5} onChange={(value) => patch({ x: value })} />
                     <NumericField label="Artwork Y" value={design.y} min={-1.5} max={1.5} onChange={(value) => patch({ y: value })} />
@@ -6926,7 +6953,7 @@ export default function Page() {
                   </div>
                 </section>
 
-                <Group title={'IMAGE · ' + activeImageLabel}>
+                <Group title="Adjustments">
                   <SliderRow label="Exposure" value={activeImageSettings.exposure} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ exposure: value })} />
                   <SliderRow label="Brightness" value={activeImageSettings.brightness} min={0.4} max={1.7} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ brightness: value })} />
                   <SliderRow label="Contrast" value={activeImageSettings.contrast} min={0.45} max={1.8} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ contrast: value })} />
@@ -6954,7 +6981,7 @@ export default function Page() {
                   ) : null}
                 </div>
 
-                <Group title={'EFFECTS · ' + activeImageLabel}>
+                <Group title="Effects">
                   <SliderRow label="Vignette intensity" value={activeImageSettings.vignette} min={0} max={0.8} step={0.01} disabled={!activeImageEditable} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patchImageTarget({ vignette: value })} />
                   <SliderRow label="Grain" value={activeImageSettings.grain} min={0} max={0.22} step={0.005} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ grain: value })} />
                   <SliderRow label="Gloss" value={activeImageSettings.gloss} min={0} max={0.8} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ gloss: value })} />
@@ -6992,7 +7019,7 @@ export default function Page() {
                   </div>
                 </section>
 
-                <Group title="CARD HARDWARE">
+                <Group title="Card Hardware">
                   <SwitchRow label="EMV Chip" detail="Tap the chip on the card to position it directly" value={design.chip} onChange={(value) => patch({ chip: value })} />
                   {design.chip ? (
                     <div className="nestedControls">
@@ -7009,7 +7036,7 @@ export default function Page() {
                   <SwitchRow label="Contactless" detail="Tap the symbol on the card to position it directly" value={design.contactless} onChange={(value) => patch({ contactless: value })} />
                 </Group>
 
-                <Group title="CARD TEXT">
+                <Group title="Card Text">
                   <SwitchRow label="Masked Number" value={design.number} onChange={(value) => patch({ number: value })} />
                   {design.number ? <input className="iosTextField" aria-label="Masked card number" value={design.numberText} onChange={(event) => patch({ numberText: singleLineCardText(event.target.value, 32) })} /> : null}
                   <SwitchRow label="Card Holder" value={design.holder} onChange={(value) => patch({ holder: value })} />
@@ -7030,7 +7057,7 @@ export default function Page() {
                   />
                 </Group>
 
-<Group title="CUSTOM LAYERS" footer="Image, text, and shape layers are embedded into the final AirCard PNG.">
+<Group title="Layers" footer="Image, text, and shape layers are embedded into the final AirCard PNG.">
                   <div className="layerAddRow">
                     <button type="button" onClick={addTextLayer}>+ Text</button>
                     <button type="button" disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={() => layerUploadRef.current?.click()}>+ Image / Logo</button>
@@ -7126,7 +7153,7 @@ export default function Page() {
                 </Group>
 
                 {selectedLayer ? (
-                  <Group title="SELECTED LAYER">
+                  <Group title="Layer Settings">
                     <button
                       type="button"
                       className="doneLayerButton"
@@ -7374,7 +7401,7 @@ export default function Page() {
               ) : <div className="stateCard"><span>Photos and image files you import will appear here.</span></div>}
             </section>
 
-            <Group title="DESIGN PRESETS">
+            <Group title="Presets">
               <button
                 type="button"
                 className="actionRow"
@@ -7396,7 +7423,7 @@ export default function Page() {
               <input ref={presetImportRef} type="file" accept=".json,application/json" hidden onChange={importPresetJson} />
             </Group>
 
-            <Group title="ADVANCED">
+            <Group title="Advanced">
               <button
                 type="button"
                 className="actionRow"
