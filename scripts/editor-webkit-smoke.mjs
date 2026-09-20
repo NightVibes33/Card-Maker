@@ -89,6 +89,34 @@ try {
   assert.equal(await rectangle.getAttribute('aria-pressed'), 'true');
   assert.equal(await page.getByLabel('Corner Radius').count(), 1);
 
+  const customStackOrder = async () => page.locator('.layerRow').evaluateAll((nodes) =>
+    nodes
+      .map((node) => node.getAttribute('aria-label') || '')
+      .filter((label) => /^(Text text|Shape shape) /i.test(label))
+  );
+  const initialStack = await customStackOrder();
+  assert.ok(
+    initialStack.findIndex((label) => /^Text text /i.test(label)) <
+      initialStack.findIndex((label) => /^Shape shape /i.test(label)),
+    'new shape should begin below the existing text layer'
+  );
+
+  await page.getByRole('button', { name: 'Bring Forward', exact: true }).click();
+  const forwardedStack = await customStackOrder();
+  assert.ok(
+    forwardedStack.findIndex((label) => /^Shape shape /i.test(label)) <
+      forwardedStack.findIndex((label) => /^Text text /i.test(label)),
+    'Bring Forward must move the selected shape above the text layer'
+  );
+
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  const restoredStack = await customStackOrder();
+  assert.ok(
+    restoredStack.findIndex((label) => /^Text text /i.test(label)) <
+      restoredStack.findIndex((label) => /^Shape shape /i.test(label)),
+    'Undo must restore the previous layer order'
+  );
+
   await page.getByRole('tab', { name: 'Position', exact: true }).click();
   const layerX = page.getByLabel('Layer horizontal position');
   assert.equal(Number(await layerX.inputValue()), 0.5);
