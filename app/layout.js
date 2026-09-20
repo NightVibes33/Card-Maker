@@ -1,15 +1,22 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'AirCard Sticker Studio',
-  description: 'iPhone-first credit card skin maker for AirCard-iOS',
-  applicationName: 'AirCard Sticker Studio',
+  title: {
+    default: 'AirCard Card Studio',
+    template: '%s — AirCard Card Studio'
+  },
+  description: 'iPhone-first card skin maker for AirCard-iOS',
+  applicationName: 'AirCard Card Studio',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'AirCard Studio'
+    title: 'Card Studio'
   },
-  formatDetection: { telephone: false }
+  formatDetection: {
+    telephone: false,
+    email: false,
+    address: false
+  }
 };
 
 export const viewport = {
@@ -17,9 +24,16 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: 'cover',
-  themeColor: '#07080b'
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f2f2f7' },
+    { media: '(prefers-color-scheme: dark)', color: '#000000' }
+  ]
 };
 
 export default function RootLayout({ children }) {
-  return <html lang="en"><body>{children}</body></html>;
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
 }
