@@ -2523,7 +2523,10 @@ export default function Page() {
           } catch {}
         }
 
-        autosaveSafe = !draftReadFailed || Boolean(localDraft);
+        // If IndexedDB could not be read, a localStorage fallback can be
+        // displayed for recovery, but it must not authorize new autosaves.
+        // The unreadable IndexedDB record may be newer than the fallback.
+        autosaveSafe = !draftReadFailed;
 
         if (designRef.current === startupDesign) {
           const indexedDraft =
