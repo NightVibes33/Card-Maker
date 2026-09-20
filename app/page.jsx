@@ -4337,12 +4337,16 @@ export default function Page() {
   }
 
   async function uploadImage(event) {
-    const file = event.target.files?.[0];
+    const input = event.currentTarget;
+    const file = input.files?.[0];
     const uploadIntent = uploadIntentRef.current;
     uploadIntentRef.current = 'replace-artwork';
-    event.target.value = '';
-    if (!file) return;
-    await withImageImportLock(async (isCurrent) => {
+    if (!file) {
+      input.value = '';
+      return;
+    }
+    try {
+      await withImageImportLock(async (isCurrent) => {
     if (file.type && !file.type.startsWith('image/')) {
       setMessage('Choose an image file.');
       return;
@@ -4424,14 +4428,24 @@ export default function Page() {
       setTab('studio');
       setMessage('Artwork replaced · existing card settings kept');
     }
-    });
+      });
+    } finally {
+      // Keep the selected File alive through async WebKit decode/IndexedDB
+      // work. Clearing the input early can invalidate its backing data on
+      // Safari/WebKit before the import transaction finishes.
+      input.value = '';
+    }
   }
 
   async function uploadLayerImage(event) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    await withImageImportLock(async (isCurrent) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) {
+      input.value = '';
+      return;
+    }
+    try {
+      await withImageImportLock(async (isCurrent) => {
     if ((designRef.current.customLayers || []).length >= MAX_CUSTOM_LAYERS) {
       setMessage('Layer limit reached. Delete a layer before adding another.');
       return;
@@ -4529,7 +4543,10 @@ export default function Page() {
     }));
     setSelectedElement(layerId);
     setMessage('Image layer added');
-    });
+      });
+    } finally {
+      input.value = '';
+    }
   }
 
   function updateCropEdge(edge, rawValue) {
