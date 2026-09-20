@@ -406,11 +406,11 @@ try {
   await page.getByRole('tab', { name: 'Discover', exact: true }).click();
   const discoverChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: 'Import Photo or File', exact: true }).click();
-  await discoverChooserPromise;
-  // WebKit's synthetic FileChooser#setFiles does not reliably dispatch React's
-  // change event for a picker opened through input.click(). The real button is
-  // still exercised above (including its new-project intent); set the exact
-  // input afterward so the import change event is deterministic in CI.
+  const discoverChooser = await discoverChooserPromise;
+  // Close the intercepted native chooser without choosing a file, then set
+  // the exact input. The app intentionally preserves the button's new-project
+  // intent across a canceled picker.
+  await discoverChooser.setFiles([]);
   const discoverUploadInput = page.locator('#panel-discover input[type="file"][accept="image/*"]').first();
   await discoverUploadInput.setInputFiles({
     name: 'fresh-main-menu-import.png',
@@ -463,7 +463,8 @@ try {
   await page.getByRole('tab', { name: 'Crop', exact: true }).click();
   const replaceChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: /Replace Artwork/i }).click();
-  await replaceChooserPromise;
+  const replaceChooser = await replaceChooserPromise;
+  await replaceChooser.setFiles([]);
   const replaceUploadInput = page.locator('#panel-studio input[type="file"][accept="image/*"]').first();
   await replaceUploadInput.setInputFiles({
     name: 'replacement-artwork.png',
