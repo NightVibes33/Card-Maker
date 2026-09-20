@@ -17,6 +17,8 @@ const OUT_H = 969;
 const CARD_RATIO = OUT_W / OUT_H;
 const MAX_IMAGE_IMPORT_BYTES = 30 * 1024 * 1024;
 const MAX_PRESET_IMPORT_BYTES = 64 * 1024 * 1024;
+const MAX_CUSTOM_LAYERS = 200;
+const MAX_PRESET_ASSETS = 200;
 const MAX_IMAGE_PIXELS = 65_000_000;
 const MAX_IMAGE_DIMENSION = 12_000;
 
@@ -389,6 +391,7 @@ function normalizeDesignState(value) {
 
   const seen = new Set();
   next.customLayers = (Array.isArray(raw.customLayers) ? raw.customLayers : [])
+    .slice(0, MAX_CUSTOM_LAYERS)
     .map(normalizeCustomLayer)
     .filter((layer) => {
       if (!layer || seen.has(layer.id)) return false;
@@ -3124,8 +3127,16 @@ export default function Page() {
       const payload = JSON.parse(await file.text());
       if (!payload?.design || Number(payload.version) < 2) throw new Error('Unsupported preset');
 
-      const idMap = {};
-      for (const [oldId, asset] of Object.entries(payload.assets || {})) {
+      const idMap = Object.create(null);
+      const presetAssets = Object.entries(payload.assets || {});
+      if (presetAssets.length > MAX_PRESET_ASSETS) {
+        throw new Error('Preset contains too many embedded assets');
+      }
+      if (Array.isArray(payload.design.customLayers) && payload.design.customLayers.length > MAX_CUSTOM_LAYERS) {
+        throw new Error('Preset contains too many layers');
+      }
+
+      for (const [oldId, asset] of presetAssets) {
         if (!asset?.data) continue;
         const assetType = String(asset.type || '');
         if ((assetType && !assetType.startsWith('image/')) || !String(asset.data).startsWith('data:image/')) {
