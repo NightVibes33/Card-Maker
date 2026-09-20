@@ -2916,7 +2916,8 @@ export default function Page() {
               left: (design.chipX * 100) + '%',
               top: (design.chipY * 100) + '%',
               width: ((255 * design.chipScale / OUT_W) * 100) + '%',
-              height: ((188 * design.chipScale / OUT_H) * 100) + '%'
+              height: ((188 * design.chipScale / OUT_H) * 100) + '%',
+              transform: 'rotate(' + Number(design.chipRotation || 0) + 'deg)'
             }}
           />
         ) : null}
@@ -2926,10 +2927,11 @@ export default function Page() {
             className="selectionOutline contactlessSelection"
             aria-hidden="true"
             style={{
-              left: (design.contactlessX * 100 - 5) + '%',
-              top: (design.contactlessY * 100 - 8) + '%',
-              width: '10%',
-              height: '16%'
+              left: (design.contactlessX * 100) + '%',
+              top: (design.contactlessY * 100) + '%',
+              width: ((184 * Number(design.contactlessScale || 1) / OUT_W) * 100) + '%',
+              height: ((184 * Number(design.contactlessScale || 1) / OUT_H) * 100) + '%',
+              transform: 'translate(-50%, -50%)'
             }}
           />
         ) : null}
@@ -2951,12 +2953,7 @@ export default function Page() {
           <div
             className="selectionOutline layerSelection"
             aria-hidden="true"
-            style={{
-              left: (Number(selectedLayer.x || 0.5) * 100 - 5) + '%',
-              top: (Number(selectedLayer.y || 0.5) * 100 - 8) + '%',
-              width: '10%',
-              height: '16%'
-            }}
+            style={customLayerSelectionStyle(selectedLayer, layerImages[selectedLayer.id])}
           />
         ) : null}
       </div>
@@ -3538,6 +3535,16 @@ export default function Page() {
                         </div>
                         <SliderRow label="Width" value={selectedLayer.width || 280} min={20} max={1200} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
                         <SliderRow label="Height" value={selectedLayer.height || 120} min={20} max={800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { height: value })} />
+                        {selectedLayer.shape !== 'ellipse' ? (
+                          <SliderRow
+                            label="Corner Radius"
+                            value={selectedLayer.radius ?? 28}
+                            min={0}
+                            max={Math.max(0, Math.floor(Math.min(Number(selectedLayer.width || 280), Number(selectedLayer.height || 120)) / 2))}
+                            step={1}
+                            onChange={(value) => updateLayer(selectedLayer.id, { radius: value })}
+                          />
+                        ) : null}
                         <label className="colorRow"><span>Color</span><input type="color" value={selectedLayer.color || '#ffffff'} onChange={(event) => updateLayer(selectedLayer.id, { color: event.target.value })} /></label>
                       </>
                     ) : null}
@@ -3557,15 +3564,15 @@ export default function Page() {
                     {selectedLayer.type === 'contactless' ? (
                       <label className="colorRow"><span>Contactless Color</span><input type="color" value={selectedLayer.color || '#ffffff'} onChange={(event) => updateLayer(selectedLayer.id, { color: event.target.value })} /></label>
                     ) : null}
-                    <SliderRow label="Layer X" value={selectedLayer.x || 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id, { x: value })} />
-                    <SliderRow label="Layer Y" value={selectedLayer.y || 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id, { y: value })} />
+                    <SliderRow label="Layer X" value={selectedLayer.x ?? 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id, { x: value })} />
+                    <SliderRow label="Layer Y" value={selectedLayer.y ?? 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id, { y: value })} />
                     <SliderRow label="Layer Scale" value={selectedLayer.scale || 1} min={0.1} max={6} step={0.01} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
                     <SliderRow label="Layer Rotation" value={selectedLayer.rotation || 0} min={-180} max={180} step={1} suffix="°" onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} />
                     <SliderRow label="Opacity" value={selectedLayer.opacity ?? 1} min={0} max={1} step={0.01} onChange={(value) => updateLayer(selectedLayer.id, { opacity: value })} />
                     {expertMode ? (
                       <div className="layerExpertValues">
-                        <NumericField label="Exact Layer X" value={selectedLayer.x || 0.5} min={0} max={1} onChange={(value) => updateLayer(selectedLayer.id, { x: value })} />
-                        <NumericField label="Exact Layer Y" value={selectedLayer.y || 0.5} min={0} max={1} onChange={(value) => updateLayer(selectedLayer.id, { y: value })} />
+                        <NumericField label="Exact Layer X" value={selectedLayer.x ?? 0.5} min={0} max={1} onChange={(value) => updateLayer(selectedLayer.id, { x: value })} />
+                        <NumericField label="Exact Layer Y" value={selectedLayer.y ?? 0.5} min={0} max={1} onChange={(value) => updateLayer(selectedLayer.id, { y: value })} />
                         <NumericField label="Exact Layer Scale" value={selectedLayer.scale || 1} min={0.1} max={6} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
                         <NumericField label="Exact Layer Rotation" value={selectedLayer.rotation || 0} min={-180} max={180} step={0.1} onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} suffix="°" />
                         <NumericField label="Exact Layer Opacity" value={selectedLayer.opacity ?? 1} min={0} max={1} onChange={(value) => updateLayer(selectedLayer.id, { opacity: value })} />
@@ -3580,6 +3587,16 @@ export default function Page() {
                           <>
                             <NumericField label="Exact Shape Width" value={selectedLayer.width || 280} min={20} max={1200} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
                             <NumericField label="Exact Shape Height" value={selectedLayer.height || 120} min={20} max={800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { height: value })} />
+                            {selectedLayer.shape !== 'ellipse' ? (
+                              <NumericField
+                                label="Exact Corner Radius"
+                                value={selectedLayer.radius ?? 28}
+                                min={0}
+                                max={Math.max(0, Math.min(Number(selectedLayer.width || 280), Number(selectedLayer.height || 120)) / 2)}
+                                step={1}
+                                onChange={(value) => updateLayer(selectedLayer.id, { radius: value })}
+                              />
+                            ) : null}
                           </>
                         ) : null}
                         {selectedLayer.type === 'image' ? (
