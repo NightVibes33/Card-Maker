@@ -243,6 +243,9 @@ requireMatch(page, /const MAX_UNPROBED_IMAGE_BYTES = 8 \* 1024 \* 1024;/, 'large
 requireMatch(page, /Image dimensions could not be verified safely/, 'large unverified images fail closed before decode');
 requireMatch(page, /const MAX_STORED_LAYER_IMAGE_PIXELS = 4_000_000;/, 'custom image-layer working-set pixels are bounded separately');
 requireMatch(page, /const MAX_STORED_LAYER_IMAGE_DIMENSION = 2560;/, 'custom image-layer dimensions are bounded separately');
+requireMatch(page, /const MAX_VISIBLE_IMAGE_DECODE_PIXELS = 24_000_000;/, 'visible image-layer decoded pixels have a total iPhone memory budget');
+requireMatch(page, /decodedPixels \+ pixels > MAX_VISIBLE_IMAGE_DECODE_PIXELS/, 'image-layer hydration enforces the decoded-pixel budget');
+requireMatch(page, /Visible image layers exceed the safe iPhone memory budget/, 'image-layer memory pressure fails with a recoverable editor message');
 requireMatch(page, /const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS \+ 1;/, 'preset asset cap includes the background plus every custom layer');
 requireMatch(page, /refs\.size > MAX_PRESET_ASSETS/, 'preset export guards asset-count round-trip compatibility');
 requireMatch(page, /const EDITOR_PREVIEW_W = 1024;/, 'interactive editor canvas uses a reduced backing width');
