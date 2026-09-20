@@ -4391,9 +4391,46 @@ export default function Page() {
         'Permanently remove ' + unused.length + ' unused imported image' +
         (unused.length === 1 ? '' : 's') + '?'
       )) return;
-  
+
+      // Re-check every reference after the confirmation dialog. The user can
+      // still Undo/Redo or switch designs while the dialog is open, and an
+      // asset that was unused when cleanup started may now be live again.
+      addDesignRefs(designRef.current);
+      for (const snapshot of undoRef.current) addDesignRefs(snapshot);
+      for (const snapshot of redoRef.current) addDesignRefs(snapshot);
+
+      try {
+        const latestDraft = await dbGet('kv', 'draft');
+        addDesignRefs(latestDraft?.design);
+      } catch {
+        setMessage('Could not re-check the autosaved draft, so no imported images were removed.');
+        return;
+      }
+
+      try {
+        const latestFallbackDraft = localStorage.getItem('aircard-sticker-fvp-v3');
+        if (latestFallbackDraft) addDesignRefs(JSON.parse(latestFallbackDraft));
+      } catch {
+        setMessage('Could not re-check the fallback draft, so no imported images were removed.');
+        return;
+      }
+
+      try {
+        const latestProjects = await dbGetAll('projects');
+        for (const project of latestProjects) addDesignRefs(project?.design);
+      } catch {
+        setMessage('Could not re-check saved designs, so no imported images were removed.');
+        return;
+      }
+
+      const deletable = unused.filter((asset) => asset?.id && !referenced.has(asset.id));
+      if (!deletable.length) {
+        setMessage('Nothing was removed because those imports became referenced again.');
+        return;
+      }
+
       const failed = [];
-      await Promise.all(unused.map(async (asset) => {
+      await Promise.all(deletable.map(async (asset) => {
         try {
           await dbDelete('imports', asset.id);
         } catch {
@@ -4401,7 +4438,7 @@ export default function Page() {
         }
       }));
   
-      const removed = new Set(unused.map((asset) => asset.id).filter((id) => !failed.includes(id)));
+      const removed = new Set(deletable.map((asset) => asset.id).filter((id) => !failed.includes(id)));
       setImports((current) => current.filter((asset) => !removed.has(asset.id)));
       setMessage(
         failed.length
