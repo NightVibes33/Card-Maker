@@ -48,7 +48,9 @@ const pageChecks = [
   [/visibleImageLayers\(designRef\.current\)\.length >= MAX_VISIBLE_IMAGE_LAYERS/, 'image-layer creation enforces the visible-image cap'],
   [/draftSaveQueueRef\.current/, 'draft writes are serialized through one persistence queue'],
   [/aircard-sticker-fvp-v3-updated-at/, 'local draft fallback records a comparable timestamp'],
-  [/localUpdatedAt > indexedUpdatedAt/, 'startup restores the newest durable draft copy']
+  [/localUpdatedAt > indexedUpdatedAt/, 'startup restores the newest durable draft copy'],
+  [/const next = normalizeDesignState\(DEFAULTS\)/, 'New Card replaces state with a normalized clean design'],
+  [/setMessage\(changed \? 'New card · Undo is available' : 'New card is already empty'\)/, 'New Card is undoable without creating fake no-op history']
 ];
 
 for (const [pattern, label] of pageChecks) requireMatch(page, pattern, label);
