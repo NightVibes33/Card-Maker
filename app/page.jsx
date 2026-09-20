@@ -571,7 +571,9 @@ function inspectSearchImage(img, preferDirectAsset = false) {
 
 async function chooseCleanProductMedia(item) {
   const candidates = [...new Set([item.image, ...(item.candidateImages || [])].filter(Boolean))].slice(0, 8);
-  const preferDirectAsset = item.assetMode === 'direct-card-art';
+  const preferDirectAsset =
+    item.assetMode === 'direct-card-art' ||
+    item.assetMode === 'resolved-product-art';
   let best = null;
 
   for (const src of candidates) {
