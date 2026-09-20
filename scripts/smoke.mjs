@@ -60,7 +60,7 @@ async function check(query, titlePattern) {
 }
 
 await check('Naruto', /naruto|konohagakure|akatsuki/i);
-await check('SpongeBob', /spongebob|bikini bottom|patrick|krusty/i);
+await check('SpongeBob', /spongebob|bikini bottom|krusty/i);
 await check('Rick and Morty', /rick|morty|portal|meeseeks/i);
 await check('Wednesday', /wednesday/i);
 console.log('Premade card-skin relevance + alternate-media smoke test passed.');
