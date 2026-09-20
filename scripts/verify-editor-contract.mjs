@@ -100,6 +100,7 @@ requireMatch(page, /const MAX_STORED_LAYER_IMAGE_DIMENSION = 2560;/, 'custom ima
 requireMatch(page, /const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS \+ 1;/, 'preset asset capacity covers every custom layer plus the imported background');
 requireMatch(page, /async function prepareLocalImageBlob\(/, 'oversized local images are downsampled before persistence');
 requireMatch(page, /maxPixels: MAX_STORED_LAYER_IMAGE_PIXELS/, 'custom image-layer imports use the smaller working set');
+requireMatch(page, /const decodedBySource = new Map\(\);/, 'duplicate image layers share decoded sources');
 if (/dbGetAll\('imports'\)/.test(page)) {
   throw new Error('Editor contract failed: Library must not hydrate full import blobs into React state');
 }
