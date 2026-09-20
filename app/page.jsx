@@ -4965,7 +4965,7 @@ export default function Page() {
       gestureHistoryRecorded.current = false;
 
       if (target === 'card-text') {
-        setSelectedElement('artwork');
+        setSelectedElement('card-text');
         setStudioTool('card');
         setMessage('Card text controls ready');
       } else {
@@ -5331,10 +5331,25 @@ export default function Page() {
       if (!design.contactless) setSelectedElement('artwork');
       return;
     }
+    if (selectedElement === 'card-text') {
+      if (!isLayerStackEntryVisible(design, 'builtin-text')) {
+        setSelectedElement('artwork');
+      }
+      return;
+    }
     if (!(design.customLayers || []).some((layer) => layer.id === selectedElement)) {
       setSelectedElement('artwork');
     }
-  }, [design.chip, design.contactless, design.customLayers, selectedElement]);
+  }, [
+    design.badge,
+    design.chip,
+    design.contactless,
+    design.customLayers,
+    design.expiry,
+    design.holder,
+    design.number,
+    selectedElement
+  ]);
 
   const selectedImageLayer = selectedLayer?.type === 'image' ? selectedLayer : null;
   const activeImageSettings = selectedImageLayer
@@ -5366,7 +5381,7 @@ export default function Page() {
             id,
             name: 'Card Text',
             type: 'Built-in text',
-            selection: null,
+            selection: 'card-text',
             builtin: true,
             action: 'card-text'
           };
@@ -6048,7 +6063,7 @@ export default function Page() {
                       className={'layerRow ' + (selectedElement === entry.selection ? 'selected' : '')}
                       onClick={() => {
                         if (entry.action === 'card-text') {
-                          setSelectedElement('artwork');
+                          setSelectedElement('card-text');
                           setStudioTool('card');
                           setMessage('Card text controls ready');
                           return;
@@ -6067,7 +6082,17 @@ export default function Page() {
                         <small>{entry.type}{entry.hidden ? ' · hidden' : ''}{index === 0 ? ' · top' : ''}</small>
                       </span>
                       <span>
-                        {entry.action === 'card-text' ? 'Edit Text' : entry.hidden ? 'Hidden' : entry.locked ? 'Locked' : selectedElement === entry.selection ? 'Selected' : entry.builtin ? 'Built-in' : 'Edit'}
+                        {entry.action === 'card-text'
+                          ? (selectedElement === 'card-text' ? 'Selected' : 'Edit Text')
+                          : entry.hidden
+                            ? 'Hidden'
+                            : entry.locked
+                              ? 'Locked'
+                              : selectedElement === entry.selection
+                                ? 'Selected'
+                                : entry.builtin
+                                  ? 'Built-in'
+                                  : 'Edit'}
                       </span>
                     </button>
                   ))}
