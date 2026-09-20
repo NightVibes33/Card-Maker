@@ -855,48 +855,178 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('aircard-sticker-fvp-v3');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') {
-          parsed.background = parsed.background && isPersistableBackground(parsed.background) ? parsed.background : '';
+    let cancelled = false;
+
+    async function hydrate() {
+      try {
+        const [draft, storedFavorites, storedProjects, storedImports, storedExports] = await Promise.all([
+          dbGet('kv', 'draft'),
+          dbGetAll('favorites'),
+          dbGetAll('projects'),
+          dbGetAll('imports'),
+          dbGetAll('exports')
+        ]);
+
+        if (cancelled) return;
+
+        if (draft?.design && typeof draft.design === 'object') {
+          const parsed = { ...draft.design };
+          parsed.background = parsed.background && isPersistableBackground(parsed.background)
+            ? parsed.background
+            : '';
           setDesign((current) => ({ ...current, ...parsed }));
+        } else {
+          const legacy = localStorage.getItem('aircard-sticker-fvp-v3');
+          if (legacy) {
+            const parsed = JSON.parse(legacy);
+            if (parsed && typeof parsed === 'object') {
+              parsed.background = parsed.background && isPersistableBackground(parsed.background)
+                ? parsed.background
+                : '';
+              setDesign((current) => ({ ...current, ...parsed }));
+            }
+          }
         }
+
+        const validFavorites = storedFavorites
+          .filter((entry) => entry?.item?.id)
+          .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+        setFavorites(validFavorites.map((entry) => entry.item));
+        setFavoriteIds(new Set(validFavorites.map((entry) => entry.item.id)));
+        setProjects(storedProjects.sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0)));
+        setImports(storedImports.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)));
+        setExportHistory(storedExports.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)).slice(0, 40));
+
+        const storedRecent = JSON.parse(localStorage.getItem('aircard-recent-artwork-v1') || '[]');
+        if (Array.isArray(storedRecent)) {
+          setRecent(storedRecent.filter((item) => item?.id).slice(0, 20));
+        }
+
+        setExpertMode(localStorage.getItem('aircard-expert-v2') === '1');
+
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        }
+      } catch {
+        setMessage('Local library could not fully load');
       }
-      const storedRecent = JSON.parse(localStorage.getItem('aircard-recent-artwork-v1') || '[]');
-      if (Array.isArray(storedRecent)) {
-        // Drop old pre-filter entries so stale storefront mockups do not keep
-        // reappearing in Recent after the cleaner search pipeline ships.
-        setRecent(storedRecent.filter((item) => item?.visualQuality === 'client-checked').slice(0, 10));
-      }
-    } catch {}
+    }
+
+    hydrate();
+
+    const updateOnline = () => setOnline(navigator.onLine);
+    updateOnline();
+    window.addEventListener('online', updateOnline);
+    window.addEventListener('offline', updateOnline);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('online', updateOnline);
+      window.removeEventListener('offline', updateOnline);
+    };
   }, []);
 
   useEffect(() => {
-    try {
-      const copy = { ...design };
-      if (copy.background && !isPersistableBackground(copy.background)) copy.background = '';
-      localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(copy));
-    } catch {}
+    setSaveStatus('Editing…');
+    const timer = setTimeout(async () => {
+      try {
+        const copy = { ...design };
+        if (copy.background && !isPersistableBackground(copy.background)) copy.background = '';
+        await dbPut('kv', {
+          id: 'draft',
+          design: copy,
+          updatedAt: Date.now()
+        });
+        localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(copy));
+        setSaveStatus('Saved');
+      } catch {
+        setSaveStatus('Save failed');
+      }
+    }, 420);
+
+    return () => clearTimeout(timer);
   }, [design]);
 
   useEffect(() => {
-    if (!design.background) {
-      setImage(null);
-      return;
+    localStorage.setItem('aircard-expert-v2', expertMode ? '1' : '0');
+  }, [expertMode]);
+
+  useEffect(() => {
+    let objectUrl = '';
+
+    async function loadBackground() {
+      if (!design.background) {
+        setImage(null);
+        return;
+      }
+
+      let src = design.background;
+
+      if (src.startsWith('idb://imports/')) {
+        const id = src.slice('idb://imports/'.length);
+        const asset = await dbGet('imports', id);
+        if (!asset?.blob) {
+          setImage(null);
+          setMessage('Imported artwork is missing');
+          return;
+        }
+        objectUrl = URL.createObjectURL(asset.blob);
+        src = objectUrl;
+      }
+
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => {
+        setImage(img);
+        setMessage('Artwork loaded');
+      };
+      img.onerror = () => {
+        setImage(null);
+        setMessage('Artwork could not load');
+      };
+      img.src = src;
     }
-    const img = new Image();
-    img.onload = () => {
-      setImage(img);
-      setMessage('Artwork loaded');
+
+    loadBackground();
+
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-    img.onerror = () => {
-      setImage(null);
-      setMessage('Artwork could not load');
-    };
-    img.src = design.background;
   }, [design.background]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const urls = [];
+
+    async function hydrateLayers() {
+      const next = {};
+      const imageLayers = (design.customLayers || []).filter((layer) => layer.type === 'image' && layer.src);
+
+      for (const layer of imageLayers) {
+        let src = layer.src;
+        if (src.startsWith('idb://imports/')) {
+          const id = src.slice('idb://imports/'.length);
+          const asset = await dbGet('imports', id);
+          if (!asset?.blob) continue;
+          src = URL.createObjectURL(asset.blob);
+          urls.push(src);
+        }
+
+        try {
+          next[layer.id] = await loadSearchImage(src);
+        } catch {}
+      }
+
+      if (!cancelled) setLayerImages(next);
+    }
+
+    hydrateLayers();
+
+    return () => {
+      cancelled = true;
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [design.customLayers]);
 
   const renderCard = useCallback((ctx, width, height) => {
     if (!ctx) return;
