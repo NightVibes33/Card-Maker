@@ -1298,28 +1298,29 @@ export default function Page() {
             <Group title="LAYOUT" footer="Drag directly on the card to move the artwork. Pinch the card with two fingers to zoom.">
               <div className="groupRow segmentedRow">
                 <div className="segmentedControl compact" role="tablist" aria-label="Artwork fit mode">
-                  <button type="button" role="tab" aria-selected={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
-                  <button type="button" role="tab" aria-selected={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
+                  <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
+                  <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
                 </div>
-                <button type="button" className="iconTextButton" onClick={() => patch({ fit: 'cover', zoom: 1, x: 0, y: 0, rotate: 0 })}>
+                <button type="button" className="iconTextButton" disabled={!design.background} onClick={() => patch({ fit: 'cover', zoom: 1, x: 0, y: 0, rotate: 0 })}>
                   <IOSIcon name="reset" size={18} />
                   <span>Reset</span>
                 </button>
               </div>
-              <SliderRow label="Zoom" value={design.zoom} min={0.5} max={5} step={0.01} onChange={(value) => patch({ zoom: value })} />
-              <SliderRow label="Horizontal" value={design.x} min={-1.5} max={1.5} step={0.01} onChange={(value) => patch({ x: value })} />
-              <SliderRow label="Vertical" value={design.y} min={-1.5} max={1.5} step={0.01} onChange={(value) => patch({ y: value })} />
-              <SliderRow label="Rotation" value={design.rotate} min={-25} max={25} step={1} suffix="°" onChange={(value) => patch({ rotate: value })} />
+              <SliderRow label="Zoom" value={design.zoom} min={0.5} max={5} step={0.01} disabled={!design.background} onChange={(value) => patch({ zoom: value })} />
+              <SliderRow label="Horizontal" value={design.x} min={-1.5} max={1.5} step={0.01} disabled={!design.background} onChange={(value) => patch({ x: value })} />
+              <SliderRow label="Vertical" value={design.y} min={-1.5} max={1.5} step={0.01} disabled={!design.background} onChange={(value) => patch({ y: value })} />
+              <SliderRow label="Rotation" value={design.rotate} min={-25} max={25} step={1} suffix="°" disabled={!design.background} onChange={(value) => patch({ rotate: value })} />
             </Group>
 
             <Group title="IMAGE">
-              <SliderRow label="Brightness" value={design.brightness} min={0.4} max={1.7} step={0.01} onChange={(value) => patch({ brightness: value })} />
-              <SliderRow label="Saturation" value={design.saturation} min={0} max={2.4} step={0.01} onChange={(value) => patch({ saturation: value })} />
-              <SliderRow label="Contrast" value={design.contrast} min={0.45} max={1.8} step={0.01} onChange={(value) => patch({ contrast: value })} />
-              <SliderRow label="Soft Blur" value={design.blur} min={0} max={1} step={0.01} onChange={(value) => patch({ blur: value })} />
+              <SliderRow label="Brightness" value={design.brightness} min={0.4} max={1.7} step={0.01} disabled={!design.background} onChange={(value) => patch({ brightness: value })} />
+              <SliderRow label="Saturation" value={design.saturation} min={0} max={2.4} step={0.01} disabled={!design.background} onChange={(value) => patch({ saturation: value })} />
+              <SliderRow label="Contrast" value={design.contrast} min={0.45} max={1.8} step={0.01} disabled={!design.background} onChange={(value) => patch({ contrast: value })} />
+              <SliderRow label="Soft Blur" value={design.blur} min={0} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ blur: value })} />
               <button
                 type="button"
                 className="settingsResetButton"
+                disabled={!design.background}
                 onClick={() => patch({ brightness: 1, saturation: 1, contrast: 1, blur: 0 })}
               >
                 Reset Image Adjustments
