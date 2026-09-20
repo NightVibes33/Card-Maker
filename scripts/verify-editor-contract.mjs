@@ -72,6 +72,7 @@ const pageChecks = [
 for (const [pattern, label] of pageChecks) requireMatch(page, pattern, label);
 
 requireMatch(page, /onChange=\{emit\}/, 'range sliders use React controlled onChange');
+requireMatch(page, /type=\{Number\(min\) < 0 \? 'text' : 'number'\}/, 'signed Expert Mode fields remain typeable on iPhone');
 if (/onInput=\{emit\}/.test(page)) {
   throw new Error('Editor contract failed: range sliders must not use raw onInput');
 }
