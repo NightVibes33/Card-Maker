@@ -6268,6 +6268,7 @@ export default function Page() {
 
                   <button
                     type="button"
+                    aria-label={'Artwork background ' + (selectedElement === 'artwork' ? 'selected' : 'edit')}
                     className={'layerRow artworkLayerRow ' + (selectedElement === 'artwork' ? 'selected' : '')}
                     onClick={() => {
                       setSelectedElement('artwork');
@@ -6287,6 +6288,20 @@ export default function Page() {
                     <button
                       type="button"
                       key={entry.id}
+                      aria-label={
+                        entry.name + ' ' + entry.type + ' ' +
+                        (entry.action === 'card-text'
+                          ? (selectedElement === 'card-text' ? 'selected' : 'edit')
+                          : entry.hidden
+                            ? 'hidden'
+                            : entry.locked
+                              ? 'locked'
+                              : selectedElement === entry.selection
+                                ? 'selected'
+                                : entry.builtin
+                                  ? 'built-in'
+                                  : 'edit')
+                      }
                       className={'layerRow ' + (selectedElement === entry.selection ? 'selected' : '')}
                       onClick={() => {
                         if (entry.action === 'card-text') {
