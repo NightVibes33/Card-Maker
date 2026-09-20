@@ -13,6 +13,8 @@ function requireMatch(source, pattern, label) {
 const page = read('app/page.jsx');
 const css = read('app/globals.css');
 const sw = read('public/sw.js');
+const imageRoute = read('app/api/image/route.js');
+const inspectRoute = read('app/api/cucu/inspect/route.js');
 
 const pageChecks = [
   [/function normalizeDesignState\(/, 'restored designs are normalized'],
@@ -27,7 +29,10 @@ const pageChecks = [
   [/Clean Unused Imports/, 'unused import cleanup exists'],
   [/renderAssetsReady/, 'exports are gated on decoded assets'],
   [/historyGroupRef/, 'continuous edits use grouped undo history'],
-  [/gestureStartDesign\.current = designRef\.current/, 'gestures snapshot authoritative state']
+  [/gestureStartDesign\.current = designRef\.current/, 'gestures snapshot authoritative state'],
+  [/function textLayerLines\(/, 'multiline text is modeled explicitly'],
+  [/label="Line Height"/, 'multiline text has line-height controls'],
+  [/<textarea[\s\S]*aria-label="Layer text"/, 'text layers use a multiline editor']
 ];
 
 for (const [pattern, label] of pageChecks) requireMatch(page, pattern, label);
@@ -50,3 +55,17 @@ requireMatch(sw, /\[ART_CACHE\]:\s*180/, 'art cache is bounded');
 requireMatch(sw, /async function trimCache\(/, 'service-worker cache eviction exists');
 
 console.log('PASS editor regression contract');
+
+
+const proxySecurityChecks = [
+  [imageRoute, /redirect:\s*'manual'/, 'image proxy validates redirects before following them'],
+  [imageRoute, /SAFE_IMAGE_TYPES/, 'image proxy rejects unsafe image formats'],
+  [imageRoute, /readLimitedBody\(/, 'image proxy stream-limits response bodies'],
+  [inspectRoute, /redirect:\s*'manual'/, 'artwork inspector validates redirects before following them'],
+  [inspectRoute, /SAFE_IMAGE_TYPES/, 'artwork inspector rejects unsafe image formats'],
+  [inspectRoute, /readLimitedBody\(/, 'artwork inspector stream-limits response bodies']
+];
+
+for (const [source, pattern, label] of proxySecurityChecks) {
+  requireMatch(source, pattern, label);
+}
