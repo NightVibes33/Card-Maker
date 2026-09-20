@@ -23,6 +23,8 @@ const MAX_CUSTOM_LAYERS = 200;
 const MAX_PRESET_ASSETS = 200;
 const MAX_IMAGE_PIXELS = 65_000_000;
 const MAX_IMAGE_DIMENSION = 12_000;
+const MAX_STORED_IMAGE_PIXELS = 12_000_000;
+const MAX_STORED_IMAGE_DIMENSION = 4096;
 
 const CUCU_CATEGORIES = [
   ['all', 'All Card Skins'],
@@ -1241,7 +1243,7 @@ function loadSearchImage(src, timeoutMs = 12000) {
   });
 }
 
-function validateLocalImageBlob(blob) {
+function decodeLocalImageBlob(blob, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
     const img = new Image();
@@ -1249,8 +1251,10 @@ function validateLocalImageBlob(blob) {
     let settled = false;
 
     const cleanup = () => {
-      clearTimeout(timer);
+      window.clearTimeout(timer);
       URL.revokeObjectURL(url);
+      img.onload = null;
+      img.onerror = null;
     };
 
     const finish = (callback) => {
@@ -1261,19 +1265,18 @@ function validateLocalImageBlob(blob) {
     };
 
     const timer = window.setTimeout(() => {
+      img.src = '';
       finish(() => reject(new Error('Image decode timed out')));
-    }, 15000);
+    }, timeoutMs);
 
     img.onload = () => {
       const width = Number(img.naturalWidth || img.width || 0);
       const height = Number(img.naturalHeight || img.height || 0);
-
       finish(() => {
         if (!width || !height) {
           reject(new Error('Image dimensions could not be read'));
           return;
         }
-
         if (
           width > MAX_IMAGE_DIMENSION ||
           height > MAX_IMAGE_DIMENSION ||
@@ -1282,8 +1285,7 @@ function validateLocalImageBlob(blob) {
           reject(new Error('Image dimensions are too large'));
           return;
         }
-
-        resolve({ width, height });
+        resolve({ image: img, width, height });
       });
     };
 
@@ -1293,6 +1295,55 @@ function validateLocalImageBlob(blob) {
 
     img.src = url;
   });
+}
+
+async function prepareLocalImageBlob(blob) {
+  const decoded = await decodeLocalImageBlob(blob);
+  const { image, width, height } = decoded;
+  const pixelScale = Math.sqrt(MAX_STORED_IMAGE_PIXELS / Math.max(1, width * height));
+  const dimensionScale = MAX_STORED_IMAGE_DIMENSION / Math.max(width, height);
+  const scale = Math.min(1, pixelScale, dimensionScale);
+
+  if (scale >= 0.999) {
+    image.src = '';
+    return { blob, width, height, optimized: false };
+  }
+
+  const targetWidth = Math.max(1, Math.round(width * scale));
+  const targetHeight = Math.max(1, Math.round(height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const ctx = canvas.getContext('2d', { alpha: true });
+  if (!ctx) {
+    image.src = '';
+    throw new Error('Image optimization is unavailable');
+  }
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+  const outputType = blob.type === 'image/png' ? 'image/png' : 'image/jpeg';
+  const optimizedBlob = await new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (result) => result ? resolve(result) : reject(new Error('Image optimization failed')),
+      outputType,
+      outputType === 'image/jpeg' ? 0.94 : undefined
+    );
+  }).finally(() => {
+    canvas.width = 1;
+    canvas.height = 1;
+    image.src = '';
+  });
+
+  return {
+    blob: optimizedBlob,
+    width: targetWidth,
+    height: targetHeight,
+    optimized: true
+  };
 }
 
 function inspectSearchImage(img, preferDirectAsset = false) {
@@ -2678,8 +2729,9 @@ export default function Page() {
       return;
     }
 
+    let preparedImage;
     try {
-      await validateLocalImageBlob(file);
+      preparedImage = await prepareLocalImageBlob(file);
     } catch (error) {
       setMessage(
         error?.message === 'Image dimensions are too large'
@@ -2693,8 +2745,8 @@ export default function Page() {
     const asset = {
       id,
       name: file.name || 'Imported image',
-      type: file.type || 'image/*',
-      blob: file,
+      type: preparedImage.blob.type || file.type || 'image/*',
+      blob: preparedImage.blob,
       createdAt: Date.now()
     };
 
@@ -2742,8 +2794,9 @@ export default function Page() {
       return;
     }
 
+    let preparedImage;
     try {
-      await validateLocalImageBlob(file);
+      preparedImage = await prepareLocalImageBlob(file);
     } catch (error) {
       setMessage(
         error?.message === 'Image dimensions are too large'
@@ -2758,8 +2811,8 @@ export default function Page() {
     const asset = {
       id: assetId,
       name: file.name || 'Image layer',
-      type: file.type || 'image/*',
-      blob: file,
+      type: preparedImage.blob.type || file.type || 'image/*',
+      blob: preparedImage.blob,
       createdAt: Date.now()
     };
 
@@ -3365,15 +3418,15 @@ export default function Page() {
         if (blob.size > MAX_IMAGE_IMPORT_BYTES) {
           throw new Error('Preset image asset is too large');
         }
-        await validateLocalImageBlob(blob);
+        const preparedImage = await prepareLocalImageBlob(blob);
 
         const newId = makeId('import');
         idMap[oldId] = newId;
         await dbPut('imports', {
           id: newId,
           name: asset.name || 'Preset asset',
-          type: asset.type || 'image/*',
-          blob,
+          type: preparedImage.blob.type || asset.type || 'image/*',
+          blob: preparedImage.blob,
           createdAt: Date.now()
         });
         createdImportIds.push(newId);
