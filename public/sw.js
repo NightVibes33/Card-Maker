@@ -5,7 +5,7 @@ const CATALOG_CACHE = 'card-studio-catalog-v3';
 const STATIC_CACHE = 'card-studio-static-v3';
 const OWNED_CACHE_PREFIX = 'card-studio-';
 
-const SHELL = ['/manifest.webmanifest'];
+const SHELL = ['/', '/manifest.webmanifest'];
 const CACHE_LIMITS = {
   [SHELL_CACHE]: 16,
   [ART_CACHE]: 40,
