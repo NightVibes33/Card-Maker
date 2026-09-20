@@ -2765,8 +2765,20 @@ export default function Page() {
           }))
           .filter((entry) => entry.item?.id)
           .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
-        setFavorites(validFavorites.map((entry) => entry.item));
-        setFavoriteIds(new Set(validFavorites.map((entry) => entry.item.id)));
+        const hydratedFavoriteItems = validFavorites.map((entry) => entry.item);
+        setFavorites((current) => {
+          const mergedById = new Map(
+            hydratedFavoriteItems.map((item) => [String(item.id), item])
+          );
+          for (const item of current) {
+            if (item?.id) mergedById.set(String(item.id), item);
+          }
+          return [...mergedById.values()];
+        });
+        setFavoriteIds((current) => new Set([
+          ...validFavorites.map((entry) => String(entry.item.id)),
+          ...current
+        ]));
         const hydratedProjects = storedProjects
           .filter((entry) => entry?.design && typeof entry.design === 'object')
           .map((entry) => ({
@@ -2785,30 +2797,58 @@ export default function Page() {
           }))
           .filter((entry) => entry.id)
           .sort((a, b) => b.updatedAt - a.updatedAt);
-        projectCountRef.current = hydratedProjects.length;
-        setProjects(hydratedProjects);
-        setImports(
-          storedImports
-            .map(importListItem)
-            .filter((entry) => entry.id)
+        setProjects((current) => {
+          const mergedById = new Map(
+            hydratedProjects.map((entry) => [String(entry.id), entry])
+          );
+          for (const entry of current) {
+            if (entry?.id) mergedById.set(String(entry.id), entry);
+          }
+          const merged = [...mergedById.values()].sort(
+            (a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0)
+          );
+          projectCountRef.current = merged.length;
+          return merged;
+        });
+        const hydratedImports = storedImports
+          .map(importListItem)
+          .filter((entry) => entry.id)
+          .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+        setImports((current) => {
+          const mergedById = new Map(
+            hydratedImports.map((entry) => [String(entry.id), entry])
+          );
+          for (const entry of current) {
+            if (entry?.id) mergedById.set(String(entry.id), entry);
+          }
+          return [...mergedById.values()].sort(
+            (a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)
+          );
+        });
+        const hydratedExports = storedExports
+          .map((entry) => ({
+            ...entry,
+            id: safeDisplayText(entry?.id, '', 160),
+            name: safeDisplayText(entry.name, 'Export', 160),
+            designName: safeDisplayText(entry.designName, 'Untitled Card', 160),
+            action: safeDisplayText(entry.action, 'export', 80),
+            width: Math.max(0, finiteNumber(entry.width, 0)),
+            height: Math.max(0, finiteNumber(entry.height, 0)),
+            createdAt: finiteNumber(entry.createdAt, 0)
+          }))
+          .filter((entry) => entry.id)
+          .sort((a, b) => b.createdAt - a.createdAt);
+        setExportHistory((current) => {
+          const mergedById = new Map(
+            hydratedExports.map((entry) => [String(entry.id), entry])
+          );
+          for (const entry of current) {
+            if (entry?.id) mergedById.set(String(entry.id), entry);
+          }
+          return [...mergedById.values()]
             .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
-        );
-        setExportHistory(
-          storedExports
-            .map((entry) => ({
-              ...entry,
-              id: safeDisplayText(entry?.id, '', 160),
-              name: safeDisplayText(entry.name, 'Export', 160),
-              designName: safeDisplayText(entry.designName, 'Untitled Card', 160),
-              action: safeDisplayText(entry.action, 'export', 80),
-              width: Math.max(0, finiteNumber(entry.width, 0)),
-              height: Math.max(0, finiteNumber(entry.height, 0)),
-              createdAt: finiteNumber(entry.createdAt, 0)
-            }))
-            .filter((entry) => entry.id)
-            .sort((a, b) => b.createdAt - a.createdAt)
-            .slice(0, 40)
-        );
+            .slice(0, 40);
+        });
 
         try {
           const storedRecent = JSON.parse(localStorage.getItem('aircard-recent-artwork-v1') || '[]');
