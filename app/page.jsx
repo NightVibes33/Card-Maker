@@ -290,6 +290,74 @@ function drawChip(ctx, d) {
   ctx.restore();
 }
 
+function drawChipLayerAtOrigin(ctx, tone = 'gold') {
+  const palettes = {
+    gold: ['#fff0a0', '#d8b24a', '#9e7421'],
+    silver: ['#f5f7f8', '#b8c0c6', '#6f777d'],
+    black: ['#696b70', '#242528', '#08090b'],
+    rose: ['#ffd0c5', '#d88978', '#8e4a40']
+  };
+  const p = palettes[tone] || palettes.gold;
+  const w = 255;
+  const h = 188;
+  const x = -w / 2;
+  const y = -h / 2;
+  const r = 30;
+
+  ctx.shadowColor = 'rgba(0,0,0,.4)';
+  ctx.shadowBlur = 24;
+  ctx.shadowOffsetY = 10;
+
+  const g = ctx.createLinearGradient(x, y, x + w, y + h);
+  g.addColorStop(0, p[0]);
+  g.addColorStop(0.45, p[1]);
+  g.addColorStop(1, p[2]);
+
+  roundRect(ctx, x, y, w, h, r);
+  ctx.fillStyle = g;
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = 'rgba(60,45,10,.45)';
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(70,48,10,.52)';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(0, y + 9);
+  ctx.lineTo(0, y + h - 9);
+  ctx.moveTo(x + 9, 0);
+  ctx.lineTo(x + w - 9, 0);
+  ctx.stroke();
+
+  [0.25, 0.75].forEach((q) => {
+    ctx.beginPath();
+    ctx.moveTo(x + w * q, y + 9);
+    ctx.lineTo(x + w * q, y + h * 0.3);
+    ctx.quadraticCurveTo(0, y + h * 0.36, 0, 0);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x + w * q, y + h - 9);
+    ctx.lineTo(x + w * q, y + h * 0.7);
+    ctx.quadraticCurveTo(0, y + h * 0.64, 0, 0);
+    ctx.stroke();
+  });
+}
+
+function drawContactlessLayerAtOrigin(ctx, color = '#ffffff') {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 10;
+  ctx.lineCap = 'round';
+  ctx.globalAlpha *= 0.9;
+  [28, 52, 78].forEach((radius) => {
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, -0.72, 0.72);
+    ctx.stroke();
+  });
+}
+
 function drawContactless(ctx, d) {
   const x = d.contactlessX * OUT_W;
   const y = d.contactlessY * OUT_H;
@@ -1361,27 +1429,9 @@ export default function Page() {
           ctx.drawImage(layerImage, -w / 2, -h / 2, w, h);
         }
       } else if (layer.type === 'chip') {
-        const temp = {
-          chipTone: layer.tone || 'gold',
-          chipScale: clamp(Number(layer.scale || 1), 0.1, 6),
-          chipX: -((255 * clamp(Number(layer.scale || 1), 0.1, 6)) / OUT_W) / 2,
-          chipY: -((188 * clamp(Number(layer.scale || 1), 0.1, 6)) / OUT_H) / 2,
-          chipRotation: Number(layer.rotation || 0)
-        };
-        ctx.save();
-        ctx.scale(OUT_W / 1536, OUT_H / 969);
-        drawChip(ctx, temp);
-        ctx.restore();
+        drawChipLayerAtOrigin(ctx, layer.tone || 'gold');
       } else if (layer.type === 'contactless') {
-        const temp = {
-          contactlessScale: clamp(Number(layer.scale || 1), 0.1, 6),
-          contactlessX: 0,
-          contactlessY: 0
-        };
-        ctx.save();
-        ctx.fillStyle = layer.color || '#ffffff';
-        drawContactless(ctx, temp);
-        ctx.restore();
+        drawContactlessLayerAtOrigin(ctx, layer.color || '#ffffff');
       }
 
       ctx.restore();
