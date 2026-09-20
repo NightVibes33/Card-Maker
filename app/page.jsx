@@ -4314,12 +4314,39 @@ export default function Page() {
 
     try {
       const payload = await serializePreset();
-      const json = JSON.stringify(payload, null, 2);
-      if (new Blob([json]).size > MAX_PRESET_IMPORT_BYTES) {
+      const parts = [
+        '{"version":2,"app":',
+        JSON.stringify(payload.app),
+        ',"exportedAt":',
+        JSON.stringify(payload.exportedAt),
+        ',"design":',
+        JSON.stringify(payload.design),
+        ',"assets":{'
+      ];
+
+      let firstAsset = true;
+      for (const [id, asset] of Object.entries(payload.assets || {})) {
+        if (!firstAsset) parts.push(',');
+        firstAsset = false;
+        parts.push(
+          JSON.stringify(id),
+          ':{"name":',
+          JSON.stringify(asset.name || ''),
+          ',"type":',
+          JSON.stringify(asset.type || 'image/*'),
+          ',"data":"',
+          asset.data,
+          '"}'
+        );
+      }
+      parts.push('}}');
+
+      const blob = new Blob(parts, { type: 'application/json' });
+      parts.length = 0;
+      if (blob.size > MAX_PRESET_IMPORT_BYTES) {
         throw new Error('The generated preset is too large to export safely');
       }
 
-      const blob = new Blob([json], { type: 'application/json' });
       url = URL.createObjectURL(blob);
       anchor = document.createElement('a');
       const presetFileBase =
