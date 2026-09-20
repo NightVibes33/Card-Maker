@@ -39,6 +39,15 @@ await page.route('**/api/cucu**', async (route) => {
   });
 });
 
+const imageLayerUpload = await sharp({
+  create: {
+    width: 320,
+    height: 200,
+    channels: 4,
+    background: { r: 20, g: 220, b: 70, alpha: 1 }
+  }
+}).png().toBuffer();
+
 try {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.locator('main.studio').waitFor({ state: 'visible', timeout: 15000 });
@@ -427,6 +436,62 @@ try {
   });
 
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
+
+  // Exercise the real custom image-layer import path in mobile WebKit.
+  const layerFileInput = page.locator('.layerAddRow + input[type="file"]').first();
+  await layerFileInput.setInputFiles({
+    name: 'webkit-layer.png',
+    mimeType: 'image/png',
+    buffer: imageLayerUpload
+  });
+
+  const importedImageRow = page.getByRole('button', {
+    name: /webkit-layer\.png image selected/i
+  });
+  await importedImageRow.waitFor({ state: 'visible', timeout: 10000 });
+
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector('.cardFrame canvas');
+    if (!canvas) return false;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+    const x = Math.max(0, Math.min(canvas.width - 1, Math.round(canvas.width * 0.34)));
+    const y = Math.max(0, Math.min(canvas.height - 1, Math.round(canvas.height * 0.64)));
+    const pixel = ctx.getImageData(x, y, 1, 1).data;
+    return pixel[1] > 150 && pixel[1] > pixel[0] * 2 && pixel[1] > pixel[2] * 2;
+  }, null, { timeout: 10000 });
+
+  await page.getByRole('tab', { name: 'Crop', exact: true }).click();
+  const imageCropLeft = page.getByLabel('Layer Crop Left');
+  await imageCropLeft.waitFor({ state: 'visible', timeout: 5000 });
+  await imageCropLeft.evaluate((node) => {
+    node.value = '0.1';
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Layer Crop Left"]');
+    return input && Math.abs(Number(input.value) - 0.1) < 0.001;
+  });
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Layer Crop Left"]');
+    return input && Math.abs(Number(input.value)) < 0.001;
+  });
+
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  const imageShowLayer = page.getByRole('switch', { name: 'Show Layer' });
+  await imageShowLayer.click();
+  assert.equal(await imageShowLayer.getAttribute('aria-checked'), 'false');
+  assert.ok(
+    await page.getByRole('button', { name: /webkit-layer\.png image hidden/i }).isVisible(),
+    'hidden image layers must remain recoverable from the layer stack'
+  );
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.waitForFunction(() => {
+    const control = [...document.querySelectorAll('[role="switch"]')]
+      .find((node) => node.textContent?.includes('Show Layer'));
+    return control?.getAttribute('aria-checked') === 'true';
+  });
 
   // Built-in hardware uses a separate transform path from custom layers.
   // Exercise it explicitly so direct-manipulation regressions cannot hide
