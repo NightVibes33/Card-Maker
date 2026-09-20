@@ -3216,8 +3216,11 @@ export default function Page() {
       const anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = (payload.design.backgroundLabel || 'aircard-design').replace(/[^a-z0-9_-]+/gi, '-') + '.aircard.json';
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
       anchor.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1200);
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
       setMessage('Design preset exported');
     } catch (error) {
       setMessage(error?.message || 'Design preset could not be exported');
@@ -3624,8 +3627,11 @@ export default function Page() {
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = name;
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
     anchor.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1200);
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
     await recordExport(name, width, height, 'download');
     setMessage(name + ' saved to Files/downloads');
   }
