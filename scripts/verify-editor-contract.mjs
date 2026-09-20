@@ -38,7 +38,8 @@ const touchChecks = [
   [/\.historyButtons button,.beforeAfterButton\{[^}]*min-height:44px/s, 'History and compare buttons'],
   [/\.layerAddRow button,.layerActionGrid button\{[^}]*min-height:44px/s, 'Layer action buttons'],
   [/\.textAlignRow button\{[^}]*min-height:44px/s, 'Text alignment buttons'],
-  [/\.doneSelectionButton\{[^}]*min-height:44px/s, 'Done selection button']
+  [/\.doneSelectionButton\{[^}]*min-height:44px/s, 'Done selection button'],
+  [/\.sliderRow input\{[^}]*min-height:44px/s, 'Range slider touch surface']
 ];
 
 for (const [pattern, label] of touchChecks) {
