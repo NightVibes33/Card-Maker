@@ -5279,7 +5279,9 @@ export default function Page() {
     // pinch baseline and cause a jump when it lifts.
     if (pointers.current.size >= 2) return;
 
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {}
 
     if (pointers.current.size === 0) {
       historyGroupRef.current = { key: '', at: 0 };
