@@ -63,8 +63,8 @@ function normalizeImageUrl(raw) {
   }
 }
 
-function imageProxy(url) {
-  return '/api/image?url=' + encodeURIComponent(url);
+function imageProxy(url, width = 0) {
+  return '/api/image?url=' + encodeURIComponent(url) + (width ? '&w=' + width : '');
 }
 
 function assetScore(raw, image = {}) {
@@ -291,6 +291,7 @@ function flattenProduct(product) {
     title,
     subtitle: 'CUCU Covers',
     image: imageProxy(candidates[0].src),
+    thumbnail: imageProxy(candidates[0].src, 560),
     candidateImages: candidates.map((asset) => imageProxy(asset.src)),
     directAssetUrls: candidates.map((asset) => asset.src),
     source: 'CUCU Covers',
@@ -307,6 +308,7 @@ function flattenProduct(product) {
 export async function GET(request) {
   const categoryKey = String(request.nextUrl.searchParams.get('category') || 'all').toLowerCase();
   const collection = COLLECTIONS[categoryKey] || COLLECTIONS.all;
+  const query = cleanText(request.nextUrl.searchParams.get('q') || '').toLowerCase();
   const requestedPage = Number(request.nextUrl.searchParams.get('page') || 1);
   const requestedLimit = Number(request.nextUrl.searchParams.get('limit') || 36);
 
@@ -325,7 +327,23 @@ export async function GET(request) {
     let inferredHasMore = false;
     let mode = 'shopify-collection';
 
-    try {
+    if (query) {
+      const tokens = query.split(/\s+/).filter((token) => token.length > 1);
+      const catalog = await getFallbackCatalog('all');
+      const matches = catalog.filter((product) => {
+        const evidence = categoryEvidence(product);
+        return tokens.every((token) => evidence.includes(token));
+      });
+
+      total = matches.length;
+      totalPages = Math.max(1, Math.ceil(total / limit));
+      inferredHasMore = startIndex + limit < total;
+      mode = 'catalog-search';
+      results = matches
+        .slice(startIndex, startIndex + limit)
+        .map((product) => flattenProduct({ ...product, __collection: DEFAULT_COLLECTION }))
+        .filter(Boolean);
+    } else try {
       const firstBatch = await getShopifyPage(collection.handle, firstSourcePage);
       if (!firstBatch.length && categoryKey !== 'all') {
         throw new Error('empty category collection');
@@ -384,8 +402,9 @@ export async function GET(request) {
         hasMore: inferredHasMore,
         source: 'CUCU Covers · ' + collection.label,
         category: categoryKey,
-        categoryLabel: collection.label,
+        categoryLabel: query ? 'Search' : collection.label,
         collectionHandle: collection.handle,
+        query,
         categories: Object.entries(COLLECTIONS).map(([key, value]) => ({
           key,
           label: value.label,
