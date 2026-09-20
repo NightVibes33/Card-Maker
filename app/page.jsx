@@ -1064,11 +1064,12 @@ function NumericField({ label, value, min, max, step = 0.001, onChange, suffix =
       <span>{label}</span>
       <div className="numericInputWrap">
         <input
-          type="number"
-          inputMode="decimal"
-          step={step}
-          min={min}
-          max={max}
+          type={Number(min) < 0 ? 'text' : 'number'}
+          inputMode={Number(min) < 0 ? 'text' : 'decimal'}
+          enterKeyHint="done"
+          step={Number(min) < 0 ? undefined : step}
+          min={Number(min) < 0 ? undefined : min}
+          max={Number(min) < 0 ? undefined : max}
           value={draft}
           aria-label={label}
           onChange={(event) => setDraft(event.target.value)}
