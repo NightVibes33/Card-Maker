@@ -46,9 +46,9 @@ body{
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
 }
-button,input{font:inherit}
+button,input,select,textarea{font:inherit}
 button{color:inherit}
-button:focus-visible,input:focus-visible{
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
   outline:3px solid color-mix(in srgb,var(--blue) 45%,transparent);
   outline-offset:2px;
 }
@@ -976,7 +976,7 @@ button:disabled{opacity:.38}
 .studioModeRow{
   position:sticky;
   z-index:18;
-  top:calc(var(--safe-top) + 300px);
+  top:calc(var(--safe-top) + 90px + min(63vw,315px));
   margin:0 -16px;
   padding:8px 16px 10px;
   background:linear-gradient(to bottom,var(--glass-strong),var(--glass));
