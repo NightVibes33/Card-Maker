@@ -38,22 +38,60 @@ async function fetchWithTimeout(url, options = {}, timeout = 12000) {
 }
 
 async function resolveImage(productUrl) {
+  const evaluate = `
+    (() => {
+      const bad = /(logo|favicon|icon|payment|badge|shopify|klarna|afterpay|sezzle|paypal|visa|mastercard|amex)/i;
+      const images = Array.from(document.images || []);
+      const scored = images
+        .map((img) => {
+          const src = img.currentSrc || img.src || '';
+          const alt = img.alt || '';
+          if (!src || bad.test(src + ' ' + alt)) return null;
+          if (!/\\/cdn\\/shop\\/(files|products)\\//i.test(src) && !/cdn\\.shopify\\.com\\/s\\/files\\//i.test(src)) {
+            return null;
+          }
+
+          const width = Number(img.naturalWidth || img.width || 0);
+          const height = Number(img.naturalHeight || img.height || 0);
+          const ratio = width && height ? width / height : 0;
+          let score = 0;
+
+          if (/product|card|skin|cover/i.test((img.className || '') + ' ' + alt)) score += 16;
+          if (width >= 1000) score += 12;
+          else if (width >= 700) score += 8;
+          else if (width >= 400) score += 3;
+          if (ratio >= 1.2 && ratio <= 2.2) score += 14;
+          else if (ratio >= 0.8 && ratio <= 2.5) score += 5;
+          if (/\\.(png|webp)(\\?|$)/i.test(src)) score += 3;
+
+          return { src, score, width, height };
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.score - a.score);
+
+      return scored[0]?.src || '';
+    })()
+  `;
+
   const endpoint =
     META_ORIGIN +
     '/?url=' +
     encodeURIComponent(productUrl) +
-    '&meta=true';
+    '&meta=false&prerender=true&waitForSelector=img' +
+    '&data.productImage.evaluate=' +
+    encodeURIComponent(evaluate) +
+    '&data.productImage.type=image';
 
   const response = await fetchWithTimeout(
     endpoint,
     {
       headers: {
         Accept: 'application/json',
-        'User-Agent': 'AirCard-Card-Studio/4.3'
+        'User-Agent': 'AirCard-Card-Studio/4.4'
       },
       next: { revalidate: 2592000 }
     },
-    15000
+    20000
   );
 
   if (!response.ok) return '';
@@ -61,24 +99,19 @@ async function resolveImage(productUrl) {
   const json = await response.json().catch(() => null);
   if (!json || json.status !== 'success') return '';
 
-  const image = json?.data?.image || null;
+  const image = json?.data?.productImage || null;
   const imageUrl = image?.url || '';
 
-  // Never fall back to Microlink's logo field. That field is the storefront
-  // branding, not product artwork, and was the cause of every Blitz card
-  // showing the same Shopify/store logo.
   if (!imageUrl || !allowedImageUrl(imageUrl)) return '';
 
   const lowerUrl = imageUrl.toLowerCase();
-  if (/(logo|favicon|shopify|brandmark|apple-touch-icon)/i.test(lowerUrl)) {
+  if (/(logo|favicon|icon|payment|badge|shopify|brandmark)/i.test(lowerUrl)) {
     return '';
   }
 
   const width = Number(image?.width || 0);
   const height = Number(image?.height || 0);
-
-  // Reject tiny metadata images that are almost certainly branding/icons.
-  if (width && height && width <= 512 && height <= 512) {
+  if (width && height && width <= 320 && height <= 320) {
     return '';
   }
 
