@@ -3,11 +3,15 @@
 const DB_NAME = 'aircard-studio-v2';
 const DB_VERSION = 1;
 const STORES = ['kv', 'favorites', 'projects', 'imports', 'exports'];
+const ART_CACHE = 'card-studio-art-v3';
+
+let dbPromise = null;
 
 function openDb() {
   if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+  if (dbPromise) return dbPromise;
 
-  return new Promise((resolve, reject) => {
+  dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onupgradeneeded = () => {
@@ -19,9 +23,27 @@ function openDb() {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('IndexedDB unavailable'));
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+      resolve(db);
+    };
+
+    request.onerror = () => {
+      dbPromise = null;
+      reject(request.error || new Error('IndexedDB unavailable'));
+    };
+
+    request.onblocked = () => {
+      dbPromise = null;
+      reject(new Error('IndexedDB upgrade blocked'));
+    };
   });
+
+  return dbPromise;
 }
 
 export async function dbPut(store, value) {
@@ -75,7 +97,7 @@ export async function dbDelete(store, id) {
 export async function cacheArtwork(url) {
   if (!url || typeof caches === 'undefined') return false;
   try {
-    const cache = await caches.open('aircard-art-v2');
+    const cache = await caches.open(ART_CACHE);
     const existing = await cache.match(url);
     if (existing) return true;
     const response = await fetch(url, { credentials: 'same-origin' });
