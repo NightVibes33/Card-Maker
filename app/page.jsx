@@ -596,12 +596,18 @@ function SliderRow({ label, value, min, max, step, onChange, suffix = '', disabl
 
 function NumericField({ label, value, min, max, step = 0.001, onChange, suffix = '' }) {
   const [draft, setDraft] = useState(String(Number(value)));
+  const cancelCommitRef = useRef(false);
 
   useEffect(() => {
     setDraft(String(Number(value)));
   }, [value]);
 
   const commit = () => {
+    if (cancelCommitRef.current) {
+      cancelCommitRef.current = false;
+      setDraft(String(Number(value)));
+      return;
+    }
     if (draft.trim() === '') {
       setDraft(String(Number(value)));
       return;
@@ -633,6 +639,7 @@ function NumericField({ label, value, min, max, step = 0.001, onChange, suffix =
           onKeyDown={(event) => {
             if (event.key === 'Enter') event.currentTarget.blur();
             else if (event.key === 'Escape') {
+              cancelCommitRef.current = true;
               setDraft(String(Number(value)));
               event.currentTarget.blur();
             }
@@ -1172,6 +1179,13 @@ export default function Page() {
     () => GRADIENTS.find((item) => item.id === design.gradient) || GRADIENTS[0],
     [design.gradient]
   );
+
+  const renderAssetsReady = useMemo(() => {
+    if (design.background && !image) return false;
+    return (design.customLayers || []).every(
+      (layer) => layer.type !== 'image' || !layer.src || Boolean(layerImages[layer.id])
+    );
+  }, [design.background, design.customLayers, image, layerImages]);
 
   const patch = useCallback((next, recordHistory = true, historyKey = '') => {
     setDesign((current) => {
@@ -2271,9 +2285,20 @@ export default function Page() {
   function updateLayer(id, delta) {
     const key = 'layer:' + id + ':' + Object.keys(delta || {}).sort().join('|');
     patch((current) => ({
-      customLayers: (current.customLayers || []).map((layer) =>
-        layer.id === id ? { ...layer, ...delta } : layer
-      )
+      customLayers: (current.customLayers || []).map((layer) => {
+        if (layer.id !== id) return layer;
+        const updated = { ...layer, ...delta };
+
+        if (updated.type === 'shape') {
+          const width = clamp(Number(updated.width ?? 280), 20, 1200);
+          const height = clamp(Number(updated.height ?? 120), 20, 800);
+          updated.width = width;
+          updated.height = height;
+          updated.radius = clamp(Number(updated.radius ?? 28), 0, Math.min(width, height) / 2);
+        }
+
+        return updated;
+      })
     }), true, key);
   }
 
@@ -2389,7 +2414,7 @@ export default function Page() {
     const now = Date.now();
     const id = makeId('project');
     const name = nameOverride.trim() || design.backgroundLabel || 'Untitled Card';
-    const preview = makeCanvas(384, 242).toDataURL('image/jpeg', 0.78);
+    const preview = renderAssetsReady ? makeCanvas(384, 242).toDataURL('image/jpeg', 0.78) : '';
     const project = {
       id,
       name,
@@ -2410,6 +2435,7 @@ export default function Page() {
     if (!project?.design) return;
     undoRef.current = [];
     redoRef.current = [];
+    historyGroupRef.current = { key: '', at: 0 };
     setHistoryVersion((value) => value + 1);
     setDesign({ ...DEFAULTS, ...project.design });
     setTab('studio');
@@ -2526,6 +2552,7 @@ export default function Page() {
   function reset() {
     undoRef.current = [];
     redoRef.current = [];
+    historyGroupRef.current = { key: '', at: 0 };
     setHistoryVersion((value) => value + 1);
     setDesign(DEFAULTS);
     setImage(null);
@@ -2807,6 +2834,11 @@ export default function Page() {
     height = OUT_H,
     name = 'cardBackgroundCombined@3x.png'
   ) {
+    if (!renderAssetsReady) {
+      setMessage('Artwork is still loading. Export is available when every image is ready.');
+      return;
+    }
+
     const file = makePngFile(width, height, name);
     const canShareFile = Boolean(
       navigator.share &&
@@ -2838,16 +2870,6 @@ export default function Page() {
   function dismissInstallHelp() {
     localStorage.setItem('aircard-install-dismissed-v2', '1');
     setInstallHelp(false);
-  }
-
-  function reset() {
-    undoRef.current = [];
-    redoRef.current = [];
-    setHistoryVersion((value) => value + 1);
-    setDesign(DEFAULTS);
-    setImage(null);
-    setSelectedElement('artwork');
-    setMessage('New card');
   }
 
   const selectedLayer = useMemo(
@@ -3796,13 +3818,14 @@ export default function Page() {
               </div>
             </section>
 
-            <button type="button" className="secondaryAction bigAction" onClick={() => setShowExportPreview(true)}>
+            <button type="button" className="secondaryAction bigAction" disabled={!renderAssetsReady} onClick={() => setShowExportPreview(true)}>
               <span>Full-Screen Preview</span>
             </button>
 
             <button
               type="button"
               className="primaryAction bigAction"
+              disabled={!renderAssetsReady}
               onClick={() => nativeExportPng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}
             >
               <IOSIcon name="photo" size={21} />
@@ -3816,6 +3839,7 @@ export default function Page() {
               <button
                 type="button"
                 className="actionRow"
+                disabled={!renderAssetsReady}
                 onClick={() => nativeExportPng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}
               >
                 <span><strong>Save 3× Image</strong><small>1536 × 969 · highest quality</small></span>
@@ -3824,6 +3848,7 @@ export default function Page() {
               <button
                 type="button"
                 className="actionRow"
+                disabled={!renderAssetsReady}
                 onClick={() => nativeExportPng(1024, 646, 'cardBackgroundCombined@2x.png')}
               >
                 <span><strong>Save 2× Image</strong><small>1024 × 646</small></span>
@@ -3832,6 +3857,7 @@ export default function Page() {
               <button
                 type="button"
                 className="actionRow"
+                disabled={!renderAssetsReady}
                 onClick={() => nativeExportPng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}
               >
                 <span><strong>Share 3× PNG</strong><small>Photos, AirDrop, Messages, apps, and more</small></span>
