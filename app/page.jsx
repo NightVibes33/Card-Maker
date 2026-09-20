@@ -1038,8 +1038,17 @@ function Group({ title, footer, children }) {
 }
 
 function proxyImageWidth(src = '', width = 1600) {
-  if (!String(src).startsWith('/api/image?')) return src;
-  const params = new URLSearchParams(String(src).slice('/api/image?'.length));
+  let source = String(src || '');
+
+  // Older favorites/recent items may store the original HTTPS artwork URL.
+  // Route those through the same-origin proxy so canvas export stays untainted
+  // and the server still enforces the current image-host allowlist.
+  if (/^https:\/\//i.test(source)) {
+    source = '/api/image?url=' + encodeURIComponent(source);
+  }
+
+  if (!source.startsWith('/api/image?')) return source;
+  const params = new URLSearchParams(source.slice('/api/image?'.length));
   params.set('w', String(Math.max(160, Math.min(3072, Math.round(width)))));
   return '/api/image?' + params.toString();
 }
