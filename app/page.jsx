@@ -1453,6 +1453,7 @@ export default function Page() {
   const [cucuHasMore, setCucuHasMore] = useState(true);
   const [cucuLoading, setCucuLoading] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
+  const [hydrated, setHydrated] = useState(false);
   const [layerImages, setLayerImages] = useState({});
   const [loadedImageLayerSourceKey, setLoadedImageLayerSourceKey] = useState('[]');
   const [backgroundLoadError, setBackgroundLoadError] = useState('');
@@ -1595,11 +1596,11 @@ export default function Page() {
     async function hydrate() {
       try {
         const [draft, storedFavorites, storedProjects, storedImports, storedExports] = await Promise.all([
-          dbGet('kv', 'draft'),
-          dbGetAll('favorites'),
-          dbGetAll('projects'),
-          dbGetAll('imports'),
-          dbGetAll('exports')
+          dbGet('kv', 'draft').catch(() => null),
+          dbGetAll('favorites').catch(() => []),
+          dbGetAll('projects').catch(() => []),
+          dbGetAll('imports').catch(() => []),
+          dbGetAll('exports').catch(() => [])
         ]);
 
         if (cancelled) return;
@@ -1613,12 +1614,16 @@ export default function Page() {
         } else {
           const legacy = localStorage.getItem('aircard-sticker-fvp-v3');
           if (legacy) {
-            const parsed = JSON.parse(legacy);
-            if (parsed && typeof parsed === 'object') {
-              parsed.background = parsed.background && isPersistableBackground(parsed.background)
-                ? parsed.background
-                : '';
-              replaceDesign({ ...designRef.current, ...parsed });
+            try {
+              const parsed = JSON.parse(legacy);
+              if (parsed && typeof parsed === 'object') {
+                parsed.background = parsed.background && isPersistableBackground(parsed.background)
+                  ? parsed.background
+                  : '';
+                replaceDesign({ ...designRef.current, ...parsed });
+              }
+            } catch {
+              localStorage.removeItem('aircard-sticker-fvp-v3');
             }
           }
         }
@@ -1632,9 +1637,13 @@ export default function Page() {
         setImports(storedImports.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)));
         setExportHistory(storedExports.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)).slice(0, 40));
 
-        const storedRecent = JSON.parse(localStorage.getItem('aircard-recent-artwork-v1') || '[]');
-        if (Array.isArray(storedRecent)) {
-          setRecent(storedRecent.filter((item) => item?.id).slice(0, 20));
+        try {
+          const storedRecent = JSON.parse(localStorage.getItem('aircard-recent-artwork-v1') || '[]');
+          if (Array.isArray(storedRecent)) {
+            setRecent(storedRecent.filter((item) => item?.id).slice(0, 20));
+          }
+        } catch {
+          localStorage.removeItem('aircard-recent-artwork-v1');
         }
 
         setExpertMode(localStorage.getItem('aircard-expert-v2') === '1');
@@ -1662,6 +1671,8 @@ export default function Page() {
         if (!standalone && !dismissed) setInstallHelp(true);
       } catch {
         setMessage('Local library could not fully load');
+      } finally {
+        if (!cancelled) setHydrated(true);
       }
     }
 
@@ -1680,6 +1691,8 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    if (!hydrated) return undefined;
+
     setSaveStatus('Editing…');
     const timer = setTimeout(async () => {
       try {
@@ -1698,7 +1711,7 @@ export default function Page() {
     }, 420);
 
     return () => clearTimeout(timer);
-  }, [design]);
+  }, [design, hydrated]);
 
   useEffect(() => {
     localStorage.setItem('aircard-expert-v2', expertMode ? '1' : '0');
