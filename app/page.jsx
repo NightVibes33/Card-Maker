@@ -2858,13 +2858,17 @@ export default function Page() {
             ? 0
             : Math.max(0, Number(settings.blur || 0) + Math.max(0, -Number(settings.sharpness || 0)) * 0.09);
 
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(-w / 2, -h / 2, w, h);
+          ctx.clip();
           ctx.filter =
             'brightness(' + brightness + ')' +
             ' saturate(' + saturation + ')' +
             ' contrast(' + contrast + ')' +
             ' blur(' + blur * 7 + 'px)';
           ctx.drawImage(layerImage, sx, sy, sw, sh, -w / 2, -h / 2, w, h);
-          ctx.filter = 'none';
+          ctx.restore();
 
           if (!layerOriginal) {
             ctx.save();
