@@ -1,9 +1,27 @@
 import { NextResponse } from 'next/server';
 
 const ORIGIN = 'https://cucucovers.com';
-const COLLECTION = 'all-card-covers';
+const DEFAULT_COLLECTION = 'all-card-covers';
 const SHOPIFY_PAGE_SIZE = 250;
 const FALLBACK_TOTAL = 2225;
+
+const COLLECTIONS = {
+  all: { label: 'All Card Skins', handle: 'all-card-covers', total: 2225 },
+  best: { label: 'Best Sellers', handle: 'best-sellers' },
+  new: { label: 'New Arrivals', handle: 'latest-1' },
+  anime: { label: 'Anime', handle: 'anime' },
+  cars: { label: 'Cars', handle: 'cars' },
+  sports: { label: 'Sports', handle: 'nba-card-skins' },
+  artistic: { label: 'Artistic', handle: 'artistic' },
+  cute: { label: 'Cute & Kawaii', handle: 'cute' },
+  pets: { label: 'Pets', handle: 'pets' },
+  classic: { label: 'Classic Art', handle: 'classic-art' },
+  funny: { label: 'Funny', handle: 'funny' },
+  memes: { label: 'Memes', handle: 'memes' },
+  retro: { label: 'Retro & Nostalgic', handle: 'retro' },
+  animals: { label: 'Animals', handle: 'animals' },
+  crypto: { label: 'Crypto', handle: 'crypto-currency' }
+};
 
 const pageCache = new Map();
 
@@ -77,15 +95,12 @@ async function fetchWithTimeout(url, options = {}, timeout = 10000) {
   }
 }
 
-async function getCollectionTotal() {
-  // The full collection was verified at 2,225 products in production smoke.
-  // Avoid a second upstream request per catalog call; it only increases the
-  // chance of Shopify throttling the actual product-data request.
-  return FALLBACK_TOTAL;
+async function getCollectionTotal(collection) {
+  return collection.total || null;
 }
 
-async function getShopifyPage(page) {
-  const key = String(page);
+async function getShopifyPage(collectionHandle, page) {
+  const key = collectionHandle + ':' + String(page);
   const now = Date.now();
   const cached = pageCache.get(key);
   if (cached && cached.expires > now) return cached.promise;
@@ -94,7 +109,7 @@ async function getShopifyPage(page) {
     const url =
       ORIGIN +
       '/collections/' +
-      COLLECTION +
+      collectionHandle +
       '/products.json?limit=' +
       SHOPIFY_PAGE_SIZE +
       '&page=' +
@@ -113,7 +128,7 @@ async function getShopifyPage(page) {
               Accept: 'application/json',
               'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 Version/18.6 Mobile/15E148 Safari/604.1',
               'Accept-Language': 'en-US,en;q=0.9',
-              Referer: ORIGIN + '/collections/' + COLLECTION
+              Referer: ORIGIN + '/collections/' + collectionHandle
             }
           },
           15000
@@ -214,12 +229,14 @@ function flattenProduct(product) {
     cleanFilter: 'direct-shopify-card-art',
     assetMode: 'direct-card-art',
     mediaAlt: candidates[0].alt || title,
-    collection: COLLECTION,
+    collection: product.__collection || DEFAULT_COLLECTION,
     tags
   };
 }
 
 export async function GET(request) {
+  const categoryKey = String(request.nextUrl.searchParams.get('category') || 'all').toLowerCase();
+  const collection = COLLECTIONS[categoryKey] || COLLECTIONS.all;
   const requestedPage = Number(request.nextUrl.searchParams.get('page') || 1);
   const requestedLimit = Number(request.nextUrl.searchParams.get('limit') || 36);
 
@@ -227,37 +244,36 @@ export async function GET(request) {
   const limit = Math.max(12, Math.min(48, Math.floor(Number.isFinite(requestedLimit) ? requestedLimit : 36)));
 
   try {
-    const total = await getCollectionTotal();
+    const knownTotal = await getCollectionTotal(collection);
     const startIndex = (page - 1) * limit;
-    const endIndexExclusive = Math.min(startIndex + limit, total);
-
-    if (startIndex >= total) {
-      return NextResponse.json({
-        results: [],
-        page,
-        limit,
-        total,
-        totalPages: Math.max(1, Math.ceil(total / limit)),
-        hasMore: false,
-        source: 'CUCU Covers · All Card Covers',
-        collectionUrl: ORIGIN + '/collections/' + COLLECTION
-      });
-    }
-
     const firstSourcePage = Math.floor(startIndex / SHOPIFY_PAGE_SIZE) + 1;
-    const lastSourcePage = Math.floor((Math.max(startIndex, endIndexExclusive - 1)) / SHOPIFY_PAGE_SIZE) + 1;
-
-    const sourcePages = await Promise.all(
-      Array.from(
-        { length: lastSourcePage - firstSourcePage + 1 },
-        (_, index) => getShopifyPage(firstSourcePage + index)
-      )
-    );
-
-    const combined = sourcePages.flat();
     const localStart = startIndex - (firstSourcePage - 1) * SHOPIFY_PAGE_SIZE;
+
+    const firstBatch = await getShopifyPage(collection.handle, firstSourcePage);
+    const needsNextBatch = localStart + limit + 1 > firstBatch.length && firstBatch.length === SHOPIFY_PAGE_SIZE;
+    const secondBatch = needsNextBatch
+      ? await getShopifyPage(collection.handle, firstSourcePage + 1)
+      : [];
+
+    const combined = [...firstBatch, ...secondBatch].map((product) => ({
+      ...product,
+      __collection: collection.handle
+    }));
+
     const wanted = combined.slice(localStart, localStart + limit);
     const results = wanted.map(flattenProduct).filter(Boolean);
+
+    const hasBufferedNext = combined.length > localStart + limit;
+    const sourceCouldContinue =
+      firstBatch.length === SHOPIFY_PAGE_SIZE &&
+      (hasBufferedNext || secondBatch.length === SHOPIFY_PAGE_SIZE);
+
+    const inferredHasMore = knownTotal
+      ? startIndex + limit < knownTotal
+      : hasBufferedNext || sourceCouldContinue;
+
+    const total = knownTotal || null;
+    const totalPages = total ? Math.max(1, Math.ceil(total / limit)) : null;
 
     return NextResponse.json(
       {
@@ -265,18 +281,27 @@ export async function GET(request) {
         page,
         limit,
         total,
-        totalPages: Math.max(1, Math.ceil(total / limit)),
-        hasMore: endIndexExclusive < total,
-        source: 'CUCU Covers · All Card Covers',
-        collectionUrl: ORIGIN + '/collections/' + COLLECTION,
+        totalPages,
+        hasMore: inferredHasMore,
+        source: 'CUCU Covers · ' + collection.label,
+        category: categoryKey,
+        categoryLabel: collection.label,
+        collectionHandle: collection.handle,
+        categories: Object.entries(COLLECTIONS).map(([key, value]) => ({
+          key,
+          label: value.label,
+          handle: value.handle
+        })),
         upstream: {
-          collection: COLLECTION,
+          collection: collection.handle,
           shopifyPageSize: SHOPIFY_PAGE_SIZE
         }
       },
       {
         headers: {
-          'Cache-Control': 'public, s-maxage=900, stale-while-revalidate=3600'
+          'Cache-Control': 'public, max-age=300, s-maxage=21600, stale-while-revalidate=604800',
+          'CDN-Cache-Control': 'public, max-age=21600, stale-while-revalidate=604800',
+          'Vercel-CDN-Cache-Control': 'public, max-age=21600, stale-while-revalidate=604800'
         }
       }
     );
@@ -287,11 +312,19 @@ export async function GET(request) {
         error: error?.message || 'CUCU catalog failed',
         results: [],
         page,
-        limit: requestedLimit,
-        total: FALLBACK_TOTAL,
-        source: 'CUCU Covers · All Card Covers'
+        limit,
+        total: collection.total || null,
+        source: 'CUCU Covers · ' + collection.label,
+        category: categoryKey,
+        categoryLabel: collection.label,
+        collectionHandle: collection.handle
       },
-      { status: 502 }
+      {
+        status: 502,
+        headers: {
+          'Cache-Control': 'public, max-age=30, s-maxage=120, stale-while-revalidate=600'
+        }
+      }
     );
   }
 }
