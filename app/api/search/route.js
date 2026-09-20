@@ -167,7 +167,7 @@ async function htmlSearch(store, term) {
   const seen = new Set();
   const re = /href=["'](?:https?:\/\/[^"']+)?\/products\/([^"'?#/]+)[^"']*["']/gi;
   let match;
-  while ((match = re.exec(html)) && handles.length < 12) {
+  while ((match = re.exec(html)) && handles.length < 40) {
     const handle = match[1];
     if (seen.has(handle)) continue;
     seen.add(handle);
@@ -181,17 +181,61 @@ async function htmlSearch(store, term) {
   }));
 }
 
-async function searchStore(store, term) {
+async function catalogSearch(store, term) {
   try {
-    const predictive = await predictiveSearch(store, term);
-    if (predictive.length) return predictive;
-  } catch {}
+    const endpoint = store.origin + '/products.json?limit=250';
+    const response = await fetch(endpoint, {
+      headers: {
+        'User-Agent': 'AirCard-Card-Studio/3.0 (+https://github.com/NightVibes33/Card-Maker)',
+        Accept: 'application/json'
+      },
+      next: { revalidate: 3600 }
+    });
 
-  try {
-    return await htmlSearch(store, term);
+    if (!response.ok) return [];
+    const json = await response.json();
+
+    return (json?.products || [])
+      .filter((product) => {
+        const title = cleanText(product.title || '');
+        if (!isCardSkinTitle(title)) return false;
+        const searchable = [
+          title,
+          product.handle || '',
+          cleanText(product.body_html || ''),
+          Array.isArray(product.tags) ? product.tags.join(' ') : product.tags || ''
+        ].join(' ');
+        return isRelevantToTerm(searchable, term);
+      })
+      .slice(0, 24)
+      .map((product) => ({
+        title: cleanText(product.title),
+        url: store.origin + '/products/' + product.handle,
+        image: normalizeImageUrl(product.image?.src || product.images?.[0]?.src || '', store.origin)
+      }));
   } catch {
     return [];
   }
+}
+
+async function searchStore(store, term) {
+  const [predictive, html, catalog] = await Promise.all([
+    predictiveSearch(store, term).catch(() => []),
+    htmlSearch(store, term).catch(() => []),
+    catalogSearch(store, term)
+  ]);
+
+  const merged = [];
+  const seen = new Set();
+
+  for (const hit of [...predictive, ...html, ...catalog]) {
+    const handle = extractHandle(hit.url);
+    if (!handle || seen.has(handle)) continue;
+    seen.add(handle);
+    merged.push(hit);
+  }
+
+  return merged;
 }
 
 function mediaScore(media, fallbackUrl = '') {
