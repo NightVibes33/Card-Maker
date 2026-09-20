@@ -2096,9 +2096,33 @@ export default function Page() {
     setMessage('New card');
   }
 
+  const selectedLayer = useMemo(
+    () => (design.customLayers || []).find((layer) => layer.id === selectedElement) || null,
+    [design.customLayers, selectedElement]
+  );
+
   const preview = (
-    <section className={'previewShell ' + (tab === 'browse' ? 'browsePreview' : 'editingPreview')}>
-      <div className="cardFrame">
+    <section className={'previewShell editingPreview ' + (previewMode === 'physical' ? 'physicalPreview' : '')}>
+      <div className="studioFloatingBar" aria-label="Studio history and comparison controls">
+        <div className="historyButtons">
+          <button type="button" onClick={undo} disabled={!undoRef.current.length} aria-label="Undo">↶</button>
+          <button type="button" onClick={redo} disabled={!redoRef.current.length} aria-label="Redo">↷</button>
+        </div>
+        <span className={'savePill ' + (saveStatus === 'Saved' ? 'isSaved' : '')}>{saveStatus}</span>
+        <button
+          type="button"
+          className="beforeAfterButton"
+          disabled={!design.background}
+          onPointerDown={() => setShowOriginal(true)}
+          onPointerUp={() => setShowOriginal(false)}
+          onPointerCancel={() => setShowOriginal(false)}
+          onPointerLeave={() => setShowOriginal(false)}
+        >
+          Before
+        </button>
+      </div>
+
+      <div className={'cardFrame ' + (previewMode === 'physical' ? 'physicalCard' : '')}>
         <canvas
           ref={canvasRef}
           width={OUT_W}
@@ -2107,9 +2131,60 @@ export default function Page() {
           onPointerMove={pointerMove}
           onPointerUp={pointerUp}
           onPointerCancel={pointerUp}
-          aria-label="Card preview. Drag to reposition artwork and pinch to zoom."
+          aria-label="Editable card preview. Drag the selected element. Use two fingers to scale and rotate."
         />
+
+        {tab === 'studio' && guidesEnabled ? (
+          <div className="cardGuides" aria-hidden="true">
+            <i className="guide safeEdge" />
+            <i className="guide textSafe" />
+            <i className="guide chipZone" />
+            <i className="guide contactlessZone" />
+            {activeGuides.x ? <i className="snapGuide vertical" /> : null}
+            {activeGuides.y ? <i className="snapGuide horizontal" /> : null}
+          </div>
+        ) : null}
+
+        {tab === 'studio' && selectedElement === 'chip' && design.chip ? (
+          <div
+            className="selectionOutline chipSelection"
+            aria-hidden="true"
+            style={{
+              left: (design.chipX * 100) + '%',
+              top: (design.chipY * 100) + '%',
+              width: ((255 * design.chipScale / OUT_W) * 100) + '%',
+              height: ((188 * design.chipScale / OUT_H) * 100) + '%'
+            }}
+          />
+        ) : null}
+
+        {tab === 'studio' && selectedElement === 'contactless' && design.contactless ? (
+          <div
+            className="selectionOutline contactlessSelection"
+            aria-hidden="true"
+            style={{
+              left: (design.contactlessX * 100 - 5) + '%',
+              top: (design.contactlessY * 100 - 8) + '%',
+              width: '10%',
+              height: '16%'
+            }}
+          />
+        ) : null}
+
+        {tab === 'studio' && selectedLayer ? (
+          <div
+            className="selectionOutline layerSelection"
+            aria-hidden="true"
+            style={{
+              left: (Number(selectedLayer.x || 0.5) * 100 - 5) + '%',
+              top: (Number(selectedLayer.y || 0.5) * 100 - 8) + '%',
+              width: '10%',
+              height: '16%'
+            }}
+          />
+        ) : null}
       </div>
+
       <div className="previewCaption" aria-live="polite">
         <span>{design.backgroundLabel}</span>
         <span>{message}</span>
@@ -2127,55 +2202,89 @@ export default function Page() {
         <button type="button" className="navTextButton" onClick={reset}>New</button>
       </header>
 
-      {preview}
+      {!online ? (
+        <div className="offlineBanner" role="status">
+          Offline · cached favorites, projects, and previously loaded card art remain available.
+        </div>
+      ) : null}
+
+      {(tab === 'studio' || tab === 'export') ? preview : null}
 
       <div className="screenContent">
-        {tab === 'browse' && (
-          <div className="tabScreen">
-            <section className="searchSection sourceSection" aria-label="CUCU card skins">
-              <div className="catalogCategoryIntro">
-                <div>
-                  <strong>CUCU Covers</strong>
-                  <span>
-                    {cucuTotal > 0
-                      ? cucuTotal.toLocaleString() + ' in this collection'
-                      : 'Real storefront collections'}
-                  </span>
-                </div>
-                <p>
-                  Card skins are loaded from CUCU’s real collections and served through Card Studio’s cache.
-                </p>
+        {tab === 'discover' && (
+          <div className="tabScreen discoverScreen">
+            <section className="discoverHero">
+              <div>
+                <span className="eyebrow">CUCU Covers</span>
+                <h2>Discover a card skin</h2>
               </div>
+              <button type="button" className="surpriseButton" onClick={surpriseMe}>Surprise Me</button>
             </section>
 
-            <section className="browseSection realCategorySection" aria-label="CUCU card skin collections">
-              <div className="browseHeading">
-                <h2>Collections</h2>
-                <span>CUCU</span>
-              </div>
-              <div className="categoryScroller" role="tablist" aria-label="CUCU collection">
-                {CUCU_CATEGORIES.map(([value, label]) => (
-                  <button
-                    type="button"
-                    role="tab"
-                    key={value}
-                    aria-selected={cucuCategory === value}
-                    className={cucuCategory === value ? 'categoryChip selected' : 'categoryChip'}
-                    onClick={() => {
-                      if (value === cucuCategory) return;
-                      setCucuCategory(value);
-                      setCucuCategoryLabel(label);
-                      setCucuItems([]);
-                      setCucuPage(0);
-                      setCucuTotal(0);
-                      setCucuHasMore(true);
-                    }}
-                  >
-                    {label}
-                  </button>
+            <div className="searchField discoverSearch">
+              <IOSIcon name="search" size={19} />
+              <input
+                value={searchInput}
+                aria-label="Search all CUCU card skins"
+                enterKeyHint="search"
+                placeholder="Search 2,225+ card skins"
+                onChange={(event) => setSearchInput(event.target.value)}
+              />
+              {searchInput ? (
+                <button type="button" className="clearSearch" onClick={() => setSearchInput('')} aria-label="Clear search">
+                  <IOSIcon name="x" size={16} />
+                </button>
+              ) : null}
+            </div>
+
+            <div className="categoryScroller discoverCategories" role="tablist" aria-label="CUCU collection">
+              {CUCU_CATEGORIES.map(([value, label]) => (
+                <button
+                  type="button"
+                  role="tab"
+                  key={value}
+                  aria-selected={!query && cucuCategory === value}
+                  className={!query && cucuCategory === value ? 'categoryChip selected' : 'categoryChip'}
+                  onClick={() => {
+                    setSearchInput('');
+                    setQuery('');
+                    if (value === cucuCategory && cucuPage > 0) return;
+                    setCucuCategory(value);
+                    setCucuCategoryLabel(label);
+                    setCucuItems([]);
+                    setCucuPage(0);
+                    setCucuTotal(0);
+                    setCucuHasMore(true);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {!query && cucuCategory === 'all' ? (
+              <>
+                {Object.entries(featured).map(([title, items]) => (
+                  <ArtworkRail
+                    key={title}
+                    title={title}
+                    items={items}
+                    onPick={useArtwork}
+                    favoriteIds={favoriteIds}
+                    onFavorite={toggleFavorite}
+                    onMenu={setMenuItem}
+                  />
                 ))}
-              </div>
-            </section>
+                <ArtworkRail
+                  title="Recently Used"
+                  items={recent}
+                  onPick={useArtwork}
+                  favoriteIds={favoriteIds}
+                  onFavorite={toggleFavorite}
+                  onMenu={setMenuItem}
+                />
+              </>
+            ) : null}
 
             <StoreCatalog
               storeName="CUCU Covers"
@@ -2183,149 +2292,373 @@ export default function Page() {
               items={cucuItems}
               total={cucuTotal}
               loading={cucuLoading}
-              hasMore={cucuHasMore}
+              error={catalogError}
+              onRetry={() => loadCucu(Math.max(1, cucuPage || 1), cucuPage === 0, cucuCategory, query)}
               onPick={useArtwork}
-              onLoadMore={() => loadCucu(cucuPage + 1, false, cucuCategory)}
+              favoriteIds={favoriteIds}
+              onFavorite={toggleFavorite}
+              onMenu={setMenuItem}
             />
 
-            <ArtworkRail title="Recent" items={recent} onPick={useArtwork} />
+            <div ref={loadMoreRef} className="infiniteSentinel" aria-hidden="true" />
 
-            <section className="browseSection">
-              <div className="browseHeading"><h2>Your Designs</h2><span>Local</span></div>
-              <div className="gradientRail" role="list">
-                {GRADIENTS.map((item) => (
+            <div className="discoverImportRow">
+              <button type="button" className="secondaryAction uploadAction" onClick={() => uploadRef.current?.click()}>
+                <IOSIcon name="photo" size={21} />
+                <span>Import Photo or File</span>
+              </button>
+              <input ref={uploadRef} type="file" accept="image/*" hidden onChange={uploadImage} />
+            </div>
+          </div>
+        )}
+
+        {tab === 'studio' && (
+          <div className="tabScreen studioScreen">
+            <div className="studioModeRow">
+              <div className="studioToolBar" role="tablist" aria-label="Studio tools">
+                {STUDIO_TOOLS.map(([value, label]) => (
                   <button
                     type="button"
-                    role="listitem"
-                    key={item.id}
-                    className={design.gradient === item.id && !design.background ? 'gradientSwatch selected' : 'gradientSwatch'}
-                    style={{ background: 'linear-gradient(135deg,' + item.a + ',' + item.b + ',' + item.c + ')' }}
-                    onClick={() => patch({ gradient: item.id, background: '', backgroundLabel: item.name, sourceCrop: null })}
-                    aria-label={'Use ' + item.name + ' background'}
+                    role="tab"
+                    key={value}
+                    aria-selected={studioTool === value}
+                    className={studioTool === value ? 'active' : ''}
+                    onClick={() => setStudioTool(value)}
                   >
-                    <span>{item.name}</span>
+                    {label}
                   </button>
                 ))}
               </div>
-            </section>
 
-            <button type="button" className="secondaryAction uploadAction" onClick={() => uploadRef.current?.click()}>
-              <IOSIcon name="photo" size={21} />
-              <span>Choose Photo</span>
-            </button>
-            <input ref={uploadRef} type="file" accept="image/*" hidden onChange={uploadImage} />
-          </div>
-        )}
-
-        {tab === 'edit' && (
-          <div className="tabScreen">
-            <p className="editStatus" aria-live="polite">
-              {design.background ? 'Live preview · changes apply instantly' : 'Choose a card skin or photo first'}
-            </p>
-            <Group title="LAYOUT" footer="Drag directly on the card to move the artwork. Pinch the card with two fingers to zoom.">
-              <div className="groupRow segmentedRow">
-                <div className="segmentedControl compact" role="tablist" aria-label="Artwork fit mode">
-                  <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
-                  <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
-                </div>
-                <button type="button" className="iconTextButton" disabled={!design.background} onClick={() => patch({ fit: 'cover', zoom: 1, x: 0, y: 0, rotate: 0 })}>
-                  <IOSIcon name="reset" size={18} />
-                  <span>Reset</span>
-                </button>
+              <div className="previewModeToggle" role="group" aria-label="Preview style">
+                <button type="button" className={previewMode === 'flat' ? 'active' : ''} onClick={() => setPreviewMode('flat')}>Flat</button>
+                <button type="button" className={previewMode === 'physical' ? 'active' : ''} onClick={() => setPreviewMode('physical')}>Physical</button>
               </div>
-              <SliderRow label="Zoom" value={design.zoom} min={0.5} max={5} step={0.01} disabled={!design.background} onChange={(value) => patch({ zoom: value })} />
-              <SliderRow label="Horizontal" value={design.x} min={-1.5} max={1.5} step={0.01} disabled={!design.background} onChange={(value) => patch({ x: value })} />
-              <SliderRow label="Vertical" value={design.y} min={-1.5} max={1.5} step={0.01} disabled={!design.background} onChange={(value) => patch({ y: value })} />
-              <SliderRow label="Rotation" value={design.rotate} min={-25} max={25} step={1} suffix="°" disabled={!design.background} onChange={(value) => patch({ rotate: value })} />
-            </Group>
+            </div>
 
-            <Group title="IMAGE">
-              <SliderRow label="Brightness" value={design.brightness} min={0.4} max={1.7} step={0.01} disabled={!design.background} onChange={(value) => patch({ brightness: value })} />
-              <SliderRow label="Saturation" value={design.saturation} min={0} max={2.4} step={0.01} disabled={!design.background} onChange={(value) => patch({ saturation: value })} />
-              <SliderRow label="Contrast" value={design.contrast} min={0.45} max={1.8} step={0.01} disabled={!design.background} onChange={(value) => patch({ contrast: value })} />
-              <SliderRow label="Soft Blur" value={design.blur} min={0} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ blur: value })} />
-              <button
-                type="button"
-                className="settingsResetButton"
-                disabled={!design.background}
-                onClick={() => patch({ brightness: 1, saturation: 1, contrast: 1, blur: 0 })}
-              >
-                Reset Image Adjustments
-              </button>
-            </Group>
+            {studioTool === 'crop' ? (
+              <>
+                <Group title="CROP">
+                  <div className="groupRow segmentedRow">
+                    <div className="segmentedControl compact" role="tablist" aria-label="Artwork fit">
+                      <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
+                      <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
+                    </div>
+                    <button type="button" className="iconTextButton" disabled={!design.background} onClick={() => patch({ flipX: !design.flipX })}>
+                      <span>{design.flipX ? 'Unflip' : 'Flip'}</span>
+                    </button>
+                  </div>
+                  <button type="button" className="actionRow" onClick={() => uploadRef.current?.click()}>
+                    <span><strong>Replace Artwork</strong><small>Photos or Files</small></span>
+                    <IOSIcon name="photo" size={19} />
+                  </button>
+                  <button type="button" className="settingsResetButton" disabled={!design.background} onClick={() => patch({ fit: 'cover', zoom: 1, x: 0, y: 0, rotate: 0, flipX: false })}>
+                    Reset Crop
+                  </button>
+                </Group>
+              </>
+            ) : null}
 
-            <Group title="FINISH">
-              <SliderRow label="Dark Overlay" value={design.overlay} min={0} max={0.75} step={0.01} onChange={(value) => patch({ overlay: value })} />
-              <SliderRow label="Vignette" value={design.vignette} min={0} max={0.8} step={0.01} onChange={(value) => patch({ vignette: value })} />
-              <SliderRow label="Gloss" value={design.gloss} min={0} max={0.8} step={0.01} onChange={(value) => patch({ gloss: value })} />
-              <SliderRow label="Grain" value={design.grain} min={0} max={0.22} step={0.005} onChange={(value) => patch({ grain: value })} />
-              <button
-                type="button"
-                className="settingsResetButton"
-                onClick={() => patch({ overlay: 0.1, vignette: 0.24, gloss: 0.2, grain: 0.035 })}
-              >
-                Reset Finish
-              </button>
-            </Group>
-          </div>
-        )}
+            {studioTool === 'position' ? (
+              <>
+                <Group title="POSITION" footer="Tap artwork, chip, contactless, or a custom layer on the card to select it. Drag to move. Two fingers scale and rotate.">
+                  <button type="button" className={'selectionRow ' + (selectedElement === 'artwork' ? 'selected' : '')} onClick={() => setSelectedElement('artwork')}>Artwork</button>
+                  {design.chip ? <button type="button" className={'selectionRow ' + (selectedElement === 'chip' ? 'selected' : '')} onClick={() => setSelectedElement('chip')}>EMV Chip</button> : null}
+                  {design.contactless ? <button type="button" className={'selectionRow ' + (selectedElement === 'contactless' ? 'selected' : '')} onClick={() => setSelectedElement('contactless')}>Contactless</button> : null}
 
-        {tab === 'layers' && (
-          <div className="tabScreen">
-            <Group title="CARD HARDWARE" footer="These elements are rendered into the final PNG.">
-              <SwitchRow label="EMV Chip" detail="Credit-card chip layer" value={design.chip} onChange={(value) => patch({ chip: value })} />
-              {design.chip ? (
-                <div className="nestedControls">
-                  <div className="tonePicker" role="radiogroup" aria-label="Chip finish">
-                    {['gold', 'silver', 'black', 'rose'].map((tone) => (
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={design.chipTone === tone}
-                        key={tone}
-                        className={design.chipTone === tone ? 'selected' : ''}
-                        onClick={() => patch({ chipTone: tone })}
-                      >
-                        <i className={'chipTone ' + tone} aria-hidden="true" />
-                        <span>{tone[0].toUpperCase() + tone.slice(1)}</span>
-                      </button>
+                  {selectedElement === 'artwork' ? (
+                    <>
+                      <SliderRow label="Artwork zoom" value={design.zoom} min={0.5} max={5} step={0.01} disabled={!design.background} onChange={(value) => patch({ zoom: value })} />
+                      <SliderRow label="Artwork horizontal position" value={design.x} min={-1.5} max={1.5} step={0.01} disabled={!design.background} onChange={(value) => patch({ x: value })} />
+                      <SliderRow label="Artwork vertical position" value={design.y} min={-1.5} max={1.5} step={0.01} disabled={!design.background} onChange={(value) => patch({ y: value })} />
+                      <SliderRow label="Artwork rotation" value={design.rotate} min={-180} max={180} step={1} suffix="°" disabled={!design.background} onChange={(value) => patch({ rotate: value })} />
+                    </>
+                  ) : null}
+
+                  {selectedElement === 'chip' && design.chip ? (
+                    <>
+                      <SliderRow label="Chip size" value={design.chipScale} min={0.5} max={2} step={0.01} onChange={(value) => patch({ chipScale: value })} />
+                      <SliderRow label="Chip horizontal position" value={design.chipX} min={0} max={0.82} step={0.005} onChange={(value) => patch({ chipX: value })} />
+                      <SliderRow label="Chip vertical position" value={design.chipY} min={0} max={0.8} step={0.005} onChange={(value) => patch({ chipY: value })} />
+                      <SliderRow label="Chip rotation" value={design.chipRotation} min={-45} max={45} step={1} suffix="°" onChange={(value) => patch({ chipRotation: value })} />
+                    </>
+                  ) : null}
+
+                  {selectedElement === 'contactless' && design.contactless ? (
+                    <>
+                      <SliderRow label="Contactless size" value={design.contactlessScale} min={0.4} max={2.2} step={0.01} onChange={(value) => patch({ contactlessScale: value })} />
+                      <SliderRow label="Contactless horizontal position" value={design.contactlessX} min={0.03} max={0.97} step={0.005} onChange={(value) => patch({ contactlessX: value })} />
+                      <SliderRow label="Contactless vertical position" value={design.contactlessY} min={0.03} max={0.97} step={0.005} onChange={(value) => patch({ contactlessY: value })} />
+                    </>
+                  ) : null}
+
+                  <SwitchRow label="Alignment Guides" detail="Safe areas, snap lines, chip/contactless zones" value={guidesEnabled} onChange={setGuidesEnabled} />
+                </Group>
+
+                {expertMode ? (
+                  <Group title="EXPERT VALUES">
+                    <label className="numericRow"><span>Zoom</span><input type="number" step="0.001" value={design.zoom} onChange={(event) => patch({ zoom: clamp(Number(event.target.value), 0.5, 5) })} /></label>
+                    <label className="numericRow"><span>X</span><input type="number" step="0.001" value={design.x} onChange={(event) => patch({ x: clamp(Number(event.target.value), -1.5, 1.5) })} /></label>
+                    <label className="numericRow"><span>Y</span><input type="number" step="0.001" value={design.y} onChange={(event) => patch({ y: clamp(Number(event.target.value), -1.5, 1.5) })} /></label>
+                    <label className="numericRow"><span>Rotation</span><input type="number" step="0.1" value={design.rotate} onChange={(event) => patch({ rotate: clamp(Number(event.target.value), -180, 180) })} /></label>
+                  </Group>
+                ) : null}
+              </>
+            ) : null}
+
+            {studioTool === 'adjust' ? (
+              <>
+                <section className="presetSection">
+                  <h3 className="sectionLabel">PRESETS</h3>
+                  <div className="presetScroller">
+                    {Object.keys(ADJUSTMENT_PRESETS).map((name) => (
+                      <button type="button" key={name} onClick={() => applyAdjustmentPreset(name)}>{name}</button>
                     ))}
                   </div>
-                  <SliderRow label="Chip Size" value={design.chipScale} min={0.6} max={1.6} step={0.01} onChange={(value) => patch({ chipScale: value })} />
-                  <SliderRow label="Chip X" value={design.chipX} min={0} max={0.72} step={0.005} onChange={(value) => patch({ chipX: value })} />
-                  <SliderRow label="Chip Y" value={design.chipY} min={0} max={0.72} step={0.005} onChange={(value) => patch({ chipY: value })} />
-                  <SliderRow label="Chip Angle" value={design.chipRotation} min={-20} max={20} step={1} suffix="°" onChange={(value) => patch({ chipRotation: value })} />
-                </div>
-              ) : null}
+                </section>
+                <Group title="IMAGE">
+                  <SliderRow label="Exposure" value={design.exposure} min={-1} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ exposure: value })} />
+                  <SliderRow label="Brightness" value={design.brightness} min={0.4} max={1.7} step={0.01} disabled={!design.background} onChange={(value) => patch({ brightness: value })} />
+                  <SliderRow label="Contrast" value={design.contrast} min={0.45} max={1.8} step={0.01} disabled={!design.background} onChange={(value) => patch({ contrast: value })} />
+                  <SliderRow label="Saturation" value={design.saturation} min={0} max={2.4} step={0.01} disabled={!design.background} onChange={(value) => patch({ saturation: value })} />
+                  <SliderRow label="Highlights" value={design.highlights} min={-1} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ highlights: value })} />
+                  <SliderRow label="Shadows" value={design.shadows} min={-1} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ shadows: value })} />
+                  <SliderRow label="Temperature" value={design.temperature} min={-1} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ temperature: value })} />
+                  <SliderRow label="Tint" value={design.tint} min={-1} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ tint: value })} />
+                  <SliderRow label="Sharpness" value={design.sharpness} min={-1} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ sharpness: value })} />
+                  <SliderRow label="Blur" value={design.blur} min={0} max={1} step={0.01} disabled={!design.background} onChange={(value) => patch({ blur: value })} />
+                  <button type="button" className="settingsResetButton" disabled={!design.background} onClick={() => applyAdjustmentPreset('Original')}>Reset Adjustments</button>
+                </Group>
+              </>
+            ) : null}
 
-              <SwitchRow label="Contactless" detail="Tap-to-pay symbol" value={design.contactless} onChange={(value) => patch({ contactless: value })} />
-              {design.contactless ? (
-                <div className="nestedControls">
-                  <SliderRow label="Symbol Size" value={design.contactlessScale} min={0.55} max={1.6} step={0.01} onChange={(value) => patch({ contactlessScale: value })} />
-                  <SliderRow label="Symbol X" value={design.contactlessX} min={0} max={0.9} step={0.005} onChange={(value) => patch({ contactlessX: value })} />
-                  <SliderRow label="Symbol Y" value={design.contactlessY} min={0} max={0.9} step={0.005} onChange={(value) => patch({ contactlessY: value })} />
+            {studioTool === 'effects' ? (
+              <Group title="EFFECTS">
+                <SliderRow label="Vignette intensity" value={design.vignette} min={0} max={0.8} step={0.01} onChange={(value) => patch({ vignette: value })} />
+                <SliderRow label="Grain" value={design.grain} min={0} max={0.22} step={0.005} onChange={(value) => patch({ grain: value })} />
+                <SliderRow label="Gloss" value={design.gloss} min={0} max={0.8} step={0.01} onChange={(value) => patch({ gloss: value })} />
+                <SliderRow label="Dark Overlay" value={design.overlay} min={0} max={0.75} step={0.01} onChange={(value) => patch({ overlay: value })} />
+                <SliderRow label="Fade" value={design.fade} min={0} max={1} step={0.01} onChange={(value) => patch({ fade: value })} />
+                <label className="colorRow">
+                  <span>Color Tint</span>
+                  <input aria-label="Effect tint color" type="color" value={design.effectTint} onChange={(event) => patch({ effectTint: event.target.value })} />
+                </label>
+                <SliderRow label="Tint Strength" value={design.effectTintStrength} min={0} max={1} step={0.01} onChange={(value) => patch({ effectTintStrength: value })} />
+                <button type="button" className="settingsResetButton" onClick={() => patch({ overlay: 0.1, vignette: 0.24, gloss: 0.2, grain: 0.035, fade: 0, effectTintStrength: 0 })}>Reset Effects</button>
+              </Group>
+            ) : null}
+
+            {studioTool === 'card' ? (
+              <>
+                <section className="presetSection">
+                  <h3 className="sectionLabel">CARD PRESETS</h3>
+                  <div className="presetScroller">
+                    {Object.keys(CARD_PRESETS).map((name) => (
+                      <button type="button" key={name} onClick={() => applyCardPreset(name)}>{name}</button>
+                    ))}
+                  </div>
+                </section>
+
+                <Group title="CARD HARDWARE">
+                  <SwitchRow label="EMV Chip" detail="Tap the chip on the card to position it directly" value={design.chip} onChange={(value) => patch({ chip: value })} />
+                  {design.chip ? (
+                    <div className="nestedControls">
+                      <div className="tonePicker" role="radiogroup" aria-label="Chip finish">
+                        {['gold', 'silver', 'black', 'rose'].map((tone) => (
+                          <button type="button" role="radio" aria-checked={design.chipTone === tone} key={tone} className={design.chipTone === tone ? 'selected' : ''} onClick={() => patch({ chipTone: tone })}>
+                            <i className={'chipTone ' + tone} aria-hidden="true" />
+                            <span>{tone[0].toUpperCase() + tone.slice(1)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  <SwitchRow label="Contactless" detail="Tap the symbol on the card to position it directly" value={design.contactless} onChange={(value) => patch({ contactless: value })} />
+                </Group>
+
+                <Group title="CARD TEXT">
+                  <SwitchRow label="Masked Number" value={design.number} onChange={(value) => patch({ number: value })} />
+                  {design.number ? <input className="iosTextField" aria-label="Masked card number" value={design.numberText} onChange={(event) => patch({ numberText: event.target.value.slice(0, 32) })} /> : null}
+                  <SwitchRow label="Card Holder" value={design.holder} onChange={(value) => patch({ holder: value })} />
+                  {design.holder ? <input className="iosTextField" aria-label="Card holder" value={design.holderText} onChange={(event) => patch({ holderText: event.target.value.slice(0, 28) })} /> : null}
+                  <SwitchRow label="Expiry" value={design.expiry} onChange={(value) => patch({ expiry: value })} />
+                  {design.expiry ? <input className="iosTextField" aria-label="Expiry date" value={design.expiryText} onChange={(event) => patch({ expiryText: event.target.value.slice(0, 8) })} /> : null}
+                  <SwitchRow label="Top Badge" value={design.badge} onChange={(value) => patch({ badge: value })} />
+                  {design.badge ? <input className="iosTextField" aria-label="Top badge text" value={design.badgeText} onChange={(event) => patch({ badgeText: event.target.value.slice(0, 18) })} /> : null}
+                  <label className="colorRow">
+                    <span>Text Color</span>
+                    <input aria-label="Text color" type="color" value={design.textColor} onChange={(event) => patch({ textColor: event.target.value })} />
+                  </label>
+                </Group>
+
+                <Group title="CUSTOM LAYERS" footer="Image, text, and shape layers are embedded into the final AirCard PNG.">
+                  <div className="layerAddRow">
+                    <button type="button" onClick={addTextLayer}>+ Text</button>
+                    <button type="button" onClick={() => layerUploadRef.current?.click()}>+ Image</button>
+                    <button type="button" onClick={addShapeLayer}>+ Shape</button>
+                  </div>
+                  <input ref={layerUploadRef} type="file" accept="image/*" hidden onChange={uploadLayerImage} />
+
+                  {(design.customLayers || []).map((layer) => (
+                    <button
+                      type="button"
+                      key={layer.id}
+                      className={'layerRow ' + (selectedElement === layer.id ? 'selected' : '')}
+                      onClick={() => setSelectedElement(layer.id)}
+                    >
+                      <span><strong>{layer.name || layer.type}</strong><small>{layer.type}</small></span>
+                      <span>{layer.locked ? 'Locked' : 'Edit'}</span>
+                    </button>
+                  ))}
+                </Group>
+
+                {selectedLayer ? (
+                  <Group title="SELECTED LAYER">
+                    {selectedLayer.type === 'text' ? (
+                      <>
+                        <input className="iosTextField" aria-label="Layer text" value={selectedLayer.text || ''} onChange={(event) => updateLayer(selectedLayer.id, { text: event.target.value })} />
+                        <SliderRow label="Font Size" value={selectedLayer.fontSize || 58} min={10} max={240} step={1} onChange={(value) => updateLayer(selectedLayer.id, { fontSize: value })} />
+                        <SliderRow label="Weight" value={selectedLayer.weight || 700} min={100} max={900} step={100} onChange={(value) => updateLayer(selectedLayer.id, { weight: value })} />
+                        <SliderRow label="Letter Spacing" value={selectedLayer.letterSpacing || 0} min={-4} max={30} step={1} onChange={(value) => updateLayer(selectedLayer.id, { letterSpacing: value })} />
+                        <label className="colorRow"><span>Color</span><input type="color" value={selectedLayer.color || '#ffffff'} onChange={(event) => updateLayer(selectedLayer.id, { color: event.target.value })} /></label>
+                      </>
+                    ) : null}
+                    {selectedLayer.type === 'shape' ? (
+                      <>
+                        <div className="segmentedControl compact">
+                          <button type="button" className={selectedLayer.shape !== 'ellipse' ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { shape: 'rectangle' })}>Rectangle</button>
+                          <button type="button" className={selectedLayer.shape === 'ellipse' ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { shape: 'ellipse' })}>Ellipse</button>
+                        </div>
+                        <SliderRow label="Width" value={selectedLayer.width || 280} min={20} max={1200} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
+                        <SliderRow label="Height" value={selectedLayer.height || 120} min={20} max={800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { height: value })} />
+                        <label className="colorRow"><span>Color</span><input type="color" value={selectedLayer.color || '#ffffff'} onChange={(event) => updateLayer(selectedLayer.id, { color: event.target.value })} /></label>
+                      </>
+                    ) : null}
+                    {selectedLayer.type === 'image' ? (
+                      <SliderRow label="Image Width" value={selectedLayer.width || 320} min={20} max={1300} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
+                    ) : null}
+                    <SliderRow label="Layer X" value={selectedLayer.x || 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id, { x: value })} />
+                    <SliderRow label="Layer Y" value={selectedLayer.y || 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id, { y: value })} />
+                    <SliderRow label="Layer Scale" value={selectedLayer.scale || 1} min={0.1} max={6} step={0.01} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
+                    <SliderRow label="Layer Rotation" value={selectedLayer.rotation || 0} min={-180} max={180} step={1} suffix="°" onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} />
+                    <SliderRow label="Opacity" value={selectedLayer.opacity ?? 1} min={0} max={1} step={0.01} onChange={(value) => updateLayer(selectedLayer.id, { opacity: value })} />
+                    <SwitchRow label="Lock Layer" value={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id, { locked: value })} />
+                    <div className="layerActionGrid">
+                      <button type="button" onClick={() => moveLayer(selectedLayer.id, 1)}>Bring Forward</button>
+                      <button type="button" onClick={() => moveLayer(selectedLayer.id, -1)}>Send Back</button>
+                      <button type="button" onClick={() => duplicateLayer(selectedLayer.id)}>Duplicate</button>
+                      <button type="button" className="destructive" onClick={() => deleteLayer(selectedLayer.id)}>Delete</button>
+                    </div>
+                  </Group>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+        )}
+
+        {tab === 'library' && (
+          <div className="tabScreen libraryScreen">
+            <section className="librarySummary">
+              <div><strong>{favorites.length}</strong><span>Favorites</span></div>
+              <div><strong>{projects.length}</strong><span>Projects</span></div>
+              <div><strong>{imports.length}</strong><span>Imports</span></div>
+            </section>
+
+            <ArtworkRail
+              title="Favorites"
+              items={favorites}
+              onPick={useArtwork}
+              favoriteIds={favoriteIds}
+              onFavorite={toggleFavorite}
+              onMenu={setMenuItem}
+            />
+
+            <section className="browseSection">
+              <div className="browseHeading"><h2>My Designs</h2><span>{projects.length}</span></div>
+              <button type="button" className="primaryAction librarySaveButton" onClick={() => saveProject()}>Save Current Design</button>
+              {projects.length ? (
+                <div className="projectGrid">
+                  {projects.map((project) => (
+                    <article className="projectCard" key={project.id}>
+                      {project.preview ? <img src={project.preview} alt="" /> : <div className="projectPlaceholder" />}
+                      <strong>{project.name}</strong>
+                      <small>{new Date(project.updatedAt || project.createdAt).toLocaleDateString()}</small>
+                      <div className="projectActions">
+                        <button type="button" onClick={() => openProject(project)}>Open</button>
+                        <button type="button" onClick={() => duplicateProject(project)}>Duplicate</button>
+                        <button type="button" className="destructive" onClick={() => removeProject(project)}>Delete</button>
+                      </div>
+                    </article>
+                  ))}
                 </div>
-              ) : null}
+              ) : <div className="stateCard"><strong>No saved designs yet</strong><span>Your autosaved draft is safe. Save named versions here when you want to keep them.</span></div>}
+            </section>
+
+            <ArtworkRail
+              title="Recent"
+              items={recent}
+              onPick={useArtwork}
+              favoriteIds={favoriteIds}
+              onFavorite={toggleFavorite}
+              onMenu={setMenuItem}
+            />
+
+            <section className="browseSection">
+              <div className="browseHeading"><h2>Imports</h2><span>{imports.length}</span></div>
+              {imports.length ? (
+                <div className="importList">
+                  {imports.map((asset) => (
+                    <button
+                      type="button"
+                      className="actionRow"
+                      key={asset.id}
+                      onClick={() => {
+                        patch({ background: 'idb://imports/' + asset.id, backgroundLabel: asset.name, sourceCrop: null, zoom: 1, x: 0, y: 0, rotate: 0 });
+                        setTab('studio');
+                        setStudioTool('crop');
+                      }}
+                    >
+                      <span><strong>{asset.name}</strong><small>{asset.type || 'image'}</small></span>
+                      <IOSIcon name="chevron" size={17} />
+                    </button>
+                  ))}
+                </div>
+              ) : <div className="stateCard"><span>Photos and image files you import will appear here.</span></div>}
+            </section>
+
+            <Group title="DESIGN PRESETS">
+              <button type="button" className="actionRow" onClick={exportPresetJson}>
+                <span><strong>Export Design JSON</strong><small>Share the full editable design state</small></span>
+                <IOSIcon name="export" size={18} />
+              </button>
+              <button type="button" className="actionRow" onClick={() => presetImportRef.current?.click()}>
+                <span><strong>Import Design JSON</strong><small>Restore a shared AirCard preset</small></span>
+                <IOSIcon name="chevron" size={17} />
+              </button>
+              <input ref={presetImportRef} type="file" accept=".json,application/json" hidden onChange={importPresetJson} />
             </Group>
 
-            <Group title="TEXT">
-              <SwitchRow label="Masked Number" value={design.number} onChange={(value) => patch({ number: value })} />
-              {design.number ? <input className="iosTextField" aria-label="Masked card number" value={design.numberText} onChange={(event) => patch({ numberText: event.target.value.slice(0, 32) })} /> : null}
-
-              <SwitchRow label="Card Holder" value={design.holder} onChange={(value) => patch({ holder: value })} />
-              {design.holder ? <input className="iosTextField" aria-label="Card holder" value={design.holderText} onChange={(event) => patch({ holderText: event.target.value.slice(0, 28) })} /> : null}
-
-              <SwitchRow label="Expiry" value={design.expiry} onChange={(value) => patch({ expiry: value })} />
-              {design.expiry ? <input className="iosTextField" aria-label="Expiry date" value={design.expiryText} onChange={(event) => patch({ expiryText: event.target.value.slice(0, 8) })} /> : null}
-
-              <SwitchRow label="Top Badge" value={design.badge} onChange={(value) => patch({ badge: value })} />
-              {design.badge ? <input className="iosTextField" aria-label="Top badge text" value={design.badgeText} onChange={(event) => patch({ badgeText: event.target.value.slice(0, 10).toUpperCase() })} /> : null}
-
-              <label className="colorRow">
-                <span>Text Color</span>
-                <input aria-label="Text color" type="color" value={design.textColor} onChange={(event) => patch({ textColor: event.target.value })} />
-              </label>
+            <Group title="ADVANCED">
+              <SwitchRow label="Expert Mode" detail="Show precise numeric editing controls" value={expertMode} onChange={setExpertMode} />
+              <button type="button" className="actionRow" onClick={() => setInstallHelp(true)}>
+                <span><strong>Install Card Studio</strong><small>Add the PWA to your iPhone Home Screen</small></span>
+                <IOSIcon name="chevron" size={17} />
+              </button>
             </Group>
+
+            <section className="browseSection">
+              <div className="browseHeading"><h2>Export History</h2><span>{exportHistory.length}</span></div>
+              {exportHistory.length ? (
+                <div className="historyList">
+                  {exportHistory.map((entry) => (
+                    <div className="historyRow" key={entry.id}>
+                      <span><strong>{entry.designName}</strong><small>{entry.width} × {entry.height} · {entry.action}</small></span>
+                      <time>{new Date(entry.createdAt).toLocaleDateString()}</time>
+                    </div>
+                  ))}
+                </div>
+              ) : <div className="stateCard"><span>Your saved/shared exports will be recorded here.</span></div>}
+            </section>
           </div>
         )}
 
@@ -2334,12 +2667,16 @@ export default function Page() {
             <section className="exportCard" aria-label="AirCard export details">
               <div className="exportGlyph"><IOSIcon name="export" size={30} /></div>
               <h2>Ready for AirCard</h2>
-              <p>The 3× export matches AirCard’s full-resolution card background size.</p>
+              <p>Preview the finished card, then share or save exact AirCard PNG sizes.</p>
               <div className="exportSpec">
                 <span>1536 × 969</span>
                 <code>cardBackgroundCombined@3x.png</code>
               </div>
             </section>
+
+            <button type="button" className="secondaryAction bigAction" onClick={() => setShowExportPreview(true)}>
+              <span>Full-Screen Preview</span>
+            </button>
 
             <button type="button" className="primaryAction bigAction" onClick={share}>
               <IOSIcon name="export" size={21} />
@@ -2356,6 +2693,8 @@ export default function Page() {
                 <IOSIcon name="chevron" size={17} />
               </button>
             </Group>
+
+            <button type="button" className="secondaryAction bigAction" onClick={() => saveProject()}>Save Design to Library</button>
 
             <p className="legalNote">Artwork rights remain with their respective owners. CUCU card-skin media is screened in-app for usable card artwork before export.</p>
           </div>
@@ -2377,6 +2716,37 @@ export default function Page() {
           </button>
         ))}
       </nav>
+
+      {menuItem ? (
+        <Modal title={menuItem.title} onClose={() => setMenuItem(null)} className="skinMenuSheet">
+          <div className="menuPreview"><CatalogArtwork item={menuItem} alt={menuItem.title} useThumbnail={false} /></div>
+          <button type="button" className="primaryAction" onClick={() => useArtwork(menuItem)}>Use Skin</button>
+          <button type="button" className="secondaryAction" onClick={() => toggleFavorite(menuItem)}>
+            {favoriteIds.has(menuItem.id) ? 'Remove Favorite' : 'Add to Favorites'}
+          </button>
+        </Modal>
+      ) : null}
+
+      {showExportPreview ? (
+        <Modal title="Final Card Preview" onClose={() => setShowExportPreview(false)} className="previewModal">
+          <div className="fullPreviewFrame">
+            <canvas ref={fullPreviewCanvasRef} width={OUT_W} height={OUT_H} aria-label="Full-screen final card preview" />
+          </div>
+          <button type="button" className="primaryAction" onClick={share}>Share 3× PNG</button>
+        </Modal>
+      ) : null}
+
+      {installHelp ? (
+        <Modal title="Install Card Studio" onClose={dismissInstallHelp} className="installModal">
+          <div className="installSteps">
+            <span>1</span><p>Open Card Studio in Safari.</p>
+            <span>2</span><p>Tap the Share button.</p>
+            <span>3</span><p>Choose <strong>Add to Home Screen</strong>.</p>
+            <span>4</span><p>Launch Card Studio from its Home Screen icon for the full-screen PWA experience.</p>
+          </div>
+          <button type="button" className="primaryAction" onClick={dismissInstallHelp}>Got It</button>
+        </Modal>
+      ) : null}
     </main>
   );
 }
