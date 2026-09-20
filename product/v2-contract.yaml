@@ -386,7 +386,7 @@ features:
     file: app/page.jsx
     contains:
       - "Expert Mode"
-      - "EXPERT VALUES"
+      - "Precision"
       - "Exact numerical access to every global transform, adjustment, effect, and card-hardware parameter."
       - "Effect Tint Strength"
       - "Contactless X"
