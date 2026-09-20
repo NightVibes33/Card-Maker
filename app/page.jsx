@@ -6140,7 +6140,7 @@ export default function Page() {
                       type="button"
                       className="actionRow"
                       key={asset.id}
-                      disabled={cleanupInProgress}
+                      disabled={cleanupInProgress || presetTransferInProgress || imageImportInProgress}
                       onClick={() => {
                         patch({
                           background: 'idb://imports/' + asset.id,
