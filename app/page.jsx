@@ -2046,18 +2046,32 @@ export default function Page() {
             } catch {}
 
             controllerReloadInFlight = true;
-            const snapshot = designRef.current;
-            const result = await persistDraftSnapshot(snapshot);
+            let snapshot = designRef.current;
+            let result = null;
 
-            if (!result.success) {
-              controllerReloadInFlight = false;
-              setSaveStatus('Save failed');
-              setMessage('Update ready, but the latest edit could not be saved. Reload manually when it is safe.');
-              return;
+            for (let attempt = 0; attempt < 3; attempt += 1) {
+              result = await persistDraftSnapshot(snapshot);
+
+              if (!result.success) {
+                controllerReloadInFlight = false;
+                setSaveStatus('Save failed');
+                setMessage('Update ready, but the latest edit could not be saved. Reload manually when it is safe.');
+                return;
+              }
+
+              if (cancelled) {
+                controllerReloadInFlight = false;
+                return;
+              }
+
+              if (designRef.current === snapshot) break;
+              snapshot = designRef.current;
             }
 
-            if (cancelled) {
+            if (designRef.current !== snapshot) {
               controllerReloadInFlight = false;
+              setSaveStatus('Editing…');
+              setMessage('Update ready. Finish editing, then reload when it is safe.');
               return;
             }
 
