@@ -63,6 +63,7 @@ const pageChecks = [
   [/const fallbackDraft = localStorage\.getItem\('aircard-sticker-fvp-v3'\)/, 'cleanup protects local fallback draft assets'],
   [/storedImports = await dbGetImportMetadata\(\)/, 'import cleanup verifies authoritative IndexedDB metadata'],
   [/Could not verify the fallback draft, so no imported images were removed\./, 'import cleanup fails closed if fallback draft verification fails'],
+  [/const layers = Array\.isArray\(value\.customLayers\) \? value\.customLayers : \[\];/, 'import cleanup tolerates malformed legacy customLayers'],
   [/for \(const layer of currentDesign\.customLayers \|\| \[\]\)/, 'project saving scans custom layers for remote artwork'],
   [/some remote art is not cached offline/, 'project saving reports incomplete offline artwork caching'],
   [/const referencedPresetAssetIds = new Set\(\)/, 'preset import tracks only referenced embedded assets'],
