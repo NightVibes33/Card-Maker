@@ -22,6 +22,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Enforce V2 YAML contract
         run: npm run verify:v2
+      - name: Enforce editor regression contract
+        run: npm run verify:editor
       - name: Build production app
         run: npm run build
       - name: Start production server
