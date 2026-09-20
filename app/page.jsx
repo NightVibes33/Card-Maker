@@ -6770,7 +6770,13 @@ export default function Page() {
                       <small>{new Date(project.updatedAt || project.createdAt).toLocaleDateString()}</small>
                       <div className="projectActions">
                         <button type="button" disabled={projectBusyIds.has(project.id)} onClick={() => openProject(project)}>Open</button>
-                        <button type="button" disabled={projectBusyIds.has(project.id)} onClick={() => duplicateProject(project)}>Duplicate</button>
+                        <button
+                          type="button"
+                          disabled={projectBusyIds.has(project.id) || projects.length >= MAX_SAVED_PROJECTS}
+                          onClick={() => duplicateProject(project)}
+                        >
+                          Duplicate
+                        </button>
                         <button type="button" disabled={projectBusyIds.has(project.id)} className="destructive" onClick={() => removeProject(project)}>Delete</button>
                       </div>
                     </article>
