@@ -2029,6 +2029,8 @@ export default function Page() {
   const projectSaveInFlightRef = useRef(false);
   const projectOpsRef = useRef(new Set());
   const presetTransferInFlightRef = useRef(false);
+  const presetImportGenerationRef = useRef(0);
+  const presetImportActiveRef = useRef(false);
   const cleanupInFlightRef = useRef(false);
   const exportInFlightRef = useRef(false);
   const imageImportInFlightRef = useRef(false);
@@ -3428,8 +3430,15 @@ export default function Page() {
     }
   }
 
+  function invalidatePendingPresetImport() {
+    if (presetImportActiveRef.current) {
+      presetImportGenerationRef.current += 1;
+    }
+  }
+
   function useArtwork(item) {
     invalidatePendingImageImport();
+    invalidatePendingPresetImport();
     const workingImage = proxyImageWidth(item.image, 3072);
     patch({
       background: workingImage,
@@ -4124,6 +4133,7 @@ export default function Page() {
   function openProject(project) {
     if (!project?.design) return;
     invalidatePendingImageImport();
+    invalidatePendingPresetImport();
     if (projectOpsRef.current.has(String(project.id || ''))) {
       setMessage('That design is still being updated');
       return;
@@ -4450,11 +4460,22 @@ export default function Page() {
 
     const createdImportIds = [];
     let presetApplied = false;
+    let superseded = false;
+    const generation = ++presetImportGenerationRef.current;
+    presetImportActiveRef.current = true;
     presetTransferInFlightRef.current = true;
     setMessage('Importing design preset…');
 
+    const ensureCurrentPresetImport = () => {
+      if (presetImportGenerationRef.current !== generation) {
+        superseded = true;
+        throw new Error('Preset import superseded');
+      }
+    };
+
     try {
       const payload = JSON.parse(await file.text());
+      ensureCurrentPresetImport();
       if (!payload?.design || Number(payload.version) !== 2) {
         throw new Error('Unsupported preset version');
       }
@@ -4528,6 +4549,7 @@ export default function Page() {
                 maxDimension: MAX_STORED_LAYER_IMAGE_DIMENSION
               }
         );
+        ensureCurrentPresetImport();
 
         const newId = makeId('import');
         idMap[oldId] = newId;
@@ -4539,6 +4561,7 @@ export default function Page() {
           createdAt: Date.now()
         });
         createdImportIds.push(newId);
+        ensureCurrentPresetImport();
       }
 
       const imported = JSON.parse(JSON.stringify(payload.design));
@@ -4563,6 +4586,7 @@ export default function Page() {
       });
 
       const nextImports = await dbGetImportMetadata();
+      ensureCurrentPresetImport();
       patch({ ...DEFAULTS, ...imported });
       presetApplied = true;
       setSelectedElement('artwork');
@@ -4575,14 +4599,18 @@ export default function Page() {
       if (!presetApplied && createdImportIds.length) {
         await Promise.all(createdImportIds.map((id) => dbDelete('imports', id).catch(() => {})));
       }
-      setMessage('Preset could not be imported');
+      if (!superseded) {
+        setMessage('Preset could not be imported');
+      }
     } finally {
+      presetImportActiveRef.current = false;
       presetTransferInFlightRef.current = false;
     }
   }
 
   function reset() {
     invalidatePendingImageImport();
+    invalidatePendingPresetImport();
     historyGroupRef.current = { key: '', at: 0 };
     const current = designRef.current;
     const next = normalizeDesignState(DEFAULTS);
