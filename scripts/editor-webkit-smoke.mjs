@@ -68,10 +68,15 @@ try {
       y: initialCanvasBox.height * (105 / 969)
     }
   });
-  await page.getByRole('button', { name: /Card Text Built-in text selected/i }).waitFor({
+  const cardTextLayerRow = page.getByRole('button', { name: /Card Text Built-in text selected/i });
+  await cardTextLayerRow.waitFor({
     state: 'visible',
     timeout: 5000
   });
+  assert.ok(
+    (await cardTextLayerRow.getAttribute('class'))?.includes('selected'),
+    'Card Text row must visibly highlight when its built-in text controls are selected'
+  );
   await topBadge.click();
 
   // Direct chip drag must target the chip rather than nearby contactless art.
