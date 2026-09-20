@@ -701,19 +701,23 @@ function clipTransformedRect(ctx, cx, cy, width, height, rotation = 0) {
 }
 
 function pointInRotatedBounds(px, py, cx, cy, rotation, scale, bounds, padding = 0) {
-  const local = pointToLocal(px, py, cx, cy, rotation, scale);
+  const safeScale = Math.max(0.0001, Number(scale || 1));
+  const localPadding = Number(padding || 0) / safeScale;
+  const local = pointToLocal(px, py, cx, cy, rotation, safeScale);
   return (
-    local.x >= bounds.left - padding &&
-    local.x <= bounds.right + padding &&
-    local.y >= bounds.top - padding &&
-    local.y <= bounds.bottom + padding
+    local.x >= bounds.left - localPadding &&
+    local.x <= bounds.right + localPadding &&
+    local.y >= bounds.top - localPadding &&
+    local.y <= bounds.bottom + localPadding
   );
 }
 
 function pointInRotatedEllipse(px, py, cx, cy, rotation, scale, width, height, padding = 0) {
-  const local = pointToLocal(px, py, cx, cy, rotation, scale);
-  const rx = Math.max(1, Number(width || 0) / 2 + padding);
-  const ry = Math.max(1, Number(height || 0) / 2 + padding);
+  const safeScale = Math.max(0.0001, Number(scale || 1));
+  const localPadding = Number(padding || 0) / safeScale;
+  const local = pointToLocal(px, py, cx, cy, rotation, safeScale);
+  const rx = Math.max(1, Number(width || 0) / 2 + localPadding);
+  const ry = Math.max(1, Number(height || 0) / 2 + localPadding);
   return (local.x * local.x) / (rx * rx) + (local.y * local.y) / (ry * ry) <= 1;
 }
 
@@ -729,11 +733,13 @@ function pointInRotatedRoundedRect(
   radius,
   padding = 0
 ) {
-  const local = pointToLocal(px, py, cx, cy, rotation, scale);
-  const halfW = Math.max(1, Number(width || 0) / 2 + padding);
-  const halfH = Math.max(1, Number(height || 0) / 2 + padding);
+  const safeScale = Math.max(0.0001, Number(scale || 1));
+  const localPadding = Number(padding || 0) / safeScale;
+  const local = pointToLocal(px, py, cx, cy, rotation, safeScale);
+  const halfW = Math.max(1, Number(width || 0) / 2 + localPadding);
+  const halfH = Math.max(1, Number(height || 0) / 2 + localPadding);
   const corner = clamp(
-    Number(radius || 0) + padding,
+    Number(radius || 0) + localPadding,
     0,
     Math.min(halfW, halfH)
   );
