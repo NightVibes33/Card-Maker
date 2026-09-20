@@ -1,0 +1,205 @@
+version: 2
+product: AirCard Card Studio
+status: required
+architecture:
+  tabs:
+    - Discover
+    - Studio
+    - Library
+    - Export
+  studio_tools:
+    - Crop
+    - Position
+    - Adjust
+    - Effects
+    - Card
+
+required_files:
+  - app/page.jsx
+  - app/globals.css
+  - app/api/cucu/route.js
+  - app/api/image/route.js
+  - app/lib/storage.js
+  - public/sw.js
+  - app/manifest.js
+
+forbidden:
+  - file: app/page.jsx
+    tokens:
+      - "Blitz"
+      - "['browse', 'Browse']"
+      - "['edit', 'Edit']"
+      - "['layers', 'Layers']"
+
+features:
+  discover_search:
+    file: app/page.jsx
+    contains:
+      - "Search 2,225+ card skins"
+      - "setSearchInput"
+      - "params.set('q'"
+  real_cucu_search_api:
+    file: app/api/cucu/route.js
+    contains:
+      - "catalog-search"
+      - "getFallbackCatalog('all')"
+      - "query.split"
+  infinite_loading:
+    file: app/page.jsx
+    contains:
+      - "IntersectionObserver"
+      - "loadMoreRef"
+      - "rootMargin: '500px 0px'"
+  favorites:
+    file: app/page.jsx
+    contains:
+      - "toggleFavorite"
+      - "favoriteIds"
+      - "dbPut('favorites'"
+  saved_projects:
+    file: app/page.jsx
+    contains:
+      - "saveProject"
+      - "openProject"
+      - "duplicateProject"
+      - "dbPut('projects'"
+  undo_redo:
+    file: app/page.jsx
+    contains:
+      - "const undo = useCallback"
+      - "const redo = useCallback"
+      - "slice(-49)"
+  adjustment_presets:
+    file: app/page.jsx
+    contains:
+      - "ADJUSTMENT_PRESETS"
+      - "Original"
+      - "Monochrome"
+      - "Neon"
+  card_presets:
+    file: app/page.jsx
+    contains:
+      - "CARD_PRESETS"
+      - "Classic Gold"
+      - "Full Art"
+  direct_manipulation:
+    file: app/page.jsx
+    contains:
+      - "hitTestElement"
+      - "selectedElement === 'chip'"
+      - "selectedElement === 'contactless'"
+      - "lastAngle.current"
+  snapping_guides:
+    file: app/page.jsx
+    contains:
+      - "setActiveGuides"
+      - "safeEdge"
+      - "snapGuide vertical"
+  before_after:
+    file: app/page.jsx
+    contains:
+      - "setShowOriginal(true)"
+      - "original: showOriginal"
+  physical_preview:
+    file: app/page.jsx
+    contains:
+      - "Physical"
+      - "physicalCard"
+  custom_layers:
+    file: app/page.jsx
+    contains:
+      - "addTextLayer"
+      - "uploadLayerImage"
+      - "addShapeLayer"
+      - "Bring Forward"
+      - "Send Back"
+      - "Duplicate"
+      - "Delete"
+  autosave_indexeddb:
+    file: app/page.jsx
+    contains:
+      - "setSaveStatus('Editing…')"
+      - "dbPut('kv'"
+      - "420"
+  indexeddb_stores:
+    file: app/lib/storage.js
+    contains:
+      - "'favorites'"
+      - "'projects'"
+      - "'imports'"
+      - "'exports'"
+  surprise_me:
+    file: app/page.jsx
+    contains:
+      - "surpriseMe"
+      - "Surprise Me"
+  featured_shelves:
+    file: app/page.jsx
+    contains:
+      - "Recently Added"
+      - "Best Sellers"
+      - "Cute & Kawaii"
+      - "Memes"
+  offline_support:
+    file: public/sw.js
+    contains:
+      - "aircard-art-v2"
+      - "cacheFirst"
+      - "staleWhileRevalidate"
+  import_photos_files:
+    file: app/page.jsx
+    contains:
+      - "Import Photo or File"
+      - "idb://imports/"
+      - "accept="image/*""
+  full_screen_export_preview:
+    file: app/page.jsx
+    contains:
+      - "Full-Screen Preview"
+      - "fullPreviewCanvasRef"
+  export_history:
+    file: app/page.jsx
+    contains:
+      - "recordExport"
+      - "Export History"
+      - "dbPut('exports'"
+  shareable_design_json:
+    file: app/page.jsx
+    contains:
+      - "exportPresetJson"
+      - "importPresetJson"
+      - ".aircard.json"
+  pwa_install_onboarding:
+    file: app/page.jsx
+    contains:
+      - "Add to Home Screen"
+      - "Install Card Studio"
+      - "display-mode: standalone"
+  expert_mode:
+    file: app/page.jsx
+    contains:
+      - "Expert Mode"
+      - "EXPERT VALUES"
+  thumbnail_pipeline:
+    file: app/api/cucu/route.js
+    contains:
+      - "thumbnail: imageProxy"
+      - "560"
+  image_edge_cache:
+    file: app/api/image/route.js
+    contains:
+      - "max-age=31536000"
+      - "Vercel-CDN-Cache-Control"
+  accessibility:
+    file: app/page.jsx
+    contains:
+      - "Artwork zoom"
+      - "Chip horizontal position"
+      - "Vignette intensity"
+  exact_aircard_exports:
+    file: app/page.jsx
+    contains:
+      - "1536 × 969"
+      - "1024 × 646"
+      - "cardBackgroundCombined@3x.png"
+      - "cardBackgroundCombined@2x.png"
