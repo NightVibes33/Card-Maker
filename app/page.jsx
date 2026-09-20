@@ -4339,12 +4339,13 @@ export default function Page() {
   async function uploadImage(event) {
     const input = event.currentTarget;
     const file = input.files?.[0];
-    const uploadIntent = uploadIntentRef.current;
-    uploadIntentRef.current = 'replace-artwork';
     if (!file) {
+      // A canceled picker must not consume the action that opened it.
       input.value = '';
       return;
     }
+    const uploadIntent = uploadIntentRef.current;
+    uploadIntentRef.current = 'replace-artwork';
     try {
       await withImageImportLock(async (isCurrent) => {
     if (file.type && !file.type.startsWith('image/')) {
