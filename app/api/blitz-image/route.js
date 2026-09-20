@@ -61,12 +61,28 @@ async function resolveImage(productUrl) {
   const json = await response.json().catch(() => null);
   if (!json || json.status !== 'success') return '';
 
-  const candidates = [
-    json?.data?.image?.url,
-    json?.data?.logo?.url
-  ].filter(Boolean);
+  const image = json?.data?.image || null;
+  const imageUrl = image?.url || '';
 
-  return candidates.find(allowedImageUrl) || '';
+  // Never fall back to Microlink's logo field. That field is the storefront
+  // branding, not product artwork, and was the cause of every Blitz card
+  // showing the same Shopify/store logo.
+  if (!imageUrl || !allowedImageUrl(imageUrl)) return '';
+
+  const lowerUrl = imageUrl.toLowerCase();
+  if (/(logo|favicon|shopify|brandmark|apple-touch-icon)/i.test(lowerUrl)) {
+    return '';
+  }
+
+  const width = Number(image?.width || 0);
+  const height = Number(image?.height || 0);
+
+  // Reject tiny metadata images that are almost certainly branding/icons.
+  if (width && height && width <= 512 && height <= 512) {
+    return '';
+  }
+
+  return imageUrl;
 }
 
 export async function GET(request) {
@@ -143,6 +159,7 @@ export async function GET(request) {
         'Cache-Control': 'public, max-age=604800',
         'CDN-Cache-Control': 'public, max-age=2592000, stale-while-revalidate=31536000',
         'Vercel-CDN-Cache-Control': 'public, max-age=2592000, stale-while-revalidate=31536000',
+        'X-Blitz-Asset': 'product-image',
         'X-Content-Type-Options': 'nosniff'
       }
     });
