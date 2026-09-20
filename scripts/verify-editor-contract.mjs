@@ -33,7 +33,12 @@ const pageChecks = [
   [/gestureStartDesign\.current = designRef\.current/, 'gestures snapshot authoritative state'],
   [/function textLayerLines\(/, 'multiline text is modeled explicitly'],
   [/label="Line Height"/, 'multiline text has line-height controls'],
-  [/<textarea[\s\S]*aria-label="Layer text"/, 'text layers use a multiline editor']
+  [/<textarea[\s\S]*aria-label="Layer text"/, 'text layers use a multiline editor'],
+  [/designRef\.current === startupDesign/, 'startup hydration does not overwrite newer edits'],
+  [/Layer limit reached\. Delete a layer before adding another\./, 'custom layer adds enforce the layer cap'],
+  [/setSelectedElement\('artwork'\);[\s\S]{0,220}setStudioTool\('crop'\)/, 'Library artwork selection targets the background before crop editing'],
+  [/for \(const snapshot of undoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves undo history assets'],
+  [/for \(const snapshot of redoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves redo history assets']
 ];
 
 for (const [pattern, label] of pageChecks) requireMatch(page, pattern, label);
