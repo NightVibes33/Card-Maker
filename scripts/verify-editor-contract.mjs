@@ -270,8 +270,16 @@ requireMatch(page, /decodedPixels \+ pixels > MAX_VISIBLE_IMAGE_DECODE_PIXELS/, 
 requireMatch(page, /Visible image layers exceed the safe iPhone memory budget/, 'image-layer memory pressure fails with a recoverable editor message');
 requireMatch(page, /const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS \+ 1;/, 'preset asset cap includes the background plus every custom layer');
 requireMatch(page, /refs\.size > MAX_PRESET_ASSETS/, 'preset export guards asset-count round-trip compatibility');
-requireMatch(page, /if \(referencedPresetAssetIds\.has\(assetId\)\) continue;[\s\S]{0,120}asset\.data = '';/, 'preset import releases unreferenced embedded payloads');
-requireMatch(page, /const blob = dataUrlToBlob\(asset\.data\);[\s\S]{0,120}asset\.data = '';/, 'preset import releases base64 strings after Blob conversion');
+requireMatch(
+  page,
+  /for \(const \[assetId, asset\] of presetAssets\)[\s\S]*?referencedPresetAssetIds\.has\(assetId\)[\s\S]*?asset\.data = ''[\s\S]*?presetAssetMap\.delete\(assetId\)/,
+  'preset import releases unreferenced embedded payloads'
+);
+requireMatch(
+  page,
+  /const blob = dataUrlToBlob\(asset\.data\);[\s\S]*?asset\.data = ''[\s\S]*?prepareLocalImageBlob\(/,
+  'preset import releases base64 strings after Blob conversion'
+);
 requireMatch(page, /const EDITOR_PREVIEW_W = 1024;/, 'interactive editor canvas uses a reduced backing width');
 requireMatch(page, /const EDITOR_PREVIEW_H = 646;/, 'interactive editor canvas preserves the exact card ratio');
 requireMatch(page, /width=\{EDITOR_PREVIEW_W\}/, 'interactive canvas uses the reduced backing width');
