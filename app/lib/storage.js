@@ -176,33 +176,66 @@ export async function dbPutIfBelowLimit(store, value, maxCount) {
   return withDbRetry((db) => new Promise((resolve, reject) => {
     let tx;
     let objectStore;
-    let inserted = false;
+    let stored = false;
+
+    const fail = (error) => {
+      try { tx?.abort(); } catch {}
+      reject(error);
+    };
+
+    const putValue = () => {
+      try {
+        objectStore.put(value);
+        stored = true;
+      } catch (error) {
+        fail(error);
+      }
+    };
+
+    const countThenPut = () => {
+      let countRequest;
+      try {
+        countRequest = objectStore.count();
+      } catch (error) {
+        fail(error);
+        return;
+      }
+
+      countRequest.onsuccess = () => {
+        if (Number(countRequest.result || 0) >= limit) return;
+        putValue();
+      };
+      countRequest.onerror = () => {
+        fail(countRequest.error || new Error('IndexedDB count failed'));
+      };
+    };
 
     try {
       tx = db.transaction(store, 'readwrite');
       objectStore = tx.objectStore(store);
-      const countRequest = objectStore.count();
 
-      countRequest.onsuccess = () => {
-        if (Number(countRequest.result || 0) >= limit) return;
-        try {
-          objectStore.put(value);
-          inserted = true;
-        } catch (error) {
-          try { tx.abort(); } catch {}
-          reject(error);
-        }
-      };
-      countRequest.onerror = () => {
-        try { tx.abort(); } catch {}
-        reject(countRequest.error || new Error('IndexedDB count failed'));
-      };
+      const key = value?.id;
+      if (key == null || key === '') {
+        countThenPut();
+      } else {
+        const existingRequest = objectStore.get(key);
+        existingRequest.onsuccess = () => {
+          if (existingRequest.result) {
+            putValue();
+          } else {
+            countThenPut();
+          }
+        };
+        existingRequest.onerror = () => {
+          fail(existingRequest.error || new Error('IndexedDB key check failed'));
+        };
+      }
     } catch (error) {
       reject(error);
       return;
     }
 
-    tx.oncomplete = () => resolve(inserted);
+    tx.oncomplete = () => resolve(stored);
     tx.onerror = () => reject(tx.error || new Error('IndexedDB limited write failed'));
     tx.onabort = () => reject(tx.error || new Error('IndexedDB limited write aborted'));
   }));
