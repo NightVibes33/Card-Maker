@@ -333,10 +333,10 @@ function normalizeCustomLayer(layer) {
     normalized.radius = finiteClamp(layer.radius, 28, 0, Math.min(normalized.width, normalized.height) / 2);
     normalized.color = normalizeHexColor(layer.color, '#ffffff');
   } else if (type === 'image') {
-    normalized.src =
-      typeof layer.src === 'string' && isPersistableBackground(layer.src)
-        ? layer.src
-        : '';
+    normalized.src = normalizePersistedArtworkSource(
+      layer.src,
+      MAX_STORED_LAYER_IMAGE_DIMENSION
+    );
     normalized.width = finiteClamp(layer.width, 640, 20, 1800);
     normalized.flipX = Boolean(layer.flipX);
     normalized.crop = normalizeCrop(layer.crop, 0.1);
@@ -354,10 +354,7 @@ function normalizeCustomLayer(layer) {
 function normalizeDesignState(value) {
   const raw = value && typeof value === 'object' ? value : {};
   const next = { ...DEFAULTS, ...raw };
-  next.background =
-    typeof raw.background === 'string' && isPersistableBackground(raw.background)
-      ? raw.background
-      : '';
+  next.background = normalizePersistedArtworkSource(raw.background, 3072);
   next.backgroundLabel = String(raw.backgroundLabel || DEFAULTS.backgroundLabel).slice(0, 120);
   next.sourceCrop = normalizeCrop(raw.sourceCrop, 0.1);
   next.originalSourceCrop = normalizeCrop(raw.originalSourceCrop, 0.1);
@@ -1691,6 +1688,14 @@ async function prepareCleanResults(items, maxItems = items.length) {
 
 function isPersistableBackground(src = '') {
   return src.startsWith('/api/image?') || src.startsWith('idb://imports/');
+}
+
+function normalizePersistedArtworkSource(src = '', width = 3072) {
+  const source = String(src || '').trim();
+  if (!source) return '';
+  if (isPersistableBackground(source)) return source;
+  if (/^https:\/\//i.test(source)) return proxyImageWidth(source, width);
+  return '';
 }
 
 function estimateDataUrlBytes(value = '') {
