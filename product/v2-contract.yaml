@@ -56,6 +56,7 @@ features:
     contains:
       - "favoriteButton"
       - "moreButton"
+      - "Preview"
       - "Use Skin"
       - "Add to Favorites"
   real_cucu_search:
@@ -250,6 +251,10 @@ features:
       - "+ Shape"
       - "+ Chip"
       - "+ Contactless"
+      - "addChipLayer"
+      - "addContactlessLayer"
+      - "drawChipLayerAtOrigin"
+      - "drawContactlessLayerAtOrigin"
       - "Bring Forward"
       - "Send Back"
       - "Duplicate"
