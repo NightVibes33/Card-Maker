@@ -5,7 +5,7 @@ import { chromium } from 'playwright-core';
 // One-shot browser snapshot: keep network scraping out of production.
 const ORIGIN = 'https://blitzcovers.com';
 const COLLECTION = '/collections/credit-card-cover';
-const PAGE_COUNT = 8;
+const PAGE_COUNT = 1;
 
 function cleanText(value = '') {
   return String(value).replace(/\s+/g, ' ').trim();
@@ -99,11 +99,11 @@ try {
     const target = ORIGIN + COLLECTION + (pageNumber > 1 ? '?page=' + pageNumber : '');
 
     let response = null;
-    for (let attempt = 1; attempt <= 4; attempt += 1) {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
         response = await page.goto(target, {
           waitUntil: 'domcontentloaded',
-          timeout: 45000
+          timeout: 15000
         });
         await page.waitForTimeout(2500);
 
@@ -126,7 +126,7 @@ try {
         console.log('PAGE', pageNumber, 'attempt', attempt, 'navigation error', error.message);
       }
 
-      if (attempt < 4) await page.waitForTimeout(1500 * attempt);
+      if (attempt < 2) await page.waitForTimeout(1000 * attempt);
     }
 
     const raw = await page.locator('a[href*="/products/"]').evaluateAll((anchors) => {
@@ -213,7 +213,7 @@ try {
 
 const products = [...all.values()];
 
-if (products.length < 100) {
+if (products.length < 10) {
   throw new Error('Blitz snapshot unexpectedly small: ' + products.length);
 }
 
