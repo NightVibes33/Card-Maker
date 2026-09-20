@@ -432,13 +432,13 @@ function normalizeDesignState(value) {
   next.contactlessRotation = finiteClamp(raw.contactlessRotation, DEFAULTS.contactlessRotation, -180, 180);
 
   next.number = Boolean(raw.number);
-  next.numberText = splitGraphemes(raw.numberText ?? DEFAULTS.numberText).slice(0, 32).join('');
+  next.numberText = singleLineCardText(raw.numberText ?? DEFAULTS.numberText, 32);
   next.holder = Boolean(raw.holder);
-  next.holderText = splitGraphemes(raw.holderText ?? DEFAULTS.holderText).slice(0, 28).join('');
+  next.holderText = singleLineCardText(raw.holderText ?? DEFAULTS.holderText, 28);
   next.expiry = Boolean(raw.expiry);
-  next.expiryText = splitGraphemes(raw.expiryText ?? DEFAULTS.expiryText).slice(0, 8).join('');
+  next.expiryText = singleLineCardText(raw.expiryText ?? DEFAULTS.expiryText, 8);
   next.badge = Boolean(raw.badge);
-  next.badgeText = splitGraphemes(raw.badgeText ?? DEFAULTS.badgeText).slice(0, 18).join('');
+  next.badgeText = singleLineCardText(raw.badgeText ?? DEFAULTS.badgeText, 18);
   next.textColor = normalizeHexColor(raw.textColor, DEFAULTS.textColor);
   next.shadow = raw.shadow == null ? DEFAULTS.shadow : Boolean(raw.shadow);
 
@@ -565,6 +565,13 @@ function splitGraphemes(value) {
     return Array.from(graphemeSegmenter.segment(text), (entry) => entry.segment);
   }
   return Array.from(text);
+}
+
+function singleLineCardText(value, maxLength) {
+  const normalized = String(value ?? '')
+    .replace(/[\r\n\t\f\v]+/g, ' ')
+    .replace(/[\u0000-\u001f\u007f]/g, '');
+  return splitGraphemes(normalized).slice(0, maxLength).join('');
 }
 
 function textLayerFontFamily(fontFamily) {
@@ -6265,13 +6272,13 @@ export default function Page() {
 
                 <Group title="CARD TEXT">
                   <SwitchRow label="Masked Number" value={design.number} onChange={(value) => patch({ number: value })} />
-                  {design.number ? <input className="iosTextField" aria-label="Masked card number" value={design.numberText} onChange={(event) => patch({ numberText: splitGraphemes(event.target.value).slice(0, 32).join('') })} /> : null}
+                  {design.number ? <input className="iosTextField" aria-label="Masked card number" value={design.numberText} onChange={(event) => patch({ numberText: singleLineCardText(event.target.value, 32) })} /> : null}
                   <SwitchRow label="Card Holder" value={design.holder} onChange={(value) => patch({ holder: value })} />
-                  {design.holder ? <input className="iosTextField" aria-label="Card holder" value={design.holderText} onChange={(event) => patch({ holderText: splitGraphemes(event.target.value).slice(0, 28).join('') })} /> : null}
+                  {design.holder ? <input className="iosTextField" aria-label="Card holder" value={design.holderText} onChange={(event) => patch({ holderText: singleLineCardText(event.target.value, 28) })} /> : null}
                   <SwitchRow label="Expiry" value={design.expiry} onChange={(value) => patch({ expiry: value })} />
-                  {design.expiry ? <input className="iosTextField" aria-label="Expiry date" value={design.expiryText} onChange={(event) => patch({ expiryText: splitGraphemes(event.target.value).slice(0, 8).join('') })} /> : null}
+                  {design.expiry ? <input className="iosTextField" aria-label="Expiry date" value={design.expiryText} onChange={(event) => patch({ expiryText: singleLineCardText(event.target.value, 8) })} /> : null}
                   <SwitchRow label="Top Badge" value={design.badge} onChange={(value) => patch({ badge: value })} />
-                  {design.badge ? <input className="iosTextField" aria-label="Top badge text" value={design.badgeText} onChange={(event) => patch({ badgeText: splitGraphemes(event.target.value).slice(0, 18).join('') })} /> : null}
+                  {design.badge ? <input className="iosTextField" aria-label="Top badge text" value={design.badgeText} onChange={(event) => patch({ badgeText: singleLineCardText(event.target.value, 18) })} /> : null}
                   <label className="colorRow">
                     <span>Text Color</span>
                     <input aria-label="Text color" type="color" value={design.textColor} onChange={(event) => patch({ textColor: event.target.value })} />
