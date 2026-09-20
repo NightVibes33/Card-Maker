@@ -41,6 +41,8 @@ const pageChecks = [
   [/designRef\.current === startupDesign/, 'startup hydration does not overwrite newer edits'],
   [/for \(let attempt = 0; attempt < 3; attempt \+= 1\)/, 'service-worker reload retries until the latest draft is stable'],
   [/if \(designRef\.current !== snapshot\)/, 'service-worker reload refuses to discard edits made during persistence'],
+  [/let hasServiceWorkerController = Boolean\(navigator\.serviceWorker\.controller\)/, 'service-worker distinguishes first claim from an update'],
+  [/if \(!hasServiceWorkerController\)/, 'first service-worker claim does not force an app reload'],
   [/Layer limit reached\. Delete a layer before adding another\./, 'custom layer adds enforce the layer cap'],
   [/visibleImageIdsTopDown\.length > MAX_VISIBLE_IMAGE_LAYERS/, 'older designs normalize overflow image layers instead of failing hydration'],
   [/visibleImageIdsTopDown\.slice\(0, MAX_VISIBLE_IMAGE_LAYERS\)/, 'overflow normalization preserves topmost visible image layers'],
