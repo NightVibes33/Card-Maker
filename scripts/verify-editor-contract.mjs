@@ -41,7 +41,10 @@ const pageChecks = [
   [/for \(const snapshot of redoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves redo history assets'],
   [/const MAX_VISIBLE_IMAGE_LAYERS = 12;/, 'visible image layers have an iPhone memory cap'],
   [/imageLayers\.length > MAX_VISIBLE_IMAGE_LAYERS/, 'image hydration refuses unsafe visible-image counts'],
-  [/visibleImageLayers\(designRef\.current\)\.length >= MAX_VISIBLE_IMAGE_LAYERS/, 'image-layer creation enforces the visible-image cap']
+  [/visibleImageLayers\(designRef\.current\)\.length >= MAX_VISIBLE_IMAGE_LAYERS/, 'image-layer creation enforces the visible-image cap',
+  [/draftSaveQueueRef\.current/, 'draft writes are serialized through one persistence queue'],
+  [/aircard-sticker-fvp-v3-updated-at/, 'local draft fallback records a comparable timestamp'],
+  [/localUpdatedAt > indexedUpdatedAt/, 'startup restores the newest durable draft copy']
 ];
 
 for (const [pattern, label] of pageChecks) requireMatch(page, pattern, label);
