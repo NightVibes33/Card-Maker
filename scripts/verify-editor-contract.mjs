@@ -239,6 +239,8 @@ const proxySecurityChecks = [
   [imageRoute, /redirect:\s*'manual'/, 'image proxy validates redirects before following them'],
   [imageRoute, /SAFE_IMAGE_TYPES/, 'image proxy rejects unsafe image formats'],
   [imageRoute, /readLimitedBody\(/, 'image proxy stream-limits response bodies'],
+  [imageRoute, /const MAX_PROXY_OUTPUT_BYTES = 15 \* 1024 \* 1024;/, 'image proxy bounds normalized output size'],
+  [imageRoute, /Processed image too large/, 'oversized normalized proxy output fails closed'],
   [imageRoute, /import sharp from 'sharp'/, 'image proxy can resize non-CDN artwork server-side'],
   [imageRoute, /limitInputPixels: MAX_DECODED_IMAGE_PIXELS/, 'proxy decoding has a pixel safety bound'],
   [imageRoute, /\.resize\(\{[\s\S]*width,[\s\S]*withoutEnlargement: true/s, 'proxy width requests are enforced server-side when needed'],
