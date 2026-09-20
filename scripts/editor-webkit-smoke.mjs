@@ -234,16 +234,20 @@ try {
   const layerX = page.getByLabel('Layer horizontal position');
   assert.equal(Number(await layerX.inputValue()), 0.5);
 
+  await editorCanvas.scrollIntoViewIfNeeded();
   const canvasBox = await editorCanvas.boundingBox();
   assert.ok(canvasBox, 'editor canvas must have a layout box');
-  await page.mouse.move(
-    canvasBox.x + canvasBox.width / 2,
-    canvasBox.y + canvasBox.height / 2
-  );
+
+  // The text layer is above the shape and overlaps the card center. Drag from
+  // the shape's clear right side so this test exercises shape manipulation,
+  // not the editor's correct topmost-layer hit testing.
+  const shapeDragStartX = canvasBox.x + canvasBox.width * (0.5 + 100 / 1536);
+  const shapeDragStartY = canvasBox.y + canvasBox.height * 0.5;
+  await page.mouse.move(shapeDragStartX, shapeDragStartY);
   await page.mouse.down();
   await page.mouse.move(
-    canvasBox.x + canvasBox.width / 2 + 42,
-    canvasBox.y + canvasBox.height / 2,
+    shapeDragStartX + 42,
+    shapeDragStartY,
     { steps: 5 }
   );
   await page.mouse.up();
