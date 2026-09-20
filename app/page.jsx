@@ -2583,17 +2583,24 @@ export default function Page() {
   ]);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const originalTarget = showOriginal
-      ? ((design.customLayers || []).some((layer) => layer.id === selectedElement && layer.type === 'image')
-          ? selectedElement
-          : 'artwork')
-      : null;
-    renderCard(canvas.getContext('2d'), OUT_W, OUT_H, { originalTarget });
-    if (showExportPreview && fullPreviewCanvasRef.current) {
-      renderCard(fullPreviewCanvasRef.current.getContext('2d'), OUT_W, OUT_H);
-    }
+    const frame = window.requestAnimationFrame(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const originalTarget = showOriginal
+        ? ((design.customLayers || []).some((layer) => layer.id === selectedElement && layer.type === 'image')
+            ? selectedElement
+            : 'artwork')
+        : null;
+
+      renderCard(canvas.getContext('2d'), OUT_W, OUT_H, { originalTarget });
+
+      if (showExportPreview && fullPreviewCanvasRef.current) {
+        renderCard(fullPreviewCanvasRef.current.getContext('2d'), OUT_W, OUT_H);
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, [design.customLayers, renderCard, selectedElement, showOriginal, showExportPreview]);
 
   const loadCucu = useCallback(async (
