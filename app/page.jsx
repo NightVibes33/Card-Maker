@@ -4717,7 +4717,6 @@ export default function Page() {
             role="tab"
             aria-selected={tab === value}
             aria-controls={'panel-' + value}
-            tabIndex={tab === value ? 0 : -1}
             className={tab === value ? 'active' : ''}
             onClick={() => setTab(value)}
           >
