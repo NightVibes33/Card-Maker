@@ -1893,6 +1893,78 @@ async function validateSafeSvgBlob(blob) {
   if (unsafeMarkup.some((pattern) => pattern.test(markup))) {
     throw new Error('SVG contains unsupported active or remote content.');
   }
+
+  const normalizeCssEscapes = (value) =>
+    String(value || '')
+      .replace(/\\([0-9a-f]{1,6})\s?/gi, (_, hex) => {
+        const codePoint = Number.parseInt(hex, 16);
+        return Number.isFinite(codePoint) && codePoint > 0 && codePoint <= 0x10ffff
+          ? String.fromCodePoint(codePoint)
+          : '';
+      })
+      .replace(/\\([^\r\n])/g, '$1');
+
+  const hasUnsafeCssReference = (value) => {
+    const css = normalizeCssEscapes(value);
+    if (/@import\b|expression\s*\(|javascript\s*:/i.test(css)) return true;
+
+    for (const match of css.matchAll(/url\(\s*([^)]*?)\s*\)/gi)) {
+      const target = String(match[1] || '').trim().replace(/^["']|["']$/g, '').trim();
+      if (target && !target.startsWith('#')) return true;
+    }
+    return false;
+  };
+
+  if (typeof DOMParser !== 'undefined') {
+    const documentNode = new DOMParser().parseFromString(markup, 'image/svg+xml');
+    if (documentNode.querySelector('parsererror')) {
+      throw new Error('SVG could not be parsed safely.');
+    }
+
+    const forbiddenElements = new Set([
+      'script',
+      'foreignobject',
+      'iframe',
+      'object',
+      'embed',
+      'audio',
+      'video',
+      'animate',
+      'animatetransform',
+      'animatemotion',
+      'set'
+    ]);
+
+    for (const element of documentNode.querySelectorAll('*')) {
+      const tag = String(element.localName || element.tagName || '').toLowerCase();
+      if (forbiddenElements.has(tag)) {
+        throw new Error('SVG contains unsupported active or remote content.');
+      }
+
+      if (tag === 'style' && hasUnsafeCssReference(element.textContent || '')) {
+        throw new Error('SVG contains unsupported active or remote content.');
+      }
+
+      for (const attribute of Array.from(element.attributes || [])) {
+        const name = String(attribute.name || '').toLowerCase();
+        const value = String(attribute.value || '').trim();
+
+        if (name.startsWith('on') || name === 'xml:base') {
+          throw new Error('SVG contains unsupported active or remote content.');
+        }
+
+        if (name === 'href' || name === 'xlink:href' || name === 'src') {
+          if (value && !value.startsWith('#')) {
+            throw new Error('SVG contains unsupported active or remote content.');
+          }
+        }
+
+        if (hasUnsafeCssReference(value)) {
+          throw new Error('SVG contains unsupported active or remote content.');
+        }
+      }
+    }
+  }
 }
 
 async function prepareLocalImageBlob(blob, limits = {}) {
