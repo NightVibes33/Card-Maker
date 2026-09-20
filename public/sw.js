@@ -33,10 +33,57 @@ async function cacheResponse(cacheName, request, response) {
   await trimCache(cacheName);
 }
 
+async function precacheAppShell() {
+  const shellCache = await caches.open(SHELL_CACHE);
+  const staticCache = await caches.open(STATIC_CACHE);
+
+  const rootResponse = await fetch('/', { cache: 'no-store' });
+  if (!rootResponse.ok) {
+    throw new Error('App shell could not be fetched');
+  }
+
+  await shellCache.put('/', rootResponse.clone());
+
+  const html = await rootResponse.text();
+  const staticUrls = new Set();
+  const attributePattern = /(?:src|href)=["']([^"']+)["']/gi;
+  let match;
+
+  while ((match = attributePattern.exec(html))) {
+    try {
+      const url = new URL(match[1], self.location.origin);
+      if (url.origin === self.location.origin && url.pathname.startsWith('/_next/static/')) {
+        staticUrls.add(url.href);
+      }
+    } catch {}
+  }
+
+  await Promise.all(
+    [...staticUrls].slice(0, CACHE_LIMITS[STATIC_CACHE]).map(async (href) => {
+      try {
+        const request = new Request(href, { credentials: 'same-origin' });
+        const response = await fetch(request);
+        if (response.ok) await staticCache.put(request, response);
+      } catch {}
+    })
+  );
+
+  try {
+    const manifestResponse = await fetch('/manifest.webmanifest', { cache: 'no-store' });
+    if (manifestResponse.ok) {
+      await shellCache.put('/manifest.webmanifest', manifestResponse);
+    }
+  } catch {}
+
+  await Promise.all([
+    trimCache(SHELL_CACHE),
+    trimCache(STATIC_CACHE)
+  ]);
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(SHELL_CACHE)
-      .then((cache) => cache.addAll(SHELL))
+    precacheAppShell()
       .then(() => self.skipWaiting())
   );
 });
