@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import sharp from 'sharp';
+import { IMAGE_PROXY_VERSION } from '../../../lib/imagePolicy';
 
 export const runtime = 'nodejs';
 
@@ -104,7 +105,9 @@ async function fetchAllowedArtwork(startUrl, options) {
 }
 
 function proxy(url, width = 0) {
-  return '/api/image?url=' + encodeURIComponent(url.toString()) + (width ? '&w=' + width : '');
+  return '/api/image?url=' + encodeURIComponent(url.toString()) +
+    (width ? '&w=' + width : '') +
+    '&v=' + encodeURIComponent(IMAGE_PROXY_VERSION);
 }
 
 function clamp(value, min, max) {
