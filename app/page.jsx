@@ -3306,34 +3306,34 @@ export default function Page() {
   }, [cucuHasMore, cucuLoading, cucuPage, cucuCategory, query, loadCucu]);
 
   async function toggleFavorite(item) {
-    if (!item?.id) return;
+    if (item?.id == null || item.id === '') return;
     const itemId = String(item.id);
     if (favoriteOpsRef.current.has(itemId)) return;
 
     favoriteOpsRef.current.add(itemId);
     try {
-      const already = favoriteIds.has(item.id);
+      const already = favoriteIds.has(itemId);
       if (already) {
         try {
-          await dbDelete('favorites', item.id);
+          await dbDelete('favorites', itemId);
         } catch {
           setMessage('Could not remove this favorite from local storage.');
           return;
         }
         setFavoriteIds((current) => {
           const next = new Set(current);
-          next.delete(item.id);
+          next.delete(itemId);
           return next;
         });
-        setFavorites((current) => current.filter((entry) => entry.id !== item.id));
+        setFavorites((current) => current.filter((entry) => String(entry.id) !== itemId));
         setMessage('Removed from Favorites');
         return;
       }
 
-      const stored = { ...item };
+      const stored = { ...item, id: itemId };
       try {
         await dbPut('favorites', {
-          id: item.id,
+          id: itemId,
           item: stored,
           updatedAt: Date.now()
         });
@@ -3345,8 +3345,8 @@ export default function Page() {
       cacheArtwork(proxyImageWidth(item.image, 3072));
       if (item.thumbnail) cacheArtwork(proxyImageWidth(item.thumbnail, 560));
 
-      setFavoriteIds((current) => new Set([...current, item.id]));
-      setFavorites((current) => [stored, ...current.filter((entry) => entry.id !== item.id)]);
+      setFavoriteIds((current) => new Set([...current, itemId]));
+      setFavorites((current) => [stored, ...current.filter((entry) => String(entry.id) !== itemId)]);
       setMessage('Added to Favorites');
     } finally {
       favoriteOpsRef.current.delete(itemId);
