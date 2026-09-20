@@ -538,7 +538,7 @@ button:disabled{opacity:.38}
 .sliderRow input{
   display:block;
   width:100%;
-  min-height:32px;
+  min-height:44px;
   accent-color:var(--blue);
 }
 .sliderRow.isDisabled{
