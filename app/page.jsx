@@ -5262,6 +5262,16 @@ export default function Page() {
       const presetBackgroundAssetId = rawBackground.startsWith('idb://imports/')
         ? rawBackground.slice('idb://imports/'.length)
         : '';
+
+      // Drop embedded payloads the design never references before decoding
+      // any images. Large base64 strings otherwise stay live for the whole
+      // import and can cause avoidable memory pressure in mobile Safari.
+      for (const [assetId, asset] of presetAssets) {
+        if (referencedPresetAssetIds.has(assetId)) continue;
+        if (asset && typeof asset === 'object') asset.data = '';
+        presetAssetMap.delete(assetId);
+      }
+
       let estimatedEmbeddedBytes = 0;
 
       for (const oldId of referencedPresetAssetIds) {
@@ -5284,6 +5294,9 @@ export default function Page() {
         }
 
         const blob = dataUrlToBlob(asset.data);
+        // The Blob owns the decoded bytes now; release the much larger base64
+        // string before rasterization and IndexedDB work.
+        asset.data = '';
         if (blob.size > MAX_IMAGE_IMPORT_BYTES) {
           throw new Error('Preset image asset is too large');
         }
@@ -5308,6 +5321,7 @@ export default function Page() {
           createdAt: Date.now()
         });
         createdImportIds.push(newId);
+        presetAssetMap.delete(oldId);
         ensureCurrentPresetImport();
       }
 
