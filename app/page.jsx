@@ -3712,7 +3712,17 @@ export default function Page() {
 
   function reset() {
     historyGroupRef.current = { key: '', at: 0 };
-    patch({ ...DEFAULTS }, true, 'new-card');
+    const current = designRef.current;
+    const next = normalizeDesignState(DEFAULTS);
+    const changed = JSON.stringify(current) !== JSON.stringify(next);
+
+    if (changed) {
+      undoRef.current = [...undoRef.current.slice(-49), current];
+      redoRef.current = [];
+      setHistoryVersion((value) => value + 1);
+      replaceDesign(next, false);
+    }
+
     setImage(null);
     setLoadedBackgroundKey('');
     setBackgroundLoadError('');
@@ -3722,7 +3732,7 @@ export default function Page() {
     setSelectedElement('artwork');
     setShowOriginal(false);
     setActiveGuides({ x: null, y: null });
-    setMessage('New card · Undo is available');
+    setMessage(changed ? 'New card · Undo is available' : 'New card is already empty');
   }
 
   function hitTestElement(event) {
