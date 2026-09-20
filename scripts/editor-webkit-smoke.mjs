@@ -527,6 +527,24 @@ try {
     'oversized vector art must be rejected before creating a layer'
   );
 
+  const scientificSvg = Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1e5pt" height="1e5pt"><rect width="100%" height="100%" fill="black"/></svg>'
+  );
+  await imageInputs.last().setInputFiles({
+    name: 'oversized-scientific-units.svg',
+    mimeType: 'image/svg+xml',
+    buffer: scientificSvg
+  });
+  await page.getByText('Image resolution is too large for reliable iPhone editing.', { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 10000
+  });
+  assert.equal(
+    await page.getByLabel('Image Width').count(),
+    0,
+    'scientific-notation SVG dimensions with absolute units must be rejected before decode'
+  );
+
   const unsafeSvg = Buffer.from(
     '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><image href="https://example.com/remote.png" width="120" height="80"/></svg>'
   );
