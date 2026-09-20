@@ -996,6 +996,7 @@ export default function Page() {
   const [menuItem, setMenuItem] = useState(null);
   const [installHelp, setInstallHelp] = useState(false);
   const [online, setOnline] = useState(true);
+  const [isIOS, setIsIOS] = useState(false);
   const [query, setQuery] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [featured, setFeatured] = useState({});
@@ -1158,7 +1159,15 @@ export default function Page() {
     hydrate();
 
     const updateOnline = () => setOnline(navigator.onLine);
+    const detectIOS = () => {
+      const ua = navigator.userAgent || '';
+      const iOSDevice = /iPad|iPhone|iPod/i.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      setIsIOS(iOSDevice);
+    };
+
     updateOnline();
+    detectIOS();
     window.addEventListener('online', updateOnline);
     window.addEventListener('offline', updateOnline);
 
@@ -2581,36 +2590,63 @@ export default function Page() {
     setExportHistory((current) => [record, ...current].slice(0, 40));
   }
 
-  async function download(width, height, name) {
-    const blob = await new Promise((resolve) => {
-      makeCanvas(width, height).toBlob(resolve, 'image/png');
-    });
-    if (!blob) return;
+  function makePngFile(width, height, name) {
+    // Keep file creation synchronous so iOS retains the user-activation
+    // required by navigator.share().
+    const dataUrl = makeCanvas(width, height).toDataURL('image/png');
+    const blob = dataUrlToBlob(dataUrl);
+    return new File([blob], name, { type: 'image/png' });
+  }
 
-    const url = URL.createObjectURL(blob);
+  async function download(width, height, name) {
+    const file = makePngFile(width, height, name);
+    const url = URL.createObjectURL(file);
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = name;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1200);
     await recordExport(name, width, height, 'download');
-    setMessage(name + ' saved');
+    setMessage(name + ' saved to Files/downloads');
+  }
+
+  async function sharePng(width = OUT_W, height = OUT_H, name = 'cardBackgroundCombined@3x.png', saveToPhotos = false) {
+    const file = makePngFile(width, height, name);
+    const canShareFile = Boolean(
+      navigator.share &&
+      (!navigator.canShare || navigator.canShare({ files: [file] }))
+    );
+
+    if (!canShareFile) {
+      await download(width, height, name);
+      setMessage('Native image sharing is unavailable here, so the PNG was downloaded instead.');
+      return;
+    }
+
+    try {
+      if (saveToPhotos && isIOS) {
+        setMessage('Choose “Save Image” in the iOS share sheet to save it to Photos.');
+      } else {
+        setMessage('Opening share sheet…');
+      }
+
+      await navigator.share({ files: [file] });
+      await recordExport(name, width, height, saveToPhotos && isIOS ? 'photos-share-sheet' : 'share');
+
+      if (saveToPhotos && isIOS) {
+        setMessage('iOS share sheet closed. If you chose “Save Image,” the PNG is now in Photos.');
+      } else {
+        setMessage('Share sheet closed');
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        setMessage('Could not open the share sheet.');
+      }
+    }
   }
 
   async function share() {
-    const blob = await new Promise((resolve) => makeCanvas(OUT_W, OUT_H).toBlob(resolve, 'image/png'));
-    if (!blob) return;
-    const file = new File([blob], 'cardBackgroundCombined@3x.png', { type: 'image/png' });
-
-    try {
-      if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
-        await navigator.share({ files: [file], title: 'AirCard skin' });
-        await recordExport(file.name, OUT_W, OUT_H, 'share');
-        setMessage('Share sheet opened');
-      } else {
-        await download(OUT_W, OUT_H, file.name);
-      }
-    } catch {}
+    return sharePng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png', false);
   }
 
   function dismissInstallHelp() {
