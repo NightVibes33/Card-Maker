@@ -1,6 +1,7 @@
 version: 2
 product: AirCard Card Studio
 status: required
+
 architecture:
   tabs:
     - Discover
@@ -17,7 +18,9 @@ architecture:
 required_files:
   - app/page.jsx
   - app/globals.css
+  - app/layout.js
   - app/api/cucu/route.js
+  - app/api/cucu/inspect/route.js
   - app/api/image/route.js
   - app/lib/storage.js
   - public/sw.js
@@ -30,21 +33,38 @@ forbidden:
       - "['browse', 'Browse']"
       - "['edit', 'Edit']"
       - "['layers', 'Layers']"
+      - "Load More"
+  - file: app/layout.js
+    tokens:
+      - "maximumScale"
 
 features:
-  discover_search:
+  discover_architecture:
     file: app/page.jsx
     contains:
+      - "Discover a card skin"
       - "Search 2,225+ card skins"
-      - "setSearchInput"
-      - "params.set('q'"
-  real_cucu_search_api:
+      - "Recently Added"
+      - "Best Sellers"
+      - "Anime"
+      - "Cars"
+      - "Cute & Kawaii"
+      - "Memes"
+      - "Recently Used"
+  minimal_card_actions:
+    file: app/page.jsx
+    contains:
+      - "favoriteButton"
+      - "moreButton"
+      - "Use Skin"
+      - "Add to Favorites"
+  real_cucu_search:
     file: app/api/cucu/route.js
     contains:
       - "catalog-search"
       - "getFallbackCatalog('all')"
       - "query.split"
-  infinite_loading:
+  infinite_lazy_loading:
     file: app/page.jsx
     contains:
       - "IntersectionObserver"
@@ -56,31 +76,110 @@ features:
       - "toggleFavorite"
       - "favoriteIds"
       - "dbPut('favorites'"
-  saved_projects:
+      - "cacheArtwork(item.image)"
+  recent_twenty:
+    file: app/page.jsx
+    contains:
+      - "slice(0, 20)"
+      - "Recently Used"
+  saved_named_projects:
     file: app/page.jsx
     contains:
       - "saveProject"
-      - "openProject"
+      - "projectName"
+      - "Name this design"
+      - "design: { ...design }"
       - "duplicateProject"
-      - "dbPut('projects'"
-  undo_redo:
+      - "removeProject"
+  autosave_indexeddb:
+    file: app/page.jsx
+    contains:
+      - "setSaveStatus('Editing…')"
+      - "dbPut('kv'"
+      - "420"
+  indexeddb_library:
+    file: app/lib/storage.js
+    contains:
+      - "'favorites'"
+      - "'projects'"
+      - "'imports'"
+      - "'exports'"
+      - "indexedDB.open"
+  undo_redo_50:
     file: app/page.jsx
     contains:
       - "const undo = useCallback"
       - "const redo = useCallback"
       - "slice(-49)"
+  before_after:
+    file: app/page.jsx
+    contains:
+      - "Before / After"
+      - "setShowOriginal(true)"
+      - "original: showOriginal"
+  crop_ui:
+    file: app/page.jsx
+    contains:
+      - "Crop Left"
+      - "Crop Right"
+      - "Crop Top"
+      - "Crop Bottom"
+      - "updateCropEdge"
+      - "originalSourceCrop"
+      - "Reset Crop"
+  position_controls:
+    file: app/page.jsx
+    contains:
+      - "Artwork zoom"
+      - "Artwork horizontal position"
+      - "Artwork vertical position"
+      - "Artwork rotation"
+      - "flipX"
+  adjustment_controls:
+    file: app/page.jsx
+    contains:
+      - "Exposure"
+      - "Brightness"
+      - "Contrast"
+      - "Saturation"
+      - "Highlights"
+      - "Shadows"
+      - "Temperature"
+      - "Tint"
+      - "Sharpness"
+      - "Blur"
   adjustment_presets:
     file: app/page.jsx
     contains:
-      - "ADJUSTMENT_PRESETS"
       - "Original"
-      - "Monochrome"
+      - "Vivid"
+      - "Dark"
+      - "AMOLED"
+      - "Warm"
+      - "Cold"
+      - "Film"
       - "Neon"
+      - "Vintage"
+      - "Monochrome"
+  effects:
+    file: app/page.jsx
+    contains:
+      - "Vignette intensity"
+      - "Grain"
+      - "Gloss"
+      - "Dark Overlay"
+      - "Fade"
+      - "Color Tint"
+      - "Tint Strength"
   card_presets:
     file: app/page.jsx
     contains:
-      - "CARD_PRESETS"
       - "Classic Gold"
+      - "Black Metal"
+      - "Silver"
+      - "Rose Gold"
+      - "Minimal"
+      - "No Chip"
       - "Full Art"
   direct_manipulation:
     file: app/page.jsx
@@ -89,61 +188,107 @@ features:
       - "selectedElement === 'chip'"
       - "selectedElement === 'contactless'"
       - "lastAngle.current"
-  snapping_guides:
+      - "setPointerCapture"
+  snap_center_thirds_edges:
     file: app/page.jsx
     contains:
-      - "setActiveGuides"
+      - "snapValue"
+      - "1 / 3"
+      - "2 / 3"
+      - "0.05"
+      - "0.95"
+  guide_overlays:
+    file: app/page.jsx
+    contains:
+      - "bleedEdge"
       - "safeEdge"
+      - "textSafe"
+      - "chipZone"
+      - "contactlessZone"
       - "snapGuide vertical"
-  before_after:
-    file: app/page.jsx
-    contains:
-      - "setShowOriginal(true)"
-      - "original: showOriginal"
+      - "snapGuide horizontal"
   physical_preview:
     file: app/page.jsx
     contains:
+      - "Flat"
       - "Physical"
-      - "physicalCard"
-  custom_layers:
+      - "physicalChipReflection"
+  physical_motion_css:
+    file: app/globals.css
+    contains:
+      - "@keyframes physicalTilt"
+      - "@keyframes physicalSheen"
+      - "@keyframes chipSheen"
+  complete_text_layers:
     file: app/page.jsx
     contains:
-      - "addTextLayer"
-      - "uploadLayerImage"
-      - "addShapeLayer"
+      - "fontFamily"
+      - "Text layer font"
+      - "Text alignment"
+      - "Font Size"
+      - "Weight"
+      - "Letter Spacing"
+      - "Text Shadow"
+      - "Layer X"
+      - "Layer Y"
+      - "Layer Rotation"
+      - "Opacity"
+  custom_layer_types:
+    file: app/page.jsx
+    contains:
+      - "+ Text"
+      - "+ Image / Logo"
+      - "+ Shape"
+      - "+ Chip"
+      - "+ Contactless"
       - "Bring Forward"
       - "Send Back"
       - "Duplicate"
       - "Delete"
-  autosave_indexeddb:
-    file: app/page.jsx
-    contains:
-      - "setSaveStatus('Editing…')"
-      - "dbPut('kv'"
-      - "420"
-  indexeddb_stores:
-    file: app/lib/storage.js
-    contains:
-      - "'favorites'"
-      - "'projects'"
-      - "'imports'"
-      - "'exports'"
+      - "Lock Layer"
   surprise_me:
     file: app/page.jsx
     contains:
       - "surpriseMe"
       - "Surprise Me"
-  featured_shelves:
+  server_artwork_preprocessing:
+    file: app/api/cucu/inspect/route.js
+    contains:
+      - "import sharp from 'sharp'"
+      - "usable"
+      - "crop"
+      - "thumbnail"
+      - "full"
+      - "s-maxage=2592000"
+  preprocess_client_reuse:
     file: app/page.jsx
     contains:
-      - "Recently Added"
-      - "Best Sellers"
-      - "Cute & Kawaii"
-      - "Memes"
-  offline_support:
+      - "server-preprocessed"
+      - "item.inspectUrls"
+      - "meta.thumbnail"
+      - "meta.full"
+  thumbnail_pipeline:
+    file: app/api/cucu/route.js
+    contains:
+      - "thumbnail: imageProxy"
+      - "inspectUrls"
+      - "560"
+  shopify_thumbnail_downsample:
+    file: app/api/image/route.js
+    contains:
+      - "cdn\\.shopify\\.com"
+      - "url.searchParams.set('width'"
+  image_edge_cache:
+    file: app/api/image/route.js
+    contains:
+      - "max-age=31536000"
+      - "Vercel-CDN-Cache-Control"
+  offline_static_and_art_cache:
     file: public/sw.js
     contains:
       - "aircard-art-v2"
+      - "aircard-static-v2"
+      - "/_next/static/"
       - "cacheFirst"
       - "staleWhileRevalidate"
   import_photos_files:
@@ -152,6 +297,7 @@ features:
       - "Import Photo or File"
       - "idb://imports/"
       - 'accept="image/*"'
+      - "Crop Left"
   full_screen_export_preview:
     file: app/page.jsx
     contains:
@@ -169,6 +315,7 @@ features:
       - "exportPresetJson"
       - "importPresetJson"
       - ".aircard.json"
+      - "payload.assets"
   pwa_install_onboarding:
     file: app/page.jsx
     contains:
@@ -180,22 +327,17 @@ features:
     contains:
       - "Expert Mode"
       - "EXPERT VALUES"
-  thumbnail_pipeline:
-    file: app/api/cucu/route.js
-    contains:
-      - "thumbnail: imageProxy"
-      - "560"
-  image_edge_cache:
-    file: app/api/image/route.js
-    contains:
-      - "max-age=31536000"
-      - "Vercel-CDN-Cache-Control"
-  accessibility:
+  accessible_range_values:
     file: app/page.jsx
     contains:
-      - "Artwork zoom"
+      - "aria-valuetext"
+      - "Math.round(value * 100) + '%'"
       - "Chip horizontal position"
       - "Vignette intensity"
+  dynamic_type_css:
+    file: app/globals.css
+    contains:
+      - "@supports (font: -apple-system-body)"
   exact_aircard_exports:
     file: app/page.jsx
     contains:
