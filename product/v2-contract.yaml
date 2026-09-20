@@ -34,6 +34,9 @@ forbidden:
       - "['edit', 'Edit']"
       - "['layers', 'Layers']"
       - "Load More"
+      - "onClick={() => download("
+      - "sharePng("
+      - "isIOS ?"
       - "<span className=\"kicker\">AirCard</span>"
       - "Design Studio"
       - "CUCU Covers"
@@ -429,3 +432,13 @@ features:
       - "grain: 0"
       - "gloss: 0"
       - "overlay: 0"
+
+  native_image_export_sheet:
+    file: app/page.jsx
+    contains:
+      - "nativeExportPng"
+      - "navigator.share"
+      - "navigator.canShare"
+      - "Save 3× Image"
+      - "Save 2× Image"
+      - "Choose “Save Image” to save it to Photos."
