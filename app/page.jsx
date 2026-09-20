@@ -2339,6 +2339,7 @@ export default function Page() {
   const imageImportGenerationRef = useRef(0);
   const pendingDesignFrameRef = useRef(0);
   const pendingVisualDesignRef = useRef(null);
+  const gesturePreviewFrameRef = useRef(0);
 
   const gradient = useMemo(
     () => GRADIENTS.find((item) => item.id === design.gradient) || GRADIENTS[0],
@@ -2454,6 +2455,10 @@ export default function Page() {
       if (pendingDesignFrameRef.current) {
         window.cancelAnimationFrame(pendingDesignFrameRef.current);
         pendingDesignFrameRef.current = 0;
+      }
+      if (gesturePreviewFrameRef.current) {
+        window.cancelAnimationFrame(gesturePreviewFrameRef.current);
+        gesturePreviewFrameRef.current = 0;
       }
       pendingVisualDesignRef.current = null;
     };
@@ -3594,6 +3599,20 @@ export default function Page() {
     loadedBackgroundKey,
     loadedImageLayerSourceKey
   ]);
+
+  const scheduleGesturePreview = useCallback(() => {
+    if (gesturePreviewFrameRef.current) return;
+    gesturePreviewFrameRef.current = window.requestAnimationFrame(() => {
+      gesturePreviewFrameRef.current = 0;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      renderCard(ctx, EDITOR_PREVIEW_W, EDITOR_PREVIEW_H, {
+        design: designRef.current
+      });
+    });
+  }, [renderCard]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -5465,6 +5484,8 @@ export default function Page() {
       lastDistance.current = distance;
       lastAngle.current = angle;
     }
+
+    if (gestureHistoryRecorded.current) scheduleGesturePreview();
   }
 
   function pointerUp(event) {
