@@ -50,6 +50,13 @@ try {
   }
 
   await page.getByRole('tab', { name: 'Studio', exact: true }).click();
+  const studioNewCard = page.getByRole('button', { name: 'Start a new card', exact: true });
+  await studioNewCard.waitFor({ state: 'visible', timeout: 5000 });
+  assert.equal(
+    await studioNewCard.isVisible(),
+    true,
+    'Studio must expose the New Card action without requiring a trip to Library'
+  );
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
 
   const editorCanvas = page.locator('.cardFrame canvas').first();
@@ -623,22 +630,70 @@ try {
   assert.equal(await editorCanvas.evaluate((node) => node.style.touchAction), 'none');
 
   await page.getByRole('tab', { name: 'Crop', exact: true }).click();
-  const [fileChooser] = await Promise.all([
-    page.waitForEvent('filechooser', { timeout: 10000 }),
-    page.getByRole('button', { name: /Replace Artwork/ }).click()
-  ]);
-  await fileChooser.setFiles({
-    name: 'webkit-smoke.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4e0AAAAASUVORK5CYII=',
-      'base64'
-    )
+
+  const redCardPng = await sharp({
+    create: {
+      width: 64,
+      height: 40,
+      channels: 4,
+      background: { r: 240, g: 20, b: 30, alpha: 1 }
+    }
+  }).png().toBuffer();
+  const blueCardPng = await sharp({
+    create: {
+      width: 64,
+      height: 40,
+      channels: 4,
+      background: { r: 20, g: 45, b: 240, alpha: 1 }
+    }
+  }).png().toBuffer();
+
+  const replaceBackground = async (name, buffer) => {
+    const [chooser] = await Promise.all([
+      page.waitForEvent('filechooser', { timeout: 10000 }),
+      page.getByRole('button', { name: /Replace Artwork/ }).click()
+    ]);
+    await chooser.setFiles({ name, mimeType: 'image/png', buffer });
+    await page.getByText('Imported image ready to crop', { exact: true }).waitFor({
+      state: 'visible',
+      timeout: 15000
+    });
+    await page.getByText('Artwork loaded', { exact: true }).waitFor({
+      state: 'visible',
+      timeout: 15000
+    });
+  };
+
+  const sampleBackgroundCorner = async () => editorCanvas.evaluate((node) => {
+    const ctx = node.getContext('2d');
+    const x = Math.max(0, Math.floor(node.width * 0.92));
+    const y = Math.max(0, Math.floor(node.height * 0.9));
+    return Array.from(ctx.getImageData(x, y, 1, 1).data);
   });
-  await page.getByText('Imported image ready to crop', { exact: true }).waitFor({
+
+  await replaceBackground('library-red.png', redCardPng);
+  await replaceBackground('library-blue.png', blueCardPng);
+
+  const bluePixel = await sampleBackgroundCorner();
+  assert.ok(
+    bluePixel[2] > bluePixel[0],
+    'second imported artwork must replace the first background before the Library test'
+  );
+
+  await page.getByRole('tab', { name: 'Library', exact: true }).click();
+  const redImport = page.locator('.importList .actionRow').filter({ hasText: 'library-red.png' }).first();
+  await redImport.waitFor({ state: 'visible', timeout: 10000 });
+  await redImport.click();
+
+  await page.getByText('Artwork loaded', { exact: true }).waitFor({
     state: 'visible',
     timeout: 15000
   });
+  const redPixel = await sampleBackgroundCorner();
+  assert.ok(
+    redPixel[0] > redPixel[2],
+    'Library → Imports must replace the currently decoded artwork instead of leaving the old image rendered'
+  );
 
   // Let the 420ms autosave commit both the imported-image reference and
   // custom layer state, then verify hydration restores them after a reload.
