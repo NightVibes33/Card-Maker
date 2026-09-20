@@ -100,6 +100,7 @@ requireMatch(sw, /async function trimCache\(/, 'service-worker cache eviction ex
 requireMatch(sw, /const SHELL = \['\/', '\/manifest\.webmanifest'\];/, 'app root is precached for first offline launch');
 requireMatch(sw, /const OWNED_CACHE_PREFIX = 'card-studio-';/, 'service-worker cleanup is scoped to Card Studio caches');
 requireMatch(sw, /key\.startsWith\(OWNED_CACHE_PREFIX\)/, 'service-worker leaves unrelated origin caches untouched');
+requireMatch(sw, /if \(response\.status >= 500\)/, 'navigation falls back to cached shell on transient server failures');
 requireMatch(sw, /requestedWidth > 0 && requestedWidth <= 800/, 'thumbnail cache routing is width-bounded');
 requireMatch(page, /proxyImageWidth\(item\.image, 3072\)/, 'editor artwork uses a bounded high-resolution working copy');
 
