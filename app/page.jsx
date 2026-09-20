@@ -2466,6 +2466,7 @@ export default function Page() {
   const pendingDesignFrameRef = useRef(0);
   const pendingVisualDesignRef = useRef(null);
   const gesturePreviewFrameRef = useRef(0);
+  const finishActiveGestureRef = useRef(null);
 
   const gradient = useMemo(
     () => GRADIENTS.find((item) => item.id === design.gradient) || GRADIENTS[0],
@@ -2522,6 +2523,14 @@ export default function Page() {
   }, []);
 
   const patch = useCallback((next, recordHistory = true, historyKey = '') => {
+    if (
+      recordHistory &&
+      (pointers.current.size > 0 || gestureStartDesign.current) &&
+      typeof finishActiveGestureRef.current === 'function'
+    ) {
+      finishActiveGestureRef.current();
+    }
+
     if (cleanupInFlightRef.current) {
       setMessage('Finish cleaning imported images before editing.');
       return designRef.current;
@@ -2591,6 +2600,13 @@ export default function Page() {
   }, []);
 
   const finishActiveGesture = useCallback(() => {
+    const active =
+      pointers.current.size > 0 ||
+      Boolean(gestureStartDesign.current) ||
+      gestureHistoryRecorded.current ||
+      Boolean(gesturePreviewFrameRef.current);
+    if (!active) return;
+
     if (gestureHistoryRecorded.current) {
       replaceDesign(designRef.current);
     }
@@ -2620,6 +2636,8 @@ export default function Page() {
       gesturePreviewFrameRef.current = 0;
     }
   }, [replaceDesign]);
+
+  finishActiveGestureRef.current = finishActiveGesture;
 
   useEffect(() => {
     if (tab === 'studio' && previewMode === 'flat') return;
