@@ -103,9 +103,8 @@ const pageChecks = [
   [/setSelectedElement\('artwork'\);[\s\S]{0,220}setStudioTool\('crop'\)/, 'Library artwork selection targets the background before crop editing'],
   [/for \(const snapshot of undoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves undo history assets'],
   [/for \(const snapshot of redoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves redo history assets'],
-  [/const projectCountRef = useRef\(0\)/, 'saved-project capacity uses a synchronous durable count'],
-  [/projectCountRef\.current \+ projectOpsRef\.current\.size >= MAX_SAVED_PROJECTS/, 'named saves reserve project capacity synchronously'],
-  [/projectCountRef\.current \+ pendingOtherProjectOps \+ pendingNamedSave >= MAX_SAVED_PROJECTS/, 'project duplicates share the same capacity budget'],
+  [/dbPutIfBelowLimit\('projects', project, MAX_SAVED_PROJECTS\)/, 'named project saves enforce capacity inside IndexedDB'],
+  [/dbPutIfBelowLimit\('projects', copy, MAX_SAVED_PROJECTS\)/, 'project duplicates share the atomic IndexedDB capacity limit'],
   [/const pendingNamedSave = projectSaveInFlightRef\.current \? 1 : 0;/, 'project duplication counts an in-flight named save against the project cap'],
   [/if \(projectOpsRef\.current\.size\) \{[\s\S]{0,180}before cleaning imported images/, 'import cleanup waits for active project transactions'],
   [/const imageImportGenerationRef = useRef\(0\)/, 'image imports use a generation token'],
@@ -233,6 +232,9 @@ requireMatch(page, /proxyImageWidth\(item\.image, 3072\)/, 'editor artwork uses 
 requireMatch(storage, /const DB_VERSION = 2;/, 'IndexedDB schema includes import metadata migration');
 requireMatch(storage, /'importMeta'/, 'import metadata store exists');
 requireMatch(storage, /export async function dbGetImportMetadata\(/, 'metadata-only import listing exists');
+requireMatch(storage, /export async function dbPutIfBelowLimit\(/, 'IndexedDB supports atomic capacity-limited writes');
+requireMatch(storage, /db\.transaction\(store, 'readwrite'\)/, 'capacity checks and writes share one readwrite transaction');
+requireMatch(storage, /objectStore\.count\(\)/, 'atomic capacity writes count the durable store before inserting');
 requireMatch(storage, /async function withDbRetry\(/, 'transient IndexedDB operations retry through a fresh connection');
 requireMatch(storage, /db\.onclose = \(\) => \{[\s\S]{0,100}dbPromise = null;/, 'unexpected IndexedDB closure invalidates the cached connection');
 requireMatch(storage, /const snapshot = await withDbRetry\(/, 'import metadata hydration uses the transient IndexedDB retry path');
