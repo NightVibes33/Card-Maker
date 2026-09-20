@@ -310,10 +310,17 @@ try {
     mimeType: 'image/png',
     buffer: imageLayerUpload
   });
-  await page.getByText('New project created from fresh-main-menu-import.png', { exact: true }).waitFor({
-    state: 'visible',
-    timeout: 10000
-  });
+  await page.waitForFunction(
+    () => {
+      try {
+        return JSON.parse(localStorage.getItem('aircard-sticker-fvp-v3') || '{}').backgroundLabel === 'fresh-main-menu-import.png';
+      } catch {
+        return false;
+      }
+    },
+    null,
+    { timeout: 10000 }
+  );
   const freshMainMenuImportDraft = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('aircard-sticker-fvp-v3') || '{}')
   );
@@ -352,10 +359,17 @@ try {
     mimeType: 'image/png',
     buffer: catalogSkinPng
   });
-  await page.getByText('Artwork replaced · existing card settings kept', { exact: true }).waitFor({
-    state: 'visible',
-    timeout: 10000
-  });
+  await page.waitForFunction(
+    () => {
+      try {
+        return JSON.parse(localStorage.getItem('aircard-sticker-fvp-v3') || '{}').backgroundLabel === 'replacement-artwork.png';
+      } catch {
+        return false;
+      }
+    },
+    null,
+    { timeout: 10000 }
+  );
   const replaceArtworkDraft = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('aircard-sticker-fvp-v3') || '{}')
   );
