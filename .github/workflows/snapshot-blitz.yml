@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: 22
       - name: Install snapshot dependencies
-        run: npm install --no-save --no-audit --no-fund microlink.io cheerio
+        run: npm install --no-save --no-audit --no-fund playwright-core
       - name: Build Blitz catalog snapshot
         run: node scripts/snapshot-blitz.mjs
       - name: Upload Blitz catalog
