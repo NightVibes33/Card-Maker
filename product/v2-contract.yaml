@@ -341,7 +341,7 @@ features:
     file: public/sw.js
     contains:
       - "card-studio-art-v5"
-      - "card-studio-static-v3"
+      - "card-studio-static-v4"
       - "/_next/static/"
       - "cacheFirst"
       - "staleWhileRevalidate"
