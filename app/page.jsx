@@ -4958,6 +4958,19 @@ export default function Page() {
         throw new Error('Unsupported preset version');
       }
 
+      if (
+        Array.isArray(payload.design.customLayers) &&
+        payload.design.customLayers.length > MAX_CUSTOM_LAYERS
+      ) {
+        throw new Error('Preset contains too many layers');
+      }
+      if (
+        Array.isArray(payload.design.layerOrder) &&
+        payload.design.layerOrder.length > MAX_CUSTOM_LAYERS + BUILTIN_LAYER_IDS.length
+      ) {
+        throw new Error('Preset contains an invalid layer order');
+      }
+
       const idMap = Object.create(null);
       const presetAssets = Object.entries(payload.assets || {});
       if (presetAssets.length > MAX_PRESET_ASSETS) {
@@ -4978,9 +4991,6 @@ export default function Page() {
       }
       if (referencedPresetAssetIds.size > MAX_PRESET_ASSETS) {
         throw new Error('Preset references too many embedded assets');
-      }
-      if (Array.isArray(payload.design.customLayers) && payload.design.customLayers.length > MAX_CUSTOM_LAYERS) {
-        throw new Error('Preset contains too many layers');
       }
       if (
         Array.isArray(payload.design.customLayers) &&
