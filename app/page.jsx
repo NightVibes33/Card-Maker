@@ -397,13 +397,13 @@ function normalizeDesignState(value) {
   next.contactlessRotation = finiteClamp(raw.contactlessRotation, DEFAULTS.contactlessRotation, -180, 180);
 
   next.number = Boolean(raw.number);
-  next.numberText = String(raw.numberText ?? DEFAULTS.numberText).slice(0, 32);
+  next.numberText = splitGraphemes(raw.numberText ?? DEFAULTS.numberText).slice(0, 32).join('');
   next.holder = Boolean(raw.holder);
-  next.holderText = String(raw.holderText ?? DEFAULTS.holderText).slice(0, 28);
+  next.holderText = splitGraphemes(raw.holderText ?? DEFAULTS.holderText).slice(0, 28).join('');
   next.expiry = Boolean(raw.expiry);
-  next.expiryText = String(raw.expiryText ?? DEFAULTS.expiryText).slice(0, 8);
+  next.expiryText = splitGraphemes(raw.expiryText ?? DEFAULTS.expiryText).slice(0, 8).join('');
   next.badge = Boolean(raw.badge);
-  next.badgeText = String(raw.badgeText ?? DEFAULTS.badgeText).slice(0, 18);
+  next.badgeText = splitGraphemes(raw.badgeText ?? DEFAULTS.badgeText).slice(0, 18).join('');
   next.textColor = normalizeHexColor(raw.textColor, DEFAULTS.textColor);
   next.shadow = raw.shadow == null ? DEFAULTS.shadow : Boolean(raw.shadow);
 
@@ -5008,13 +5008,13 @@ export default function Page() {
 
                 <Group title="CARD TEXT">
                   <SwitchRow label="Masked Number" value={design.number} onChange={(value) => patch({ number: value })} />
-                  {design.number ? <input className="iosTextField" aria-label="Masked card number" value={design.numberText} onChange={(event) => patch({ numberText: event.target.value.slice(0, 32) })} /> : null}
+                  {design.number ? <input className="iosTextField" aria-label="Masked card number" value={design.numberText} onChange={(event) => patch({ numberText: splitGraphemes(event.target.value).slice(0, 32).join('') })} /> : null}
                   <SwitchRow label="Card Holder" value={design.holder} onChange={(value) => patch({ holder: value })} />
-                  {design.holder ? <input className="iosTextField" aria-label="Card holder" value={design.holderText} onChange={(event) => patch({ holderText: event.target.value.slice(0, 28) })} /> : null}
+                  {design.holder ? <input className="iosTextField" aria-label="Card holder" value={design.holderText} onChange={(event) => patch({ holderText: splitGraphemes(event.target.value).slice(0, 28).join('') })} /> : null}
                   <SwitchRow label="Expiry" value={design.expiry} onChange={(value) => patch({ expiry: value })} />
-                  {design.expiry ? <input className="iosTextField" aria-label="Expiry date" value={design.expiryText} onChange={(event) => patch({ expiryText: event.target.value.slice(0, 8) })} /> : null}
+                  {design.expiry ? <input className="iosTextField" aria-label="Expiry date" value={design.expiryText} onChange={(event) => patch({ expiryText: splitGraphemes(event.target.value).slice(0, 8).join('') })} /> : null}
                   <SwitchRow label="Top Badge" value={design.badge} onChange={(value) => patch({ badge: value })} />
-                  {design.badge ? <input className="iosTextField" aria-label="Top badge text" value={design.badgeText} onChange={(event) => patch({ badgeText: event.target.value.slice(0, 18) })} /> : null}
+                  {design.badge ? <input className="iosTextField" aria-label="Top badge text" value={design.badgeText} onChange={(event) => patch({ badgeText: splitGraphemes(event.target.value).slice(0, 18).join('') })} /> : null}
                   <label className="colorRow">
                     <span>Text Color</span>
                     <input aria-label="Text color" type="color" value={design.textColor} onChange={(event) => patch({ textColor: event.target.value })} />
