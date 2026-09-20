@@ -4574,20 +4574,31 @@ export default function Page() {
         file = makePngFile(width, height, name);
       } catch {
         setMessage('PNG export failed. Re-open the artwork or image layer and try again.');
-        return;
+        return false;
       }
     }
-    const url = URL.createObjectURL(file);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = name;
-    anchor.style.display = 'none';
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
-    await recordExport(name, width, height, 'download');
-    setMessage(name + ' saved to Files/downloads');
+
+    let url = '';
+    let anchor = null;
+
+    try {
+      url = URL.createObjectURL(file);
+      anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = name;
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      await recordExport(name, width, height, 'download');
+      setMessage(name + ' saved to Files/downloads');
+      return true;
+    } catch {
+      setMessage('Could not start the PNG download on this device.');
+      return false;
+    } finally {
+      anchor?.remove();
+      if (url) setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }
   }
 
   async function nativeExportPng(
@@ -4632,8 +4643,10 @@ export default function Page() {
       }
 
       if (!canShareFile) {
-        await download(width, height, name, file);
-        setMessage('Native image sharing is unavailable, so the PNG download was started instead.');
+        const downloaded = await download(width, height, name, file);
+        if (downloaded) {
+          setMessage('Native image sharing is unavailable, so the PNG download was started instead.');
+        }
         return;
       }
 
