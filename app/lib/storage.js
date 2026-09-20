@@ -93,6 +93,9 @@ function openDb() {
         db.close();
         dbPromise = null;
       };
+      db.onclose = () => {
+        dbPromise = null;
+      };
       resolve(db);
     };
 
