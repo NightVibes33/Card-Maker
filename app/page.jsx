@@ -4320,8 +4320,8 @@ export default function Page() {
               layerScale,
               shapeWidth,
               shapeHeight,
-            hitPadding
-          )
+              hitPadding
+            )
           ) {
             return layer.id;
           }
@@ -4357,8 +4357,8 @@ export default function Page() {
           layer.rotation,
           layerScale,
           bounds,
-            hitPadding
-          )
+          hitPadding
+        )
       ) {
         return layer.id;
       }
