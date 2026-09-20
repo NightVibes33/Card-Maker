@@ -1060,7 +1060,16 @@ export default function Page() {
         setExpertMode(localStorage.getItem('aircard-expert-v2') === '1');
 
         if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+          navigator.serviceWorker.register('/sw.js').then((registration) => {
+            registration.update().catch(() => {});
+          }).catch(() => {});
+
+          const reloadKey = 'card-studio-sw-v3-reloaded';
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (sessionStorage.getItem(reloadKey) === '1') return;
+            sessionStorage.setItem(reloadKey, '1');
+            window.location.reload();
+          });
         }
 
         const standalone =
