@@ -19,6 +19,7 @@ const EDITOR_PREVIEW_W = 1024;
 const EDITOR_PREVIEW_H = 646;
 const CARD_RATIO = OUT_W / OUT_H;
 const MAX_IMAGE_IMPORT_BYTES = 30 * 1024 * 1024;
+const MAX_SVG_IMPORT_BYTES = 2 * 1024 * 1024;
 const MAX_PRESET_IMPORT_BYTES = 48 * 1024 * 1024;
 const MAX_PRESET_EMBEDDED_BYTES = 30 * 1024 * 1024;
 const MAX_CUSTOM_LAYERS = 200;
@@ -1619,7 +1620,36 @@ function decodeLocalImageBlob(blob, timeoutMs = 15000) {
   });
 }
 
+async function validateSafeSvgBlob(blob) {
+  const sourceType = String(blob?.type || '').toLowerCase();
+  const sourceName = String(blob?.name || '');
+  const isSvg =
+    sourceType === 'image/svg+xml' ||
+    /\.svg$/i.test(sourceName);
+  if (!isSvg) return;
+
+  if (Number(blob?.size || 0) > MAX_SVG_IMPORT_BYTES) {
+    throw new Error('SVG is too large. Choose a vector file under 2 MB.');
+  }
+
+  const markup = await blob.text();
+  const unsafeMarkup = [
+    /<\s*script\b/i,
+    /<\s*foreignObject\b/i,
+    /<!\s*(?:DOCTYPE|ENTITY)\b/i,
+    /\bon[a-z][a-z0-9_-]*\s*=/i,
+    /\b(?:href|xlink:href|src)\s*=\s*["']?\s*(?:https?:|\/\/|javascript:|data:text\/html)/i,
+    /@import\b/i,
+    /url\(\s*["']?\s*(?:https?:|\/\/|javascript:)/i
+  ];
+
+  if (unsafeMarkup.some((pattern) => pattern.test(markup))) {
+    throw new Error('SVG contains unsupported active or remote content.');
+  }
+}
+
 async function prepareLocalImageBlob(blob, limits = {}) {
+  await validateSafeSvgBlob(blob);
   const decoded = await decodeLocalImageBlob(blob);
   const { image, width, height } = decoded;
   const maxPixels = Math.max(
@@ -3576,7 +3606,9 @@ export default function Page() {
           ? 'Image resolution is too large for reliable iPhone editing.'
           : error?.message === 'Image remains too large after optimization'
             ? 'Image is still too large after optimization. Choose a smaller file.'
-            : 'This image could not be decoded on this device.'
+            : String(error?.message || '').startsWith('SVG')
+              ? error.message
+              : 'This image could not be decoded on this device.'
       );
       return;
     }
@@ -3664,7 +3696,9 @@ export default function Page() {
           ? 'Image resolution is too large for reliable iPhone editing.'
           : error?.message === 'Image remains too large after optimization'
             ? 'Image is still too large after optimization. Choose a smaller file.'
-            : 'This image could not be decoded on this device.'
+            : String(error?.message || '').startsWith('SVG')
+              ? error.message
+              : 'This image could not be decoded on this device.'
       );
       return;
     }
