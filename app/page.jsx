@@ -2997,30 +2997,31 @@ export default function Page() {
     const rect = event.currentTarget.getBoundingClientRect();
     const px = ((event.clientX - rect.left) / Math.max(1, rect.width)) * OUT_W;
     const py = ((event.clientY - rect.top) / Math.max(1, rect.height)) * OUT_H;
-    const customLayerMap = new Map((design.customLayers || []).map((layer) => [layer.id, layer]));
-    const stack = normalizeLayerOrder(design).slice().reverse();
+    const currentDesign = designRef.current;
+    const customLayerMap = new Map((currentDesign.customLayers || []).map((layer) => [layer.id, layer]));
+    const stack = normalizeLayerOrder(currentDesign).slice().reverse();
 
     for (const stackId of stack) {
-      if (stackId === 'builtin-contactless' && design.contactless) {
-        const radius = 96 * Number(design.contactlessScale || 1);
-        if (Math.hypot(px - design.contactlessX * OUT_W, py - design.contactlessY * OUT_H) <= radius) {
+      if (stackId === 'builtin-contactless' && currentDesign.contactless) {
+        const radius = 96 * Number(currentDesign.contactlessScale || 1);
+        if (Math.hypot(px - currentDesign.contactlessX * OUT_W, py - currentDesign.contactlessY * OUT_H) <= radius) {
           return 'contactless';
         }
         continue;
       }
 
-      if (stackId === 'builtin-chip' && design.chip) {
-        const chipW = 255 * Number(design.chipScale || 1);
-        const chipH = 188 * Number(design.chipScale || 1);
-        const cx = design.chipX * OUT_W + chipW / 2;
-        const cy = design.chipY * OUT_H + chipH / 2;
+      if (stackId === 'builtin-chip' && currentDesign.chip) {
+        const chipW = 255 * Number(currentDesign.chipScale || 1);
+        const chipH = 188 * Number(currentDesign.chipScale || 1);
+        const cx = currentDesign.chipX * OUT_W + chipW / 2;
+        const cy = currentDesign.chipY * OUT_H + chipH / 2;
         if (
           pointInRotatedBounds(
             px,
             py,
             cx,
             cy,
-            design.chipRotation,
+            currentDesign.chipRotation,
             1,
             { left: -chipW / 2, top: -chipH / 2, right: chipW / 2, bottom: chipH / 2 },
             10
@@ -3075,7 +3076,7 @@ export default function Page() {
       historyGroupRef.current = { key: '', at: 0 };
       const target = hitTestElement(event);
       gestureTarget.current = target;
-      gestureStartDesign.current = design;
+      gestureStartDesign.current = designRef.current;
       gestureHistoryRecorded.current = false;
       setSelectedElement(target);
     }
@@ -3128,7 +3129,7 @@ export default function Page() {
           return { contactlessX: snapX.value, contactlessY: snapY.value };
         }, false);
       } else if (target !== 'artwork') {
-        const layer = (design.customLayers || []).find((entry) => entry.id === target);
+        const layer = (designRef.current.customLayers || []).find((entry) => entry.id === target);
         if (layer && !layer.locked) {
           if (moved) recordGestureHistory();
           patch((current) => ({
