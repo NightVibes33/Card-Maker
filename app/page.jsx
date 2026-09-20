@@ -2883,7 +2883,7 @@ export default function Page() {
   }
 
   function updateCropEdge(edge, rawValue) {
-    const value = clamp(Number(rawValue), 0, 0.48);
+    const value = clamp(Number(rawValue), 0, 0.9);
     patch((current) => {
       const crop = current.sourceCrop || { x: 0, y: 0, w: 1, h: 1 };
       let left = clamp(crop.x, 0, 0.9);
@@ -2908,7 +2908,7 @@ export default function Page() {
   }
 
   function updateLayerCropEdge(id, edge, rawValue) {
-    const value = clamp(Number(rawValue), 0, 0.48);
+    const value = clamp(Number(rawValue), 0, 0.9);
     patch((current) => ({
       customLayers: (current.customLayers || []).map((layer) => {
         if (layer.id !== id || layer.type !== 'image' || layer.locked) return layer;
@@ -4271,7 +4271,7 @@ export default function Page() {
                         disabled={Boolean(selectedImageLayer.locked)}
                         value={selectedImageLayer.crop?.x || 0}
                         min={0}
-                        max={0.48}
+                        max={0.9}
                         step={0.005}
                         formatValue={(value) => Math.round(value * 100) + '%'}
                         onChange={(value) => updateLayerCropEdge(selectedImageLayer.id, 'left', value)}
@@ -4281,7 +4281,7 @@ export default function Page() {
                         disabled={Boolean(selectedImageLayer.locked)}
                         value={selectedImageLayer.crop ? Math.max(0, 1 - selectedImageLayer.crop.x - selectedImageLayer.crop.w) : 0}
                         min={0}
-                        max={0.48}
+                        max={0.9}
                         step={0.005}
                         formatValue={(value) => Math.round(value * 100) + '%'}
                         onChange={(value) => updateLayerCropEdge(selectedImageLayer.id, 'right', value)}
@@ -4291,7 +4291,7 @@ export default function Page() {
                         disabled={Boolean(selectedImageLayer.locked)}
                         value={selectedImageLayer.crop?.y || 0}
                         min={0}
-                        max={0.48}
+                        max={0.9}
                         step={0.005}
                         formatValue={(value) => Math.round(value * 100) + '%'}
                         onChange={(value) => updateLayerCropEdge(selectedImageLayer.id, 'top', value)}
@@ -4301,7 +4301,7 @@ export default function Page() {
                         disabled={Boolean(selectedImageLayer.locked)}
                         value={selectedImageLayer.crop ? Math.max(0, 1 - selectedImageLayer.crop.y - selectedImageLayer.crop.h) : 0}
                         min={0}
-                        max={0.48}
+                        max={0.9}
                         step={0.005}
                         formatValue={(value) => Math.round(value * 100) + '%'}
                         onChange={(value) => updateLayerCropEdge(selectedImageLayer.id, 'bottom', value)}
@@ -4332,10 +4332,10 @@ export default function Page() {
                       <IOSIcon name="photo" size={19} />
                     </button>
                     <div className="cropControlBlock">
-                      <SliderRow label="Crop Left" value={design.sourceCrop?.x || 0} min={0} max={0.48} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('left', value)} />
-                      <SliderRow label="Crop Right" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.x - design.sourceCrop.w) : 0} min={0} max={0.48} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('right', value)} />
-                      <SliderRow label="Crop Top" value={design.sourceCrop?.y || 0} min={0} max={0.48} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('top', value)} />
-                      <SliderRow label="Crop Bottom" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.y - design.sourceCrop.h) : 0} min={0} max={0.48} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('bottom', value)} />
+                      <SliderRow label="Crop Left" value={design.sourceCrop?.x || 0} min={0} max={0.9} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('left', value)} />
+                      <SliderRow label="Crop Right" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.x - design.sourceCrop.w) : 0} min={0} max={0.9} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('right', value)} />
+                      <SliderRow label="Crop Top" value={design.sourceCrop?.y || 0} min={0} max={0.9} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('top', value)} />
+                      <SliderRow label="Crop Bottom" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.y - design.sourceCrop.h) : 0} min={0} max={0.9} step={0.005} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateCropEdge('bottom', value)} />
                     </div>
                     <button
                       type="button"
@@ -4437,10 +4437,10 @@ export default function Page() {
                     <NumericField label="Artwork X" value={design.x} min={-1.5} max={1.5} onChange={(value) => patch({ x: value })} />
                     <NumericField label="Artwork Y" value={design.y} min={-1.5} max={1.5} onChange={(value) => patch({ y: value })} />
                     <NumericField label="Artwork Rotation" value={design.rotate} min={-180} max={180} step={0.1} onChange={(value) => patch({ rotate: value })} suffix="°" />
-                    <NumericField label="Crop Left" value={design.sourceCrop?.x || 0} min={0} max={0.48} onChange={(value) => updateCropEdge('left', value)} />
-                    <NumericField label="Crop Right" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.x - design.sourceCrop.w) : 0} min={0} max={0.48} onChange={(value) => updateCropEdge('right', value)} />
-                    <NumericField label="Crop Top" value={design.sourceCrop?.y || 0} min={0} max={0.48} onChange={(value) => updateCropEdge('top', value)} />
-                    <NumericField label="Crop Bottom" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.y - design.sourceCrop.h) : 0} min={0} max={0.48} onChange={(value) => updateCropEdge('bottom', value)} />
+                    <NumericField label="Crop Left" value={design.sourceCrop?.x || 0} min={0} max={0.9} onChange={(value) => updateCropEdge('left', value)} />
+                    <NumericField label="Crop Right" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.x - design.sourceCrop.w) : 0} min={0} max={0.9} onChange={(value) => updateCropEdge('right', value)} />
+                    <NumericField label="Crop Top" value={design.sourceCrop?.y || 0} min={0} max={0.9} onChange={(value) => updateCropEdge('top', value)} />
+                    <NumericField label="Crop Bottom" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.y - design.sourceCrop.h) : 0} min={0} max={0.9} onChange={(value) => updateCropEdge('bottom', value)} />
                     <NumericField label="Exposure" value={design.exposure} min={-1} max={1} onChange={(value) => patch({ exposure: value })} />
                     <NumericField label="Brightness" value={design.brightness} min={0.4} max={1.7} onChange={(value) => patch({ brightness: value })} />
                     <NumericField label="Contrast" value={design.contrast} min={0.45} max={1.8} onChange={(value) => patch({ contrast: value })} />
