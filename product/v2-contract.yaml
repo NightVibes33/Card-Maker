@@ -222,6 +222,12 @@ features:
       - "@keyframes physicalTilt"
       - "@keyframes physicalSheen"
       - "@keyframes chipSheen"
+  liquid_glass_hierarchy:
+    file: app/globals.css
+    contains:
+      - ".studioFloatingBar"
+      - ".tabBar"
+      - "backdrop-filter:saturate(180%) blur(28px)"
   complete_text_layers:
     file: app/page.jsx
     contains:
@@ -306,6 +312,12 @@ features:
     contains:
       - "Full-Screen Preview"
       - "fullPreviewCanvasRef"
+  full_screen_export_css:
+    file: app/globals.css
+    contains:
+      - ".previewModal"
+      - "width:100vw"
+      - "height:100dvh"
   export_history:
     file: app/page.jsx
     contains:
@@ -334,6 +346,9 @@ features:
       - "Effect Tint Strength"
       - "Contactless X"
       - "Chip Rotation"
+      - "Exact Layer X"
+      - "Exact Layer Rotation"
+      - "Exact Font Size"
   accessible_range_values:
     file: app/page.jsx
     contains:
