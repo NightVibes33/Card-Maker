@@ -98,7 +98,7 @@ features:
       - "toggleFavorite"
       - "favoriteIds"
       - "dbPut('favorites'"
-      - "cacheArtwork(item.image)"
+      - "cacheArtwork(proxyImageWidth(item.image, 3072))"
   recent_twenty:
     file: app/page.jsx
     contains:
@@ -110,7 +110,7 @@ features:
       - "saveProject"
       - "projectName"
       - "Name this design"
-      - "design: { ...design }"
+      - "design: JSON.parse(JSON.stringify(currentDesign))"
       - "duplicateProject"
       - "removeProject"
   autosave_indexeddb:
@@ -340,7 +340,7 @@ features:
   offline_static_and_art_cache:
     file: public/sw.js
     contains:
-      - "card-studio-art-v3"
+      - "card-studio-art-v4"
       - "card-studio-static-v3"
       - "/_next/static/"
       - "cacheFirst"
