@@ -24,6 +24,8 @@ const pageChecks = [
   [/remote\.protocol !== 'https:'/, 'persisted proxy targets require HTTPS'],
   [/remote\.username \|\|[\s\S]{0,80}remote\.password/, 'persisted proxy targets reject embedded credentials'],
   [/const normalized = new URLSearchParams\(\)/, 'persisted proxy URLs are rebuilt from supported parameters only'],
+  [/if \(!source\.startsWith\('\/api\/image\?'\)\) return '';/, 'unknown artwork schemes and paths fail closed'],
+  [/This artwork source is unavailable or unsupported\./, 'invalid catalog artwork never enters editor state'],
   [/if \(!hydrated \|\| !autosaveReady\) return undefined;/, 'autosave waits for safe draft hydration'],
   [/draftReadFailed = true/, 'draft read failures are tracked separately from an empty draft'],
   [/setSaveStatus\('Autosave paused'\)/, 'unsafe draft hydration pauses autosave instead of overwriting storage'],
