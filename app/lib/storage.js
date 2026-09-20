@@ -4,19 +4,29 @@ const DB_NAME = 'aircard-studio-v2';
 const DB_VERSION = 2;
 const STORES = ['kv', 'favorites', 'projects', 'imports', 'importMeta', 'exports'];
 
+let metadataSegmenter = null;
+
+function truncateMetadataText(value, maxLength) {
+  const text =
+    typeof value === 'string' || typeof value === 'number'
+      ? String(value).trim()
+      : '';
+  if (!text) return '';
+
+  if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+    metadataSegmenter ||= new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+    return Array.from(metadataSegmenter.segment(text), (entry) => entry.segment)
+      .slice(0, maxLength)
+      .join('');
+  }
+
+  return Array.from(text).slice(0, maxLength).join('');
+}
+
 function importMetadata(value = {}) {
-  const id =
-    typeof value.id === 'string' || typeof value.id === 'number'
-      ? String(value.id).slice(0, 160)
-      : '';
-  const name =
-    typeof value.name === 'string' || typeof value.name === 'number'
-      ? String(value.name).trim().slice(0, 160)
-      : '';
-  const type =
-    typeof value.type === 'string' || typeof value.type === 'number'
-      ? String(value.type).trim().slice(0, 80)
-      : '';
+  const id = truncateMetadataText(value.id, 160);
+  const name = truncateMetadataText(value.name, 160);
+  const type = truncateMetadataText(value.type, 80);
 
   return {
     id,
