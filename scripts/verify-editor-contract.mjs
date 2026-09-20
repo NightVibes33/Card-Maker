@@ -200,6 +200,9 @@ requireMatch(page, /proxyImageWidth\(item\.image, 3072\)/, 'editor artwork uses 
 requireMatch(storage, /const DB_VERSION = 2;/, 'IndexedDB schema includes import metadata migration');
 requireMatch(storage, /'importMeta'/, 'import metadata store exists');
 requireMatch(storage, /export async function dbGetImportMetadata\(/, 'metadata-only import listing exists');
+requireMatch(storage, /async function withDbRetry\(/, 'transient IndexedDB operations retry through a fresh connection');
+requireMatch(storage, /db\.onclose = \(\) => \{[\s\S]{0,100}dbPromise = null;/, 'unexpected IndexedDB closure invalidates the cached connection');
+requireMatch(storage, /const snapshot = await withDbRetry\(/, 'import metadata hydration uses the transient IndexedDB retry path');
 requireMatch(storage, /parsed\.pathname !== '\/api\/image'/, 'offline artwork cache only accepts the local image proxy');
 requireMatch(storage, /parseAllowedRemoteImageUrl\(upstream\)/, 'offline artwork cache validates the upstream image host');
 requireMatch(imagePolicy, /export const IMAGE_PROXY_VERSION = '2';/, 'image proxy URLs have an explicit cache generation');
