@@ -172,10 +172,7 @@ try {
   const earlyLibrarySkin = page.getByRole('button', { name: 'Use WebKit Library Skin', exact: true }).first();
   await earlyLibrarySkin.waitFor({ state: 'visible', timeout: 15000 });
   await earlyLibrarySkin.click();
-  await page.getByText('New project created from WebKit Library Skin', { exact: true }).waitFor({
-    state: 'visible',
-    timeout: 10000
-  });
+  await page.locator('#panel-studio').waitFor({ state: 'visible', timeout: 10000 });
 
   assert.equal(
     await page.getByRole('button', { name: 'Undo', exact: true }).isDisabled(),
@@ -1229,10 +1226,7 @@ try {
   const mainLibrarySkin = page.getByRole('button', { name: 'Use WebKit Library Skin', exact: true }).first();
   await mainLibrarySkin.waitFor({ state: 'visible', timeout: 15000 });
   await mainLibrarySkin.click();
-  await page.getByText('New project created from WebKit Library Skin', { exact: true }).waitFor({
-    state: 'visible',
-    timeout: 10000
-  });
+  await page.locator('#panel-studio').waitFor({ state: 'visible', timeout: 10000 });
   assert.equal(
     await page.getByRole('button', { name: 'Undo', exact: true }).isDisabled(),
     true,
