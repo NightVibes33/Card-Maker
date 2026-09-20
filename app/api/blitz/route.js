@@ -4,8 +4,10 @@ import { BLITZ_INDEX } from './catalog';
 const ORIGIN = 'https://blitzcovers.com';
 const COLLECTION = 'credit-card-cover';
 
+const BLITZ_IMAGE_REV = '3';
+
 function imageUrl(handle) {
-  return '/api/blitz-image?handle=' + encodeURIComponent(handle);
+  return '/api/blitz-image?handle=' + encodeURIComponent(handle) + '&v=' + BLITZ_IMAGE_REV;
 }
 
 function toPublicItem(entry) {
