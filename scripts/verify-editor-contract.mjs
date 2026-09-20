@@ -250,6 +250,9 @@ requireMatch(page, /proxyImageWidth\(item\.image, 3072\)/, 'editor artwork uses 
 requireMatch(storage, /const DB_VERSION = 2;/, 'IndexedDB schema includes import metadata migration');
 requireMatch(storage, /'importMeta'/, 'import metadata store exists');
 requireMatch(storage, /export async function dbGetImportMetadata\(/, 'metadata-only import listing exists');
+requireMatch(storage, /async function serializeImportRecord\(/, 'imported image payloads detach from live File objects before IndexedDB storage');
+requireMatch(storage, /blobBytes: bytes/, 'imported image binary payloads persist as ArrayBuffer data');
+requireMatch(storage, /return store === 'imports' \? hydrateImportRecord\(value\) : value;/, 'import reads reconstruct usable Blob objects from stored binary data');
 requireMatch(storage, /export async function dbPutIfBelowLimit\(/, 'IndexedDB supports atomic capacity-limited writes');
 requireMatch(storage, /db\.transaction\(store, 'readwrite'\)/, 'capacity checks and writes share one readwrite transaction');
 requireMatch(storage, /objectStore\.count\(\)/, 'atomic capacity writes count the durable store before inserting');
