@@ -4183,7 +4183,7 @@ export default function Page() {
       fit: 'cover'
     }, {
       studioTool: 'position',
-      statusMessage: item.title + ' imported as a new card'
+      statusMessage: 'New project created from ' + item.title
     });
 
     rememberArtwork(item);
@@ -6214,6 +6214,18 @@ export default function Page() {
   const preview = (
     <section className={'previewShell editingPreview ' + (previewMode === 'physical' ? 'physicalPreview' : '')}>
       <div className="studioFloatingBar" aria-label="Studio history and comparison controls">
+        {tab === 'studio' ? (
+          <button
+            type="button"
+            className="studioNewCardButton studioToolbarNewButton"
+            disabled={cleanupInProgress || presetTransferInProgress || imageImportInProgress}
+            onClick={reset}
+            aria-label="New project"
+          >
+            <IOSIcon name="reset" size={16} />
+            <span>New</span>
+          </button>
+        ) : null}
         <div className="historyButtons">
           <button type="button" onClick={undo} disabled={!undoRef.current.length} aria-label="Undo">↶</button>
           <button type="button" onClick={redo} disabled={!redoRef.current.length} aria-label="Redo">↷</button>
@@ -6502,17 +6514,6 @@ export default function Page() {
               </div>
 
               <div className="studioModeActions">
-                <button
-                  type="button"
-                  className="studioNewCardButton"
-                  disabled={cleanupInProgress || presetTransferInProgress || imageImportInProgress}
-                  onClick={reset}
-                  aria-label="Start a new card"
-                >
-                  <IOSIcon name="reset" size={16} />
-                  <span>New Card</span>
-                </button>
-
                 <div className="previewModeToggle" role="group" aria-label="Preview style">
                   <button type="button" aria-pressed={previewMode === 'flat'} className={previewMode === 'flat' ? 'active' : ''} onClick={() => setPreviewMode('flat')}>Flat</button>
                   <button type="button" aria-pressed={previewMode === 'physical'} className={previewMode === 'physical' ? 'active' : ''} onClick={() => setPreviewMode('physical')}>Physical</button>

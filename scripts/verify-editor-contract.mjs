@@ -107,7 +107,7 @@ const pageChecks = [
   [/function startFreshWorkingProject\(/, 'fresh project transitions centralize state replacement'],
   [/function applyImportedArtwork\([\s\S]{0,700}startFreshWorkingProject\(/, 'Library imports start a fresh working project'],
   [/onClick=\{\(\) => applyImportedArtwork\(asset\)\}/, 'Library import rows cannot bypass artwork replacement safety'],
-  [/className="studioNewCardButton"/, 'Studio exposes a New Card action'],
+  [/className="studioFloatingBar"[\s\S]{0,420}aria-label="New project"/, 'Studio exposes New in the always-visible editor toolbar'],
   [/dbPutIfBelowLimit\('projects', project, MAX_SAVED_PROJECTS\)/, 'named project saves enforce capacity inside IndexedDB'],
   [/dbPutIfBelowLimit\('projects', copy, MAX_SAVED_PROJECTS\)/, 'project duplicates share the atomic IndexedDB capacity limit'],
   [/copyInserted = await dbPutIfBelowLimit\('projects', copy, MAX_SAVED_PROJECTS\)/, 'project duplication enforces the project cap atomically'],
@@ -173,7 +173,7 @@ const pageChecks = [
   [/localUpdatedAt >= indexedUpdatedAt/, 'startup prefers the synchronous fallback when draft timestamps tie'],
   [/startFreshWorkingProject\(DEFAULTS,[\s\S]{0,180}New card ready · unsaved work cleared/, 'New Card starts a clean working project'],
   [/undoRef\.current = \[\];[\s\S]{0,80}redoRef\.current = \[\];/, 'fresh project transitions clear undo and redo history'],
-  [/function useArtwork\([\s\S]{0,900}startFreshWorkingProject\(\{[\s\S]{0,120}\.\.\.DEFAULTS/, 'catalog artwork selection starts from defaults instead of inheriting editor state'],
+  [/function useArtwork\([\s\S]{0,1000}startFreshWorkingProject\(\{[\s\S]{0,120}\.\.\.DEFAULTS/, 'main Card Library artwork selection starts from defaults instead of inheriting editor state'],
   [/function openProject\([\s\S]{0,700}startFreshWorkingProject\(/, 'opening a saved project starts a new working session rather than preserving unsaved undo history']
 ];
 

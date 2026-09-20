@@ -59,6 +59,13 @@ try {
   }
 
   await page.getByRole('tab', { name: 'Studio', exact: true }).click();
+  const newProjectButton = page.getByRole('button', { name: 'New project', exact: true });
+  await newProjectButton.waitFor({ state: 'visible', timeout: 5000 });
+  assert.equal(
+    await newProjectButton.isVisible(),
+    true,
+    'Studio must expose a visible New project button in the editor toolbar'
+  );
   const studioNewCard = page.getByRole('button', { name: 'Start a new card', exact: true });
   await studioNewCard.waitFor({ state: 'visible', timeout: 5000 });
   assert.equal(
@@ -934,7 +941,7 @@ try {
 
   // New Card must be a real project boundary: no undo path back into unsaved
   // work, while the explicitly saved named project remains available.
-  await page.getByRole('button', { name: /New Card/ }).click();
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
   await page.getByText('New card ready · unsaved work cleared', { exact: true }).waitFor({
     state: 'visible',
     timeout: 5000
