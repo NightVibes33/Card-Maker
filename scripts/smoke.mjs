@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-
 const base = process.env.SMOKE_BASE || 'http://127.0.0.1:3000';
 
 async function fetchJsonRetry(url, label, attempts = 4) {
@@ -191,119 +189,20 @@ async function checkCucuCatalog() {
   );
 }
 
-async function checkBlitzCatalog() {
-  const firstResult = await fetchJsonRetry(base + '/api/blitz?page=1&limit=24', 'Blitz catalog page 1');
-  const first = firstResult.json;
-  if (!Array.isArray(first.results) || first.results.length < 1) {
-    throw new Error('Blitz catalog page 1 returned no products');
-  }
-  if ((Number(first.total) || 0) < 100) {
-    throw new Error('Blitz catalog total unexpectedly small: ' + first.total);
-  }
-  if (first.source !== 'Blitz Covers · Full Card Covers') {
-    throw new Error('Blitz catalog source mismatch: ' + first.source);
-  }
-
-  if (first.upstream?.mode !== 'indexed-snapshot') {
-    throw new Error('Blitz catalog did not use indexed snapshot mode: ' + JSON.stringify(first.upstream));
-  }
-
-  const invalid = first.results.find((item) =>
-    item.source !== 'Blitz Covers' ||
-    item.mediaType !== 'premade-card-skin' ||
-    item.collection !== 'credit-card-cover' ||
-    item.assetMode !== 'resolved-product-art' ||
-    !/blitzcovers\.com\/products\//i.test(item.sourceUrl || '') ||
-    !item.image?.startsWith('/api/blitz-image?') ||
-    !Array.isArray(item.candidateImages) ||
-    item.candidateImages.length < 1 ||
-    !item.candidateImages.every((src) => src.startsWith('/api/blitz-image?')) ||
-    /customization|custom card|priority|packaging|voucher/i.test(item.title || '')
-  );
-  if (invalid) {
-    throw new Error('Blitz catalog returned invalid item: ' + JSON.stringify(invalid));
-  }
-
-  const sample = first.results.slice(0, 6);
-  const hashes = [];
-  let type = '';
-
-  for (const item of sample) {
-    const imageResponse = await fetch(base + item.image);
-    if (!imageResponse.ok) {
-      continue;
-    }
-
-    type = imageResponse.headers.get('content-type') || '';
-    const blitzCache =
-      imageResponse.headers.get('cdn-cache-control') ||
-      imageResponse.headers.get('cache-control') ||
-      '';
-    const assetKind = imageResponse.headers.get('x-blitz-asset') || '';
-
-    if (!/2592000|604800/.test(blitzCache)) {
-      throw new Error('Blitz image is not long-lived cached: ' + blitzCache);
-    }
-    if (!type.startsWith('image/')) {
-      throw new Error('Blitz image proxy returned ' + type);
-    }
-    if (assetKind !== 'product-image') {
-      throw new Error('Blitz resolver did not mark product artwork: ' + assetKind);
-    }
-
-    const buffer = Buffer.from(await imageResponse.arrayBuffer());
-    hashes.push(createHash('sha256').update(buffer).digest('hex'));
-  }
-
-  if (hashes.length < 2) {
-    throw new Error('Blitz resolver returned fewer than 2 usable product images in first 6 cards');
-  }
-
-  if (new Set(hashes).size < 2) {
-    throw new Error('Blitz resolver returned identical image bytes for multiple products (likely storefront logo)');
-  }
-
-  const totalPages = Number(first.totalPages) || Math.ceil(first.total / 24);
-  const lastResult = await fetchJsonRetry(
-    base + '/api/blitz?page=' + totalPages + '&limit=24',
-    'Blitz final page'
-  );
-  const last = lastResult.json;
-  if (!Array.isArray(last.results) || last.results.length < 1) {
-    throw new Error('Blitz final catalog page returned no products');
-  }
-  if (last.hasMore !== false) {
-    throw new Error('Blitz final catalog page incorrectly reports hasMore');
-  }
-
-  console.log(
-    'PASS Blitz catalog =>',
-    first.total,
-    'real full-card products across',
-    totalPages,
-    'app pages | final page',
-    last.results.length,
-    'products | distinct resolved product images',
-    new Set(hashes).size,
-    '|',
-    type
-  );
-}
-
 async function checkBrowseTaxonomy() {
   const response = await fetch(base + '/');
   if (!response.ok) throw new Error('Home page returned ' + response.status);
   const html = (await response.text()).replace(/&amp;/g, '&');
 
-  for (const label of ['CUCU', 'Blitz', 'All Card Skins', 'Best Sellers', 'New Arrivals', 'Cute & Kawaii']) {
+  for (const label of ['CUCU Covers', 'All Card Skins', 'Best Sellers', 'New Arrivals', 'Cute & Kawaii']) {
     if (!html.includes(label)) throw new Error('Browse UI missing real source/category label: ' + label);
   }
 
-  if (/Original ↗|Open the original|>Cartoon<|>TV</i.test(html)) {
-    throw new Error('Browse UI still contains fake taxonomy or outbound storefront controls');
+  if (/Blitz|Original ↗|Open the original|>Cartoon<|>TV</i.test(html)) {
+    throw new Error('Browse UI still contains removed sources, fake taxonomy, or outbound storefront controls');
   }
 
-  console.log('PASS Browse taxonomy => CUCU + Blitz sources, real CUCU collections, no storefront redirects');
+  console.log('PASS Browse taxonomy => CUCU-only real collections, no Blitz, no storefront redirects');
 }
 
 await check('Naruto', /naruto|konohagakure|akatsuki/i);
@@ -311,6 +210,5 @@ await check('SpongeBob', /spongebob|bikini bottom|krusty/i);
 await check('Rick and Morty', /rick|morty|portal|meeseeks/i);
 await check('Wednesday', /wednesday/i);
 await checkBrowseTaxonomy();
-await checkBlitzCatalog();
 await checkCucuCatalog();
-console.log('CUCU + Blitz direct-card catalog smoke tests passed; live storefront search checks completed.');
+console.log('CUCU catalog smoke tests passed; Blitz is fully removed.');
