@@ -272,6 +272,8 @@ requireMatch(page, /imported\.background = normalizePersistedArtworkSource\(impo
 requireMatch(page, /src: normalizePersistedArtworkSource\(src, MAX_STORED_LAYER_IMAGE_DIMENSION\)/, 'legacy preset image layers are upgraded instead of cleared');
 requireMatch(page, /const decodedBySource = new Map\(\);/, 'duplicate image layers share decoded sources');
 requireMatch(page, /const animatedOrVectorSource =/, 'animated and vector imports are normalized');
+requireMatch(page, /chunkType === 'acTL'/, 'APNG animation is detected from the PNG animation-control chunk');
+requireMatch(page, /Boolean\(probedDimensions\?\.animated\)/, 'ordinary image\/png APNG files are raster-normalized deterministically');
 requireMatch(page, /gif\|apng\|svg\\\+xml/, 'APNG, GIF, and SVG imports use deterministic rasterization');
 requireMatch(page, /const encodeCanvas = \(type, quality\)/, 'image optimization has an encoder fallback path');
 requireMatch(page, /optimizedBlob\.size > MAX_IMAGE_IMPORT_BYTES/, 'optimized image blobs cannot exceed the import storage ceiling');
