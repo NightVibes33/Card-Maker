@@ -14,6 +14,8 @@ function importMetadata(value = {}) {
 }
 const ART_CACHE = 'card-studio-art-v4';
 const ART_CACHE_LIMIT = 40;
+const THUMB_CACHE = 'card-studio-thumb-v1';
+const THUMB_CACHE_LIMIT = 160;
 
 let dbPromise = null;
 
@@ -205,9 +207,19 @@ export async function dbGetImportMetadata() {
 export async function cacheArtwork(url) {
   if (!url || typeof caches === 'undefined') return false;
   try {
-    const cache = await caches.open(ART_CACHE);
+    let requestedWidth = 0;
+    try {
+      const parsed = new URL(url, window.location.origin);
+      requestedWidth = Number(parsed.searchParams.get('w') || 0);
+    } catch {}
+
+    const isThumbnail = requestedWidth > 0 && requestedWidth <= 800;
+    const cacheName = isThumbnail ? THUMB_CACHE : ART_CACHE;
+    const cacheLimit = isThumbnail ? THUMB_CACHE_LIMIT : ART_CACHE_LIMIT;
+    const cache = await caches.open(cacheName);
     const existing = await cache.match(url);
     if (existing) return true;
+
     const response = await fetch(url, { credentials: 'same-origin' });
     if (!response.ok || !(response.headers.get('content-type') || '').startsWith('image/')) {
       return false;
@@ -215,7 +227,7 @@ export async function cacheArtwork(url) {
     await cache.put(url, response.clone());
 
     const keys = await cache.keys();
-    const overflow = keys.length - ART_CACHE_LIMIT;
+    const overflow = keys.length - cacheLimit;
     if (overflow > 0) {
       await Promise.all(keys.slice(0, overflow).map((request) => cache.delete(request)));
     }
