@@ -2,7 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright-core';
 
-// One-shot browser snapshot: keep network scraping out of production.\nconst ORIGIN = 'https://blitzcovers.com';
+// One-shot browser snapshot: keep network scraping out of production.
+const ORIGIN = 'https://blitzcovers.com';
 const COLLECTION = '/collections/credit-card-cover';
 const PAGE_COUNT = 8;
 
