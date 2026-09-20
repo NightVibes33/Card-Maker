@@ -596,9 +596,15 @@ function customLayerBounds(layer, layerImage) {
         size * 0.25,
         ...lines.map((line) => measureTrackedText(measureCtx, line, tracking))
       );
-      const metrics = measureCtx.measureText(lines.find(Boolean) || 'M');
-      ascent = Math.max(size * 0.55, Number(metrics.actualBoundingBoxAscent || 0));
-      descent = Math.max(size * 0.15, Number(metrics.actualBoundingBoxDescent || 0));
+      const lineMetrics = lines.map((line) => measureCtx.measureText(line || 'M'));
+      ascent = Math.max(
+        size * 0.55,
+        ...lineMetrics.map((metrics) => Number(metrics.actualBoundingBoxAscent || 0))
+      );
+      descent = Math.max(
+        size * 0.15,
+        ...lineMetrics.map((metrics) => Number(metrics.actualBoundingBoxDescent || 0))
+      );
     }
   }
 
