@@ -2854,6 +2854,16 @@ export default function Page() {
       setMessage('Could not save the image layer. Free some device storage and try again.');
       return;
     }
+
+    if (
+      (designRef.current.customLayers || []).length >= MAX_CUSTOM_LAYERS ||
+      visibleImageLayers(designRef.current).length >= MAX_VISIBLE_IMAGE_LAYERS
+    ) {
+      await dbDelete('imports', assetId).catch(() => {});
+      setMessage('Layer capacity changed while the image was processing. Try again after freeing a layer slot.');
+      return;
+    }
+
     setImports((current) => [importListItem(asset), ...current.filter((entry) => entry.id !== assetId)]);
     patch((current) => ({
       layerOrder: insertCustomLayerBelowHardware(current, layerId),
