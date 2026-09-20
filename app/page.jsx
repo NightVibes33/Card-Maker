@@ -3505,6 +3505,9 @@ export default function Page() {
     }
 
     if (pointers.current.size === 0) {
+      if (gestureHistoryRecorded.current) {
+        replaceDesign(designRef.current);
+      }
       setActiveGuides({ x: null, y: null });
       gestureStartDesign.current = null;
       gestureHistoryRecorded.current = false;
