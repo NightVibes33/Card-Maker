@@ -152,6 +152,24 @@ try {
   const imageInputs = page.locator('input[type="file"][accept="image/*"]');
   assert.ok(await imageInputs.count() >= 2, 'background and image-layer file inputs must exist');
 
+  const oversizedSvg = Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="20000" height="20000"><rect width="100%" height="100%" fill="black"/></svg>'
+  );
+  await imageInputs.last().setInputFiles({
+    name: 'oversized-safe.svg',
+    mimeType: 'image/svg+xml',
+    buffer: oversizedSvg
+  });
+  await page.getByText('Image resolution is too large for reliable iPhone editing.', { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 10000
+  });
+  assert.equal(
+    await page.getByLabel('Image Width').count(),
+    0,
+    'oversized vector art must be rejected before creating a layer'
+  );
+
   const unsafeSvg = Buffer.from(
     '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><image href="https://example.com/remote.png" width="120" height="80"/></svg>'
   );
