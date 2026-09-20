@@ -19,6 +19,13 @@ page.on('pageerror', (error) => {
   pageErrors.push(String(error?.stack || error?.message || error));
 });
 
+// Prevent asynchronous onboarding hydration from racing the first editor tap.
+await page.addInitScript(() => {
+  try {
+    localStorage.setItem('aircard-install-dismissed-v2', '1');
+  } catch {}
+});
+
 await page.route('**/api/cucu**', async (route) => {
   await route.fulfill({
     status: 200,
