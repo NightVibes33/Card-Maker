@@ -4093,8 +4093,8 @@ export default function Page() {
       if (imported.background?.startsWith('idb://imports/')) {
         const oldId = imported.background.slice('idb://imports/'.length);
         imported.background = idMap[oldId] ? 'idb://imports/' + idMap[oldId] : '';
-      } else if (imported.background && !String(imported.background).startsWith('/api/image?')) {
-        imported.background = '';
+      } else {
+        imported.background = normalizePersistedArtworkSource(imported.background, 3072);
       }
 
       imported.customLayers = (Array.isArray(imported.customLayers) ? imported.customLayers : []).map((layer) => {
@@ -4104,8 +4104,10 @@ export default function Page() {
           const oldId = src.slice('idb://imports/'.length);
           return { ...layer, src: idMap[oldId] ? 'idb://imports/' + idMap[oldId] : '' };
         }
-        if (src && !src.startsWith('/api/image?')) return { ...layer, src: '' };
-        return layer;
+        return {
+          ...layer,
+          src: normalizePersistedArtworkSource(src, MAX_STORED_LAYER_IMAGE_DIMENSION)
+        };
       });
 
       const nextImports = await dbGetImportMetadata();
