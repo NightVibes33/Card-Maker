@@ -29,6 +29,24 @@ const MAX_STORED_IMAGE_DIMENSION = 4096;
 const MAX_STORED_LAYER_IMAGE_PIXELS = 4_000_000;
 const MAX_STORED_LAYER_IMAGE_DIMENSION = 2560;
 
+const DISCRETE_DESIGN_HISTORY_KEYS = new Set(['fit', 'gradient', 'chipTone']);
+const CONTINUOUS_LAYER_HISTORY_KEYS = new Set([
+  'text',
+  'color',
+  'x',
+  'y',
+  'scale',
+  'rotation',
+  'opacity',
+  'width',
+  'height',
+  'radius',
+  'fontSize',
+  'weight',
+  'letterSpacing',
+  'lineHeight'
+]);
+
 const CUCU_CATEGORIES = [
   ['all', 'All Card Skins'],
   ['best', 'Best Sellers'],
@@ -1922,22 +1940,23 @@ export default function Page() {
     const changed = deltaKeys.some((key) => !Object.is(current[key], updated[key]));
     if (!changed) return current;
 
+    let historyGroupKey = '';
+
     if (recordHistory) {
       const now = Date.now();
       const autoKey = deltaKeys.length === 1 ? deltaKeys[0] : '';
       const autoValue = autoKey ? delta[autoKey] : undefined;
-      const discreteKeys = new Set(['fit', 'gradient', 'chipTone']);
       const canAutoGroup =
         !historyKey &&
         typeof next !== 'function' &&
         Boolean(autoKey) &&
         typeof autoValue !== 'boolean' &&
-        !discreteKeys.has(autoKey);
-      const automaticKey = historyKey || (canAutoGroup ? 'design:' + autoKey : '');
+        !DISCRETE_DESIGN_HISTORY_KEYS.has(autoKey);
+      historyGroupKey = historyKey || (canAutoGroup ? 'design:' + autoKey : '');
       const previousGroup = historyGroupRef.current;
       const coalesced = Boolean(
-        automaticKey &&
-        previousGroup.key === automaticKey &&
+        historyGroupKey &&
+        previousGroup.key === historyGroupKey &&
         now - previousGroup.at < 700
       );
 
@@ -1947,10 +1966,13 @@ export default function Page() {
       }
 
       redoRef.current = [];
-      historyGroupRef.current = { key: automaticKey, at: now };
+      historyGroupRef.current = { key: historyGroupKey, at: now };
     }
 
-    const resolved = replaceDesign(updated, recordHistory);
+    // Continuous controls already clamp/sanitize at their own input boundary.
+    // Avoid remapping every layer and rebuilding z-order on each slider/text tick.
+    const shouldNormalize = recordHistory && !historyGroupKey;
+    const resolved = replaceDesign(updated, shouldNormalize);
     return resolved;
   }, [replaceDesign]);
 
@@ -3518,24 +3540,8 @@ export default function Page() {
     }
 
     const deltaKeys = Object.keys(delta || {});
-    const continuousLayerKeys = new Set([
-      'text',
-      'color',
-      'x',
-      'y',
-      'scale',
-      'rotation',
-      'opacity',
-      'width',
-      'height',
-      'radius',
-      'fontSize',
-      'weight',
-      'letterSpacing',
-      'lineHeight'
-    ]);
     const key =
-      deltaKeys.length === 1 && continuousLayerKeys.has(deltaKeys[0])
+      deltaKeys.length === 1 && CONTINUOUS_LAYER_HISTORY_KEYS.has(deltaKeys[0])
         ? 'layer:' + id + ':' + deltaKeys[0]
         : '';
     patch((current) => {
