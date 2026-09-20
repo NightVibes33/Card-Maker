@@ -45,7 +45,6 @@ html,body{
   min-height:100%;
   background:var(--system-bg);
   color:var(--label);
-  scroll-padding-top:calc(var(--safe-top) + 390px);
   scroll-padding-bottom:calc(88px + var(--safe-bottom));
 }
 body{
