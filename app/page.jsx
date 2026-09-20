@@ -3343,7 +3343,12 @@ export default function Page() {
         return;
       }
 
-      const stored = { ...item, id: itemId };
+      const stored = normalizeStoredArtworkItem({ ...item, id: itemId });
+      if (!stored) {
+        setMessage('This artwork could not be saved as a favorite.');
+        return;
+      }
+
       try {
         await dbPut('favorites', {
           id: itemId,
@@ -3355,8 +3360,8 @@ export default function Page() {
         return;
       }
 
-      cacheArtwork(proxyImageWidth(item.image, 3072));
-      if (item.thumbnail) cacheArtwork(proxyImageWidth(item.thumbnail, 560));
+      cacheArtwork(stored.image);
+      if (stored.thumbnail) cacheArtwork(stored.thumbnail);
 
       setFavoriteIds((current) => new Set([...current, itemId]));
       setFavorites((current) => [stored, ...current.filter((entry) => String(entry.id) !== itemId)]);
