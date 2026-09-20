@@ -267,6 +267,24 @@ features:
       - "Duplicate"
       - "Delete"
       - "Lock Layer"
+  unified_z_stack:
+    file: app/page.jsx
+    contains:
+      - "layerOrder"
+      - "normalizeLayerOrder"
+      - "insertCustomLayerBelowHardware"
+      - "isLayerStackEntryVisible"
+      - "builtin-chip"
+      - "builtin-contactless"
+      - "builtin-text"
+      - "visualLayerStack"
+      - "Top → Bottom"
+  selection_escape:
+    file: app/page.jsx
+    contains:
+      - "Done Editing Layer"
+      - "doneSelectionButton"
+      - "setSelectedElement('artwork')"
   surprise_me:
     file: app/page.jsx
     contains:
