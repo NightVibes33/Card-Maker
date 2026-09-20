@@ -12,7 +12,7 @@ import {
   dbPut,
   makeId
 } from './lib/storage';
-import { parseAllowedRemoteImageUrl } from './lib/imagePolicy';
+import { IMAGE_PROXY_VERSION, parseAllowedRemoteImageUrl } from './lib/imagePolicy';
 
 const OUT_W = 1536;
 const OUT_H = 969;
@@ -1243,6 +1243,7 @@ function proxyImageWidth(src = '', width = 1600) {
   const normalized = new URLSearchParams();
   normalized.set('url', remote.toString());
   normalized.set('w', String(Math.max(160, Math.min(3072, Math.round(width)))));
+  normalized.set('v', IMAGE_PROXY_VERSION);
   return '/api/image?' + normalized.toString();
 }
 
