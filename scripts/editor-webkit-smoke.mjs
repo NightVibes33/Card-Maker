@@ -283,6 +283,41 @@ try {
     'opening a named project must restore its saved design snapshot'
   );
 
+  // Round-trip the complete editable preset, including embedded imported
+  // background/image assets, through the browser download + file import path.
+  await page.getByRole('tab', { name: 'Library', exact: true }).click();
+  const [presetDownload] = await Promise.all([
+    page.waitForEvent('download', { timeout: 20000 }),
+    page.getByRole('button', { name: /Export Design JSON/ }).click()
+  ]);
+  assert.match(presetDownload.suggestedFilename(), /\.aircard\.json$/i);
+  const presetPath = await presetDownload.path();
+  assert.ok(presetPath, 'preset download must produce a local file for round-trip import');
+
+  await page.getByRole('tab', { name: 'Studio', exact: true }).click();
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  await page.getByRole('button', { name: /^Text text /i }).first().click();
+  await page.getByLabel('Layer text').fill('PRESET MUTATED');
+
+  await page.getByRole('tab', { name: 'Library', exact: true }).click();
+  const [presetChooser] = await Promise.all([
+    page.waitForEvent('filechooser', { timeout: 10000 }),
+    page.getByRole('button', { name: /Import Design JSON/ }).click()
+  ]);
+  await presetChooser.setFiles(presetPath);
+  await page.getByText('Design preset imported', { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 20000
+  });
+
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  await page.getByRole('button', { name: /^Text text /i }).first().click();
+  assert.equal(
+    await page.getByLabel('Layer text').inputValue(),
+    'AVATAR\nWA',
+    'preset import must restore the exported text-layer state'
+  );
+
   await page.getByRole('tab', { name: 'Export', exact: true }).click();
   const save2x = page.getByRole('button', { name: /Save 2× Image/ }).first();
   await save2x.waitFor({ state: 'visible' });
