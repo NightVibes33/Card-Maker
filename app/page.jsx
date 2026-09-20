@@ -3898,10 +3898,15 @@ export default function Page() {
       return;
     }
 
-    const canShareFile = Boolean(
-      navigator.share &&
-      (!navigator.canShare || navigator.canShare({ files: [file] }))
-    );
+    let canShareFile = false;
+    try {
+      canShareFile = Boolean(
+        navigator.share &&
+        (!navigator.canShare || navigator.canShare({ files: [file] }))
+      );
+    } catch {
+      canShareFile = false;
+    }
 
     if (!canShareFile) {
       await download(width, height, name, file);
