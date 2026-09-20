@@ -4910,7 +4910,13 @@ export default function Page() {
       designName: designRef.current.backgroundLabel || 'Untitled Card',
       createdAt: Date.now()
     };
-    await dbPut('exports', record).catch(() => {});
+
+    try {
+      await dbPut('exports', record);
+    } catch {
+      return false;
+    }
+
     setExportHistory((current) => [record, ...current].slice(0, 40));
 
     dbGetAll('exports')
@@ -4920,6 +4926,8 @@ export default function Page() {
       )
       .then((stale) => Promise.all(stale.map((entry) => dbDelete('exports', entry.id).catch(() => {}))))
       .catch(() => {});
+
+    return true;
   }
 
   function makePngFile(width, height, name) {
@@ -4952,8 +4960,12 @@ export default function Page() {
       anchor.style.display = 'none';
       document.body.appendChild(anchor);
       anchor.click();
-      await recordExport(name, width, height, 'download');
-      setMessage(name + ' saved to Files/downloads');
+      const historySaved = await recordExport(name, width, height, 'download');
+      setMessage(
+        historySaved
+          ? name + ' saved to Files/downloads'
+          : name + ' saved to Files/downloads · export history could not be stored'
+      );
       return true;
     } catch {
       setMessage('Could not start the PNG download on this device.');
@@ -5016,8 +5028,12 @@ export default function Page() {
       try {
         setMessage('Opening the native image sheet… Choose “Save Image” to save it to Photos.');
         await navigator.share({ files: [file] });
-        await recordExport(name, width, height, 'native-image-sheet');
-        setMessage('Image sheet closed');
+        const historySaved = await recordExport(name, width, height, 'native-image-sheet');
+        setMessage(
+          historySaved
+            ? 'Image sheet closed'
+            : 'Image shared successfully · export history could not be stored'
+        );
       } catch (error) {
         if (error?.name === 'AbortError') {
           setMessage('Image sharing canceled');
