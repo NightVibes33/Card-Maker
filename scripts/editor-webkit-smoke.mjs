@@ -294,6 +294,53 @@ try {
   }
   console.log('PASS main Card Library hard reset => chip, color, layers, history restored to defaults');
 
+  // The Library tab's Recent rail must use the same hard project boundary.
+  // Dirty hardware state again, then select the same card from Library -> Recent.
+  await page.getByRole('tab', { name: 'Position', exact: true }).click();
+  await page.getByLabel('Chip horizontal position').evaluate((node) => {
+    node.value = '0.48';
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+    node.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  await page.getByRole('button', { name: 'Black Metal', exact: true }).click();
+  await page.getByRole('button', { name: '+ Contactless', exact: true }).click();
+  await page.getByLabel('Contactless Color').evaluate((node) => {
+    node.value = '#ff3300';
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+    node.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  await page.getByRole('tab', { name: 'Library', exact: true }).click();
+  const recentLibraryCard = page.getByRole('button', {
+    name: 'Use card skin WebKit Library Skin',
+    exact: true
+  }).first();
+  await recentLibraryCard.waitFor({ state: 'visible', timeout: 10000 });
+  await recentLibraryCard.click();
+  await page.locator('#panel-studio').waitFor({ state: 'visible', timeout: 10000 });
+
+  const libraryTabFreshDraft = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('aircard-sticker-fvp-v3') || '{}')
+  );
+  assert.equal(libraryTabFreshDraft.chipTone, 'gold', 'Library Recent import must reset chip finish');
+  assert.ok(
+    Math.abs(Number(libraryTabFreshDraft.chipX) - 0.105) < 0.002,
+    'Library Recent import must reset chip position'
+  );
+  assert.equal(libraryTabFreshDraft.contactless, true, 'Library Recent import must restore built-in Contactless');
+  assert.deepEqual(
+    libraryTabFreshDraft.customLayers,
+    [],
+    'Library Recent import must remove user-colored contactless and every other custom layer'
+  );
+  assert.deepEqual(
+    libraryTabFreshDraft.layerOrder,
+    ['builtin-chip', 'builtin-contactless', 'builtin-text'],
+    'Library Recent import must restore the factory layer stack'
+  );
+  console.log('PASS Library Recent card import => full factory reset');
+
   // Main-menu local file import must have the exact same new-project semantics.
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
   await page.getByRole('button', { name: 'Black Metal', exact: true }).click();
