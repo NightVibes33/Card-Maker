@@ -33,6 +33,8 @@ const pageChecks = [
   [/if \(!hydrated \|\| autosaveReady\) return undefined;/, 'paused autosave has a local-recovery-only path'],
   [/if \(!autosaveReady && autosavePausedBaselineRef\.current === designRef\.current\)/, 'paused pagehide flush never overwrites recovery storage before a real edit'],
   [/function pointInRotatedBounds\(/, 'rotated geometry hit testing exists'],
+  [/Math\.abs\(normalized\.w - 1\) < 1e-9[\s\S]{0,120}return null;/, 'full-frame crops normalize back to no-op state'],
+  [/try \{[\s\S]{0,100}setPointerCapture\(event\.pointerId\);[\s\S]{0,50}\} catch \{\}/, 'mobile pointer capture failures are non-fatal'],
   [/function normalizeFreeRotation\(/, 'free rotations wrap smoothly through the ±180° boundary'],
   [/contactlessRotation: normalizeFreeRotation\(/, 'contactless gesture rotation wraps instead of sticking at 180°'],
   [/rotation: normalizeFreeRotation\(/, 'custom layer gesture rotation wraps instead of sticking at 180°'],
