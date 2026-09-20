@@ -204,7 +204,9 @@ if (/for \(let i = 0; i < (?:3600|900); i \+= 1\)/.test(page)) {
 }
 
 requireMatch(css, /scroll-padding-bottom:calc\(88px \+ var\(--safe-bottom\)\)/, 'focused controls stay clear of the fixed bottom tab bar');
-requireMatch(css, /#panel-studio input,[\s\S]{0,160}scroll-margin-top:calc\(var\(--safe-top\) \+ 170px \+ min\(63vw,315px\)\)/, 'Studio controls stay clear of the sticky editor preview');
+requireMatch(css, /\.studioPreview\{[^}]*position:relative;[^}]*top:auto;/s, 'Studio preview scrolls naturally instead of becoming a giant sticky header');
+requireMatch(css, /\.studioModeRow\{[^}]*position:sticky;[^}]*top:var\(--safe-top\);/s, 'Studio tool dock owns the safe-area sticky position');
+requireMatch(css, /#panel-studio input,[\s\S]{0,180}scroll-margin-top:calc\(var\(--safe-top\) \+ 126px\)/, 'Studio controls focus below the compact sticky tool dock');
 
 const touchChecks = [
   [/\.studioToolBar button\{[^}]*min-height:44px/s, 'Studio tool buttons'],
