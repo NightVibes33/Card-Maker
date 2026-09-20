@@ -42,6 +42,35 @@ async function checkHome() {
   console.log('PASS V2 shell');
 }
 
+async function checkInstallIcons() {
+  for (const [path, width, height] of [
+    ['/icon', 512, 512],
+    ['/apple-icon', 180, 180]
+  ]) {
+    const response = await fetch(base + path);
+    if (!response.ok || !(response.headers.get('content-type') || '').startsWith('image/png')) {
+      throw new Error(path + ' did not return a PNG install icon');
+    }
+
+    const bytes = Buffer.from(await response.arrayBuffer());
+    const image = sharp(bytes, { animated: false }).ensureAlpha();
+    const metadata = await image.metadata();
+    if (metadata.width !== width || metadata.height !== height) {
+      throw new Error(
+        path + ' has wrong dimensions: ' +
+        String(metadata.width || '?') + 'x' + String(metadata.height || '?')
+      );
+    }
+
+    const raw = await image.raw().toBuffer();
+    if (raw.length < 4 || raw[3] !== 255) {
+      throw new Error(path + ' has a transparent top-left corner instead of full-bleed artwork');
+    }
+  }
+
+  console.log('PASS install icons => 512px maskable + 180px Apple full-bleed PNGs');
+}
+
 async function checkCatalog() {
   const { response, json } = await fetchJsonRetry(
     base + '/api/cucu?category=all&page=1&limit=24',
@@ -184,6 +213,7 @@ async function checkSearch(catalogResults) {
 }
 
 await checkHome();
+await checkInstallIcons();
 const results = await checkCatalog();
 await checkPreprocessing(results);
 await checkSearch(results);
