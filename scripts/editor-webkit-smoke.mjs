@@ -56,6 +56,76 @@ try {
   assert.equal(await editorCanvas.getAttribute('width'), '1024');
   assert.equal(await editorCanvas.getAttribute('height'), '646');
 
+  const initialCanvasBox = await editorCanvas.boundingBox();
+  assert.ok(initialCanvasBox, 'editor canvas must have a layout box');
+
+  // Built-in card text should be directly selectable from its rendered badge.
+  const topBadge = page.getByRole('switch', { name: 'Top Badge' });
+  await topBadge.click();
+  await editorCanvas.click({
+    position: {
+      x: initialCanvasBox.width * ((1536 - 105) / 1536),
+      y: initialCanvasBox.height * (105 / 969)
+    }
+  });
+  await page.getByRole('button', { name: /Card Text Built-in text selected/i }).waitFor({
+    state: 'visible',
+    timeout: 5000
+  });
+  await topBadge.click();
+
+  // Direct chip drag must target the chip rather than nearby contactless art.
+  const chipStartX = 0.105 + (255 / 2) / 1536;
+  const chipStartY = 0.35 + (188 / 2) / 969;
+  await page.mouse.move(
+    initialCanvasBox.x + initialCanvasBox.width * chipStartX,
+    initialCanvasBox.y + initialCanvasBox.height * chipStartY
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    initialCanvasBox.x + initialCanvasBox.width * chipStartX + 34,
+    initialCanvasBox.y + initialCanvasBox.height * chipStartY,
+    { steps: 4 }
+  );
+  await page.mouse.up();
+
+  await page.getByRole('tab', { name: 'Position', exact: true }).click();
+  const chipX = page.getByLabel('Chip horizontal position');
+  await chipX.waitFor({ state: 'visible', timeout: 5000 });
+  assert.ok(Number(await chipX.inputValue()) > 0.14, 'direct canvas drag must move the built-in EMV chip');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Chip horizontal position"]');
+    return input && Math.abs(Number(input.value) - 0.105) < 0.001;
+  });
+
+  // Contactless overlaps the chip's padded touch region; stack order must
+  // still select Contactless at its own center.
+  await page.mouse.move(
+    initialCanvasBox.x + initialCanvasBox.width * 0.285,
+    initialCanvasBox.y + initialCanvasBox.height * 0.43
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    initialCanvasBox.x + initialCanvasBox.width * 0.285 + 34,
+    initialCanvasBox.y + initialCanvasBox.height * 0.43,
+    { steps: 4 }
+  );
+  await page.mouse.up();
+
+  const contactlessX = page.getByLabel('Contactless horizontal position');
+  await contactlessX.waitFor({ state: 'visible', timeout: 5000 });
+  assert.ok(
+    Number(await contactlessX.inputValue()) > 0.32,
+    'contactless must win hit testing at its own center and move directly'
+  );
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Contactless horizontal position"]');
+    return input && Math.abs(Number(input.value) - 0.285) < 0.001;
+  });
+
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
   await page.getByRole('button', { name: '+ Text', exact: true }).click();
   const textEditor = page.getByLabel('Layer text');
   await textEditor.fill('AVATAR\nWA');
