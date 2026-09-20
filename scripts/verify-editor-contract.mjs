@@ -61,6 +61,8 @@ const pageChecks = [
   [/pointers\.current\.clear\(\)/, 'leaving the editable canvas clears stale pointer state'],
   [/gestureTarget\.current = 'artwork'/, 'leaving the editable canvas resets the gesture target'],
   [/const finishActiveGesture = useCallback\(/, 'discrete actions can terminate active canvas gestures'],
+  [/finishActiveGestureRef\.current = finishActiveGesture/, 'central editor patching can finalize active gestures'],
+  [/recordHistory[\s\S]{0,180}finishActiveGestureRef\.current\(\)/, 'normal Studio edits terminate a live canvas gesture before mutation'],
   [/finishActiveGesture\(\);[\s\S]{0,120}if \(cleanupInFlightRef\.current\)/, 'Undo and other guarded actions finalize active gestures first'],
   [/inert=\{blockingAssetOperation \|\| undefined\}/, 'blocking editor operations use a boolean inert attribute'],
   [/setSelectedElement\('card-text'\)/, 'built-in card text keeps an independent selection state'],
