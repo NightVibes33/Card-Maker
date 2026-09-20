@@ -86,7 +86,7 @@ function cleanText(value = '') {
 
 function isCardSkinTitle(title = '') {
   const text = title.toLowerCase();
-  if (/(poster|mouse ?pad|phone case|shirt|hoodie|metal print|sticker sheet)/i.test(text)) return false;
+  if (/(poster|mouse ?pad|phone case|shirt|hoodie|metal print|sticker sheet|design your own|custom card skin|custom credit card)/i.test(text)) return false;
   return (
     /(credit|debit|bank|card).{0,24}(skin|cover|sticker)/i.test(text) ||
     /(skin|cover|sticker).{0,24}(credit|debit|bank|card)/i.test(text) ||
@@ -234,7 +234,30 @@ function mediaScore(media, fallbackUrl = '') {
   return { score, src, alt, ratio, width };
 }
 
-async function fetchProduct(store, hit) {
+function normalizeComparable(value = '') {
+  return cleanText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isRelevantToTerm(text, term) {
+  const haystack = normalizeComparable(text);
+  const needle = normalizeComparable(term);
+  if (!haystack || !needle) return false;
+  if (haystack.includes(needle)) return true;
+
+  const ignored = new Set(['credit', 'debit', 'card', 'skin', 'cover', 'sticker', 'anime', 'cartoon', 'tv', 'show']);
+  const tokens = needle.split(' ').filter((token) => token.length > 2 && !ignored.has(token));
+  if (!tokens.length) return false;
+
+  // Require every meaningful token for multi-word franchises so "Dragon Ball"
+  // does not degrade into an unrelated result containing only "Dragon".
+  return tokens.every((token) => haystack.includes(token));
+}
+
+async function fetchProduct(store, hit, matchedTerm, originalQuery) {
   const handle = extractHandle(hit.url);
   if (!handle) return null;
 
@@ -251,6 +274,17 @@ async function fetchProduct(store, hit) {
   const title = cleanText(details?.title || hit.title || handle.replace(/[-_]+/g, ' '));
   if (!isCardSkinTitle(title)) return null;
 
+  const descriptiveText = [
+    title,
+    details?.description || '',
+    Array.isArray(details?.tags) ? details.tags.join(' ') : details?.tags || '',
+    details?.vendor || '',
+    ...(details?.media || []).map((media) => media?.alt || media?.preview_image?.alt || '')
+  ].join(' ');
+
+  if (!isRelevantToTerm(descriptiveText, matchedTerm)) return null;
+
+  const queryRelevant = isRelevantToTerm(descriptiveText, originalQuery);
   const candidates = [];
 
   for (const media of details?.media || []) {
@@ -301,7 +335,9 @@ async function fetchProduct(store, hit) {
     originalImage: best.src,
     mediaAlt: best.alt || '',
     mediaAspectRatio: best.ratio || null,
-    priority: store.priority
+    priority: store.priority,
+    matchedTerm,
+    queryRelevant
   };
 }
 
@@ -324,7 +360,7 @@ export async function GET(request) {
     for (const store of STORES) {
       for (const term of terms) {
         discoveryJobs.push(
-          searchStore(store, term).then((hits) => ({ store, hits }))
+          searchStore(store, term).then((hits) => ({ store, term, hits }))
         );
       }
     }
@@ -336,10 +372,10 @@ export async function GET(request) {
     for (const group of discovered) {
       for (const hit of group.hits.slice(0, 8)) {
         const handle = extractHandle(hit.url);
-        const key = group.store.origin + '|' + handle;
+        const key = group.store.origin + '|' + handle + '|' + group.term.toLowerCase();
         if (!handle || seenProduct.has(key)) continue;
         seenProduct.add(key);
-        productJobs.push(fetchProduct(group.store, hit));
+        productJobs.push(fetchProduct(group.store, hit, group.term, q));
         if (productJobs.length >= 32) break;
       }
       if (productJobs.length >= 32) break;
@@ -353,7 +389,7 @@ export async function GET(request) {
       const bText = b.title.toLowerCase();
       const aMatch = queryTokens.reduce((score, token) => score + (aText.includes(token) ? 1 : 0), 0);
       const bMatch = queryTokens.reduce((score, token) => score + (bText.includes(token) ? 1 : 0), 0);
-      return bMatch - aMatch || b.priority - a.priority;
+      return Number(b.queryRelevant) - Number(a.queryRelevant) || bMatch - aMatch || b.priority - a.priority;
     });
 
     const deduped = [];
@@ -363,7 +399,7 @@ export async function GET(request) {
       const key = item.title.toLowerCase().replace(/[^a-z0-9]+/g, '');
       if (!key || seen.has(key)) continue;
       seen.add(key);
-      const { priority, originalImage, ...publicItem } = item;
+      const { priority, originalImage, queryRelevant, ...publicItem } = item;
       deduped.push(publicItem);
       if (deduped.length >= 20) break;
     }

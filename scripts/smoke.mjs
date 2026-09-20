@@ -1,6 +1,6 @@
 const base = process.env.SMOKE_BASE || 'http://127.0.0.1:3000';
 
-async function check(query, expectedHint) {
+async function check(query, titlePattern) {
   const response = await fetch(base + '/api/search?q=' + encodeURIComponent(query) + '&kind=anime');
   if (!response.ok) throw new Error(query + ' search returned ' + response.status);
 
@@ -16,18 +16,23 @@ async function check(query, expectedHint) {
   const invalid = json.results.find((item) =>
     item.mediaType !== 'premade-card-skin' ||
     /Jikan|AniList|TVmaze/i.test(item.source || '') ||
-    !/\/products\//i.test(item.sourceUrl || '')
+    !/\/products\//i.test(item.sourceUrl || '') ||
+    /design your own|custom card skin|custom credit card/i.test(item.title || '')
   );
   if (invalid) {
-    throw new Error(query + ' returned a non-card-skin result: ' + JSON.stringify(invalid));
+    throw new Error(query + ' returned a non-premade or invalid result: ' + JSON.stringify(invalid));
   }
 
-  const first = json.results[0];
-  if (!first.image?.startsWith('/api/image?')) {
+  const relevant = json.results.find((item) => titlePattern.test(item.title || '') || titlePattern.test(item.mediaAlt || ''));
+  if (!relevant) {
+    throw new Error(query + ' returned card skins, but none matched the requested franchise: ' + json.results.map((x) => x.title).join(' | '));
+  }
+
+  if (!relevant.image?.startsWith('/api/image?')) {
     throw new Error(query + ' result bypassed image proxy');
   }
 
-  const imageResponse = await fetch(base + first.image);
+  const imageResponse = await fetch(base + relevant.image);
   if (!imageResponse.ok) {
     throw new Error(query + ' image proxy returned ' + imageResponse.status);
   }
@@ -41,17 +46,16 @@ async function check(query, expectedHint) {
     'PASS',
     query,
     '=>',
-    first.title,
+    relevant.title,
     '|',
-    first.source,
+    relevant.source,
     '|',
-    first.mediaType,
+    relevant.mediaType,
     '|',
-    type,
-    expectedHint || ''
+    type
   );
 }
 
-await check('Naruto', 'premade skin');
-await check('SpongeBob', 'premade skin');
-console.log('Premade card-skin search smoke test passed.');
+await check('Naruto', /naruto/i);
+await check('SpongeBob', /spongebob|bikini bottom/i);
+console.log('Premade card-skin relevance + image smoke test passed.');
