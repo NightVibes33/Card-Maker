@@ -3937,8 +3937,8 @@ export default function Page() {
       }
     }
 
-    const assets = [];
     let embeddedBytes = 0;
+    let estimatedEncodedBytes = 0;
 
     for (const id of refs) {
       const asset = await dbGet('imports', id);
@@ -3946,14 +3946,17 @@ export default function Page() {
         throw new Error('A referenced imported image is missing');
       }
 
-      embeddedBytes += Number(asset.blob.size || 0);
+      const blobBytes = Number(asset.blob.size || 0);
+      embeddedBytes += blobBytes;
+      estimatedEncodedBytes += Math.ceil(blobBytes / 3) * 4;
+
       if (embeddedBytes > MAX_PRESET_EMBEDDED_BYTES) {
         throw new Error('This design has too much imported image data for a safe preset export');
       }
-      assets.push([id, asset]);
-    }
+      if (estimatedEncodedBytes > MAX_PRESET_IMPORT_BYTES - 1024 * 1024) {
+        throw new Error('This design would create a preset that is too large to export safely');
+      }
 
-    for (const [id, asset] of assets) {
       payload.assets[id] = {
         name: asset.name,
         type: asset.type,
