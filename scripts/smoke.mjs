@@ -17,6 +17,9 @@ async function check(query, titlePattern) {
     item.mediaType !== 'premade-card-skin' ||
     /Jikan|AniList|TVmaze/i.test(item.source || '') ||
     !/\/products\//i.test(item.sourceUrl || '') ||
+    !Array.isArray(item.candidateImages) ||
+    item.candidateImages.length < 1 ||
+    !item.candidateImages.every((src) => src.startsWith('/api/image?')) ||
     /design your own|custom card skin|custom credit card/i.test(item.title || '')
   );
   if (invalid) {
@@ -56,6 +59,8 @@ async function check(query, titlePattern) {
   );
 }
 
-await check('Naruto', /naruto/i);
-await check('SpongeBob', /spongebob|bikini bottom/i);
-console.log('Premade card-skin relevance + image smoke test passed.');
+await check('Naruto', /naruto|konohagakure|akatsuki/i);
+await check('SpongeBob', /spongebob|bikini bottom|patrick|krusty/i);
+await check('Rick and Morty', /rick|morty|portal|meeseeks/i);
+await check('Wednesday', /wednesday/i);
+console.log('Premade card-skin relevance + alternate-media smoke test passed.');
