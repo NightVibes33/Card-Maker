@@ -1125,6 +1125,7 @@ export default function Page() {
   const [studioTool, setStudioTool] = useState('position');
   const [design, setDesign] = useState(DEFAULTS);
   const [image, setImage] = useState(null);
+  const [loadedBackgroundKey, setLoadedBackgroundKey] = useState('');
   const [recent, setRecent] = useState([]);
   const [message, setMessage] = useState('Ready');
   const [saveStatus, setSaveStatus] = useState('Saved');
@@ -1157,6 +1158,7 @@ export default function Page() {
   const [cucuLoading, setCucuLoading] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [layerImages, setLayerImages] = useState({});
+  const [loadedImageLayerSourceKey, setLoadedImageLayerSourceKey] = useState('[]');
   const canvasRef = useRef(null);
   const fullPreviewCanvasRef = useRef(null);
   const uploadRef = useRef(null);
@@ -1190,11 +1192,20 @@ export default function Page() {
   );
 
   const renderAssetsReady = useMemo(() => {
-    if (design.background && !image) return false;
+    if (design.background && (!image || loadedBackgroundKey !== design.background)) return false;
+    if (loadedImageLayerSourceKey !== imageLayerSourceKey) return false;
     return (design.customLayers || []).every(
       (layer) => layer.type !== 'image' || !layer.src || Boolean(layerImages[layer.id])
     );
-  }, [design.background, design.customLayers, image, layerImages]);
+  }, [
+    design.background,
+    design.customLayers,
+    image,
+    imageLayerSourceKey,
+    layerImages,
+    loadedBackgroundKey,
+    loadedImageLayerSourceKey
+  ]);
 
   const patch = useCallback((next, recordHistory = true, historyKey = '') => {
     setDesign((current) => {
@@ -1383,22 +1394,28 @@ export default function Page() {
 
   useEffect(() => {
     let objectUrl = '';
+    let cancelled = false;
+    const backgroundKey = design.background || '';
 
     async function loadBackground() {
-      if (!design.background) {
+      if (!backgroundKey) {
         setImage(null);
+        setLoadedBackgroundKey('');
         return;
       }
 
       setImage(null);
+      setLoadedBackgroundKey('');
       setMessage('Loading artwork…');
-      let src = design.background;
+      let src = backgroundKey;
 
       if (src.startsWith('idb://imports/')) {
         const id = src.slice('idb://imports/'.length);
         const asset = await dbGet('imports', id);
+        if (cancelled) return;
         if (!asset?.blob) {
           setImage(null);
+          setLoadedBackgroundKey('');
           setMessage('Imported artwork is missing');
           return;
         }
@@ -1409,11 +1426,15 @@ export default function Page() {
       const img = new Image();
       img.decoding = 'async';
       img.onload = () => {
+        if (cancelled) return;
         setImage(img);
+        setLoadedBackgroundKey(backgroundKey);
         setMessage('Artwork loaded');
       };
       img.onerror = () => {
+        if (cancelled) return;
         setImage(null);
+        setLoadedBackgroundKey('');
         setMessage('Artwork could not load');
       };
       img.src = src;
@@ -1422,6 +1443,7 @@ export default function Page() {
     loadBackground();
 
     return () => {
+      cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [design.background]);
@@ -1436,6 +1458,7 @@ export default function Page() {
       const imageLayers = JSON.parse(imageLayerSourceKey || '[]');
 
       setLayerImages({});
+      setLoadedImageLayerSourceKey('');
 
       for (const layer of imageLayers) {
         let src = layer.src;
@@ -1459,6 +1482,7 @@ export default function Page() {
 
       if (!cancelled) {
         setLayerImages(next);
+        setLoadedImageLayerSourceKey(imageLayerSourceKey);
         if (failed) setMessage('Some image layers could not load');
       }
     }
@@ -2578,6 +2602,9 @@ export default function Page() {
     setHistoryVersion((value) => value + 1);
     setDesign(DEFAULTS);
     setImage(null);
+    setLoadedBackgroundKey('');
+    setLayerImages({});
+    setLoadedImageLayerSourceKey('[]');
     setSelectedElement('artwork');
     setMessage('New card');
   }
