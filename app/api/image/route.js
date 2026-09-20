@@ -16,6 +16,45 @@ function isAllowed(url) {
   return url.protocol === 'https:' && ALLOWED_HOSTS.has(url.hostname.toLowerCase());
 }
 
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const MAX_REDIRECTS = 4;
+
+async function fetchAllowedImage(startUrl, options) {
+  let current = new URL(startUrl);
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    if (!isAllowed(current)) {
+      throw new Error('Redirect host not allowed');
+    }
+
+    const response = await fetch(current, {
+      ...options,
+      redirect: 'manual'
+    });
+
+    if (!REDIRECT_STATUSES.has(response.status)) {
+      return { response, finalUrl: current };
+    }
+
+    if (hop === MAX_REDIRECTS) {
+      throw new Error('Too many image redirects');
+    }
+
+    const location = response.headers.get('location');
+    if (!location) {
+      throw new Error('Image redirect missing location');
+    }
+
+    const next = new URL(location, current);
+    if (!isAllowed(next)) {
+      throw new Error('Redirect host not allowed');
+    }
+    current = next;
+  }
+
+  throw new Error('Too many image redirects');
+}
+
 export async function GET(request) {
   const raw = request.nextUrl.searchParams.get('url');
   if (!raw || raw.length > 2200) {
@@ -48,9 +87,8 @@ export async function GET(request) {
   const timer = setTimeout(() => controller.abort(), 10000);
 
   try {
-    const upstream = await fetch(url, {
+    const { response: upstream } = await fetchAllowedImage(url, {
       signal: controller.signal,
-      redirect: 'follow',
       headers: {
         'User-Agent': 'AirCard-Card-Studio/3.0 (+https://github.com/NightVibes33/Card-Maker)',
         Accept: 'image/avif,image/webp,image/apng,image/jpeg,image/png,*/*'
@@ -61,11 +99,6 @@ export async function GET(request) {
 
     if (!upstream.ok) {
       return new NextResponse('Image unavailable', { status: 502 });
-    }
-
-    const finalUrl = new URL(upstream.url);
-    if (!isAllowed(finalUrl)) {
-      return new NextResponse('Redirect host not allowed', { status: 403 });
     }
 
     const contentType = upstream.headers.get('content-type') || '';
