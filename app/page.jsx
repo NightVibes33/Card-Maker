@@ -1891,22 +1891,22 @@ export default function Page() {
       setMessage('Loading artwork…');
       let src = backgroundKey;
 
-      if (src.startsWith('idb://imports/')) {
-        const id = src.slice('idb://imports/'.length);
-        const asset = await dbGet('imports', id);
-        if (cancelled) return;
-        if (!asset?.blob) {
-          setImage(null);
-          setLoadedBackgroundKey('');
-          setBackgroundLoadError('Imported artwork is missing.');
-          setMessage('Imported artwork is missing');
-          return;
-        }
-        objectUrl = URL.createObjectURL(asset.blob);
-        src = objectUrl;
-      }
-
       try {
+        if (src.startsWith('idb://imports/')) {
+          const id = src.slice('idb://imports/'.length);
+          const asset = await dbGet('imports', id);
+          if (cancelled) return;
+          if (!asset?.blob) {
+            setImage(null);
+            setLoadedBackgroundKey('');
+            setBackgroundLoadError('Imported artwork is missing.');
+            setMessage('Imported artwork is missing');
+            return;
+          }
+          objectUrl = URL.createObjectURL(asset.blob);
+          src = objectUrl;
+        }
+
         const img = await loadSearchImage(src, 15000);
         if (cancelled) return;
         setImage(img);
@@ -1945,18 +1945,19 @@ export default function Page() {
 
       for (const layer of imageLayers) {
         let src = layer.src;
-        if (src.startsWith('idb://imports/')) {
-          const id = src.slice('idb://imports/'.length);
-          const asset = await dbGet('imports', id);
-          if (!asset?.blob) {
-            failed = true;
-            continue;
-          }
-          src = URL.createObjectURL(asset.blob);
-          urls.push(src);
-        }
 
         try {
+          if (src.startsWith('idb://imports/')) {
+            const id = src.slice('idb://imports/'.length);
+            const asset = await dbGet('imports', id);
+            if (!asset?.blob) {
+              failed = true;
+              continue;
+            }
+            src = URL.createObjectURL(asset.blob);
+            urls.push(src);
+          }
+
           next[layer.id] = await loadSearchImage(src);
         } catch {
           failed = true;
@@ -3673,7 +3674,9 @@ export default function Page() {
   }
 
   function dismissInstallHelp() {
-    localStorage.setItem('aircard-install-dismissed-v2', '1');
+    try {
+      localStorage.setItem('aircard-install-dismissed-v2', '1');
+    } catch {}
     setInstallHelp(false);
   }
 
