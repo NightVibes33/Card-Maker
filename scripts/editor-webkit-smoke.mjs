@@ -60,10 +60,24 @@ try {
   await lockLayer.click();
   assert.equal(await lockLayer.getAttribute('aria-checked'), 'true');
   assert.equal(await textEditor.isDisabled(), true);
+  assert.equal(
+    await page.getByRole('button', { name: 'Delete', exact: true }).isDisabled(),
+    true,
+    'locked layers must disable destructive deletion'
+  );
+  assert.equal(
+    await page.getByRole('button', { name: 'Bring Forward', exact: true }).isDisabled(),
+    true,
+    'locked layers must disable z-order movement'
+  );
 
   const showLayer = page.getByRole('switch', { name: 'Show Layer' });
   await showLayer.click();
   assert.equal(await showLayer.getAttribute('aria-checked'), 'false');
+  assert.ok(
+    await page.getByRole('button', { name: /Text text hidden/i }).isVisible(),
+    'hidden layers must remain visible in the layer stack so they can be recovered'
+  );
 
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await page.waitForFunction(() => {
@@ -157,6 +171,22 @@ try {
   assert.ok(
     Number(await layerX.inputValue()) > 0.55,
     'Redo must restore the dragged shape position'
+  );
+
+  // Zero is a valid normalized coordinate. Older editor code used x || 0.5
+  // and silently snapped an exact zero back to center.
+  await layerX.evaluate((node) => {
+    node.value = '0';
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Layer horizontal position"]');
+    return input && Number(input.value) === 0;
+  });
+  assert.equal(
+    Number(await layerX.inputValue()),
+    0,
+    'an exact zero layer coordinate must remain zero'
   );
 
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
