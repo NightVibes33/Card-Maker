@@ -982,6 +982,7 @@ function drawChipLayerAtOrigin(ctx, tone = 'gold', pixelScale = 1) {
   const x = -w / 2;
   const y = -h / 2;
   const r = 30;
+  const inset = 9;
 
   ctx.shadowColor = 'rgba(0,0,0,.4)';
   ctx.shadowBlur = 24 * pixelScale;
