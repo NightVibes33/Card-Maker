@@ -1,9 +1,9 @@
-const SHELL_CACHE = 'aircard-shell-v2';
-const ART_CACHE = 'aircard-art-v2';
-const CATALOG_CACHE = 'aircard-catalog-v2';
-const STATIC_CACHE = 'aircard-static-v2';
+const SHELL_CACHE = 'card-studio-shell-v3';
+const ART_CACHE = 'card-studio-art-v3';
+const CATALOG_CACHE = 'card-studio-catalog-v3';
+const STATIC_CACHE = 'card-studio-static-v3';
 
-const SHELL = ['/', '/manifest.webmanifest'];
+const SHELL = ['/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -54,6 +54,19 @@ async function staleWhileRevalidate(request, cacheName) {
   return (await network) || new Response('Offline', { status: 503 });
 }
 
+async function networkFirst(request, cacheName) {
+  const cache = await caches.open(cacheName);
+
+  try {
+    const response = await fetch(request, { cache: 'no-store' });
+    if (response.ok) cache.put(request, response.clone()).catch(() => {});
+    return response;
+  } catch {
+    const hit = await cache.match(request);
+    return hit || new Response('Offline', { status: 503 });
+  }
+}
+
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
@@ -74,6 +87,6 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (event.request.mode === 'navigate') {
-    event.respondWith(staleWhileRevalidate(event.request, SHELL_CACHE));
+    event.respondWith(networkFirst(event.request, SHELL_CACHE));
   }
 });
