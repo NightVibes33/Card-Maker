@@ -32,6 +32,9 @@ export function parseAllowedRemoteImageUrl(value) {
     return null;
   }
 
+  // URL fragments are client-side only and are never sent upstream. Strip
+  // them so identical artwork cannot occupy multiple proxy/cache keys.
+  url.hash = '';
   return url;
 }
 
