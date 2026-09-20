@@ -180,6 +180,26 @@ const STUDIO_TOOLS = [
   ['card', 'Card']
 ];
 
+const IMAGE_LAYER_DEFAULTS = {
+  exposure: 0,
+  brightness: 1,
+  contrast: 1,
+  saturation: 1,
+  highlights: 0,
+  shadows: 0,
+  temperature: 0,
+  tint: 0,
+  sharpness: 0,
+  blur: 0,
+  vignette: 0,
+  grain: 0,
+  gloss: 0,
+  overlay: 0,
+  fade: 0,
+  effectTint: '#7b61ff',
+  effectTintStrength: 0
+};
+
 const ADJUSTMENT_PRESETS = {
   // Presets are full looks, not labels pasted over tiny slider changes.
   // Every preset owns the entire image-adjustment/effects surface so switching
@@ -328,26 +348,6 @@ const ADJUSTMENT_PRESETS = {
     vignette: 0.16,
     grain: 0.025
   }
-};
-
-const IMAGE_LAYER_DEFAULTS = {
-  exposure: 0,
-  brightness: 1,
-  contrast: 1,
-  saturation: 1,
-  highlights: 0,
-  shadows: 0,
-  temperature: 0,
-  tint: 0,
-  sharpness: 0,
-  blur: 0,
-  vignette: 0,
-  grain: 0,
-  gloss: 0,
-  overlay: 0,
-  fade: 0,
-  effectTint: '#7b61ff',
-  effectTintStrength: 0
 };
 
 const CARD_PRESETS = {
