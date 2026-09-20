@@ -532,6 +532,10 @@ try {
   await page.getByRole('tab', { name: 'Crop', exact: true }).click();
   const layerCropLeft = page.getByLabel('Layer Crop Left');
   await layerCropLeft.waitFor({ state: 'visible', timeout: 15000 });
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Layer Crop Left"]');
+    return Boolean(input && !input.disabled);
+  }, null, { timeout: 15000 });
   await layerCropLeft.evaluate((node) => {
     node.value = '0.1';
     node.dispatchEvent(new Event('input', { bubbles: true }));
