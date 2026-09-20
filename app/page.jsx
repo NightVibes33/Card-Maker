@@ -292,7 +292,7 @@ function normalizeImageAdjustments(value) {
 
 function normalizeCustomLayer(layer) {
   if (!layer || typeof layer !== 'object' || !layer.id) return null;
-  const id = String(layer.id).slice(0, 120);
+  const id = splitGraphemes(layer.id).slice(0, 120).join('');
   if (!id || BUILTIN_LAYER_IDS.includes(id)) return null;
 
   const type = ['text', 'shape', 'image', 'chip', 'contactless'].includes(layer.type)
@@ -303,7 +303,7 @@ function normalizeCustomLayer(layer) {
   const normalized = {
     id,
     type,
-    name: String(layer.name || type).slice(0, 80),
+    name: splitGraphemes(layer.name || type).slice(0, 80).join(''),
     x: finiteClamp(layer.x, 0.5, 0, 1),
     y: finiteClamp(layer.y, 0.5, 0, 1),
     scale: finiteClamp(layer.scale, 1, 0.1, 6),
@@ -354,7 +354,7 @@ function normalizeDesignState(value) {
   const raw = value && typeof value === 'object' ? value : {};
   const next = { ...DEFAULTS };
   next.background = normalizePersistedArtworkSource(raw.background, 3072);
-  next.backgroundLabel = String(raw.backgroundLabel || DEFAULTS.backgroundLabel).slice(0, 120);
+  next.backgroundLabel = splitGraphemes(raw.backgroundLabel || DEFAULTS.backgroundLabel).slice(0, 120).join('');
   next.sourceCrop = normalizeCrop(raw.sourceCrop, 0.1);
   next.originalSourceCrop = normalizeCrop(raw.originalSourceCrop, 0.1);
   next.gradient = Math.round(finiteClamp(raw.gradient, DEFAULTS.gradient, 0, GRADIENTS.length - 1));
@@ -5261,7 +5261,7 @@ export default function Page() {
                   aria-label="Project name"
                   placeholder="Name this design"
                   value={projectName}
-                  onChange={(event) => setProjectName(event.target.value.slice(0, 60))}
+                  onChange={(event) => setProjectName(splitGraphemes(event.target.value).slice(0, 60).join(''))}
                 />
                 <button
                   type="button"
