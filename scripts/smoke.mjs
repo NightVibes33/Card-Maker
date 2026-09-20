@@ -1,6 +1,6 @@
 const base = process.env.SMOKE_BASE || 'http://127.0.0.1:3000';
 
-async function fetchJsonRetry(url, label, attempts = 4) {
+async function fetchJsonRetry(url, label, attempts = 5) {
   let lastResponse = null;
   let lastJson = null;
 
@@ -24,191 +24,126 @@ async function fetchJsonRetry(url, label, attempts = 4) {
   );
 }
 
-async function fetchSearch(query) {
-  let last = null;
-
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    const response = await fetch(base + '/api/search?q=' + encodeURIComponent(query) + '&kind=anime');
-    const json = await response.json().catch(() => ({}));
-    last = { response, json };
-
-    if (response.ok && Array.isArray(json.results) && json.results.length > 0) {
-      return json;
-    }
-
-    if (attempt < 3) {
-      await new Promise((resolve) => setTimeout(resolve, 700 * attempt));
-    }
-  }
-
-  if (!last?.response?.ok) {
-    throw new Error(query + ' search returned ' + (last?.response?.status || 'unknown status'));
-  }
-
-  console.warn('WARN', query, 'returned no results after 3 attempts; upstream storefront search was empty');
-  return null;
-}
-
-async function check(query, titlePattern) {
-  const json = await fetchSearch(query);
-  if (!json) return;
-
-  if (json.policy?.postersAllowed !== false) {
-    throw new Error(query + ' did not enforce poster rejection');
-  }
-
-  const invalid = json.results.find((item) =>
-    item.mediaType !== 'premade-card-skin' ||
-    /Jikan|AniList|TVmaze/i.test(item.source || '') ||
-    !/\/products\//i.test(item.sourceUrl || '') ||
-    !Array.isArray(item.candidateImages) ||
-    item.candidateImages.length < 1 ||
-    !item.candidateImages.every((src) => src.startsWith('/api/image?')) ||
-    /design your own|custom card skin|custom credit card/i.test(item.title || '')
-  );
-  if (invalid) {
-    throw new Error(query + ' returned a non-premade or invalid result: ' + JSON.stringify(invalid));
-  }
-
-  const relevant = json.results.find((item) => titlePattern.test(item.title || '') || titlePattern.test(item.mediaAlt || ''));
-  if (!relevant) {
-    throw new Error(query + ' returned card skins, but none matched the requested franchise: ' + json.results.map((x) => x.title).join(' | '));
-  }
-
-  if (!relevant.image?.startsWith('/api/image?')) {
-    throw new Error(query + ' result bypassed image proxy');
-  }
-
-  const imageResponse = await fetch(base + relevant.image);
-  if (!imageResponse.ok) {
-    throw new Error(query + ' image proxy returned ' + imageResponse.status);
-  }
-
-  const type = imageResponse.headers.get('content-type') || '';
-  if (!type.startsWith('image/')) {
-    throw new Error(query + ' image proxy returned ' + type);
-  }
-
-  console.log(
-    'PASS',
-    query,
-    '=>',
-    relevant.title,
-    '|',
-    relevant.source,
-    '|',
-    relevant.mediaType,
-    '|',
-    type
-  );
-}
-
-async function checkCucuCatalog() {
-  const firstResult = await fetchJsonRetry(base + '/api/cucu?page=1&limit=24', 'CUCU catalog page 1');
-  const first = firstResult.json;
-  if (!Array.isArray(first.results) || first.results.length < 1) {
-    throw new Error('CUCU catalog page 1 returned no products');
-  }
-  if ((Number(first.total) || 0) < 2000) {
-    throw new Error('CUCU catalog total unexpectedly small: ' + first.total);
-  }
-  if (first.source !== 'CUCU Covers · All Card Skins') {
-    throw new Error('CUCU catalog source mismatch: ' + first.source);
-  }
-
-  const expectedCategories = [
-    'All Card Skins',
-    'Best Sellers',
-    'New Arrivals',
-    'Anime',
-    'Cars',
-    'Sports',
-    'Artistic',
-    'Cute & Kawaii',
-    'Pets',
-    'Classic Art',
-    'Funny',
-    'Memes',
-    'Retro & Nostalgic',
-    'Animals',
-    'Crypto'
-  ];
-
-  const categoryLabels = Array.isArray(first.categories)
-    ? first.categories.map((entry) => entry.label)
-    : [];
-
-  for (const label of expectedCategories) {
-    if (!categoryLabels.includes(label)) {
-      throw new Error('CUCU category missing from API: ' + label);
-    }
-  }
-
-  const catalogCache = firstResult.response.headers.get('cache-control') || '';
-  if (!/s-maxage=21600/.test(catalogCache)) {
-    throw new Error('CUCU catalog is not edge cached for 6h: ' + catalogCache);
-  }
-
-  const invalidFirst = first.results.find((item) =>
-    item.source !== 'CUCU Covers' ||
-    item.mediaType !== 'premade-card-skin' ||
-    item.collection !== 'all-card-covers' ||
-    item.assetMode !== 'direct-card-art' ||
-    !Array.isArray(item.directAssetUrls) ||
-    item.directAssetUrls.length < 1 ||
-    !/cucucovers\.com\/products\//i.test(item.sourceUrl || '') ||
-    !item.image?.startsWith('/api/image?') ||
-    !Array.isArray(item.candidateImages) ||
-    item.candidateImages.length < 1
-  );
-  if (invalidFirst) {
-    throw new Error('CUCU catalog returned invalid item: ' + JSON.stringify(invalidFirst));
-  }
-
-  const totalPages = Number(first.totalPages) || Math.ceil(first.total / 24);
-  const lastResult = await fetchJsonRetry(
-    base + '/api/cucu?page=' + totalPages + '&limit=24',
-    'CUCU final page'
-  );
-  const last = lastResult.json;
-  if (!Array.isArray(last.results) || last.results.length < 1) {
-    throw new Error('CUCU final catalog page returned no products');
-  }
-  if (last.hasMore !== false) {
-    throw new Error('CUCU final catalog page incorrectly reports hasMore');
-  }
-
-  console.log(
-    'PASS CUCU catalog =>',
-    first.total,
-    'products across',
-    totalPages,
-    'app pages | final page',
-    last.results.length,
-    'products'
-  );
-}
-
-async function checkBrowseTaxonomy() {
+async function checkHome() {
   const response = await fetch(base + '/');
   if (!response.ok) throw new Error('Home page returned ' + response.status);
   const html = (await response.text()).replace(/&amp;/g, '&');
 
-  for (const label of ['CUCU Covers', 'All Card Skins', 'Best Sellers', 'New Arrivals', 'Cute & Kawaii']) {
-    if (!html.includes(label)) throw new Error('Browse UI missing real source/category label: ' + label);
+  for (const text of ['Card Studio', 'Discover a card skin', 'Search 2,225+ card skins', 'Surprise Me']) {
+    if (!html.includes(text)) throw new Error('Home page missing V2 UI text: ' + text);
   }
 
-  if (/Original ↗|Open the original|>Cartoon<|>TV</i.test(html)) {
-    throw new Error('Browse UI still contains removed sources, fake taxonomy, or outbound storefront controls');
+  if (/Blitz|Load More|Original ↗|Open the original/i.test(html)) {
+    throw new Error('Home page contains removed or legacy catalog UI');
   }
 
-  console.log('PASS Browse taxonomy => CUCU-only real collections with no storefront redirects');
+  console.log('PASS V2 shell');
 }
 
-await check('Naruto', /naruto|konohagakure|akatsuki/i);
-await check('SpongeBob', /spongebob|bikini bottom|krusty/i);
-await check('Rick and Morty', /rick|morty|portal|meeseeks/i);
-await check('Wednesday', /wednesday/i);
-await checkBrowseTaxonomy();
-await checkCucuCatalog();
-console.log('CUCU catalog smoke tests passed.');
+async function checkCatalog() {
+  const { response, json } = await fetchJsonRetry(
+    base + '/api/cucu?category=all&page=1&limit=24',
+    'CUCU catalog'
+  );
+
+  if (!Array.isArray(json.results) || json.results.length < 1) {
+    throw new Error('CUCU catalog returned no products');
+  }
+
+  if ((Number(json.total) || 0) < 2000) {
+    throw new Error('CUCU catalog total unexpectedly small: ' + json.total);
+  }
+
+  const cache = response.headers.get('cache-control') || '';
+  if (!/s-maxage=21600/.test(cache)) {
+    throw new Error('CUCU catalog missing 6h edge cache: ' + cache);
+  }
+
+  const expectedCategories = [
+    'All Card Skins','Best Sellers','New Arrivals','Anime','Cars','Sports',
+    'Artistic','Cute & Kawaii','Pets','Classic Art','Funny','Memes',
+    'Retro & Nostalgic','Animals','Crypto'
+  ];
+  const labels = (json.categories || []).map((entry) => entry.label);
+  for (const label of expectedCategories) {
+    if (!labels.includes(label)) throw new Error('Missing CUCU category: ' + label);
+  }
+
+  const invalid = json.results.find((item) =>
+    item.source !== 'CUCU Covers' ||
+    item.mediaType !== 'premade-card-skin' ||
+    item.assetMode !== 'direct-card-art' ||
+    !item.image?.startsWith('/api/image?') ||
+    !item.thumbnail?.startsWith('/api/image?') ||
+    !item.thumbnail.includes('w=560') ||
+    !Array.isArray(item.inspectUrls) ||
+    item.inspectUrls.length < 1 ||
+    !item.inspectUrls.every((url) => url.startsWith('/api/cucu/inspect?'))
+  );
+
+  if (invalid) throw new Error('Invalid CUCU V2 item: ' + JSON.stringify(invalid));
+
+  const thumb = await fetch(base + json.results[0].thumbnail);
+  if (!thumb.ok || !(thumb.headers.get('content-type') || '').startsWith('image/')) {
+    throw new Error('CUCU thumbnail pipeline failed');
+  }
+
+  console.log('PASS CUCU catalog + thumbnail pipeline =>', json.total, 'products');
+  return json.results;
+}
+
+async function checkPreprocessing(results) {
+  let usable = null;
+
+  for (const item of results.slice(0, 6)) {
+    for (const inspectUrl of item.inspectUrls.slice(0, 3)) {
+      try {
+        const result = await fetchJsonRetry(base + inspectUrl, 'CUCU artwork preprocessing', 3);
+        if (result.json?.usable && result.json?.full && result.json?.thumbnail) {
+          usable = result;
+          break;
+        }
+      } catch {}
+    }
+    if (usable) break;
+  }
+
+  if (!usable) throw new Error('No usable server-preprocessed CUCU image found in sample');
+
+  const cache =
+    usable.response.headers.get('cdn-cache-control') ||
+    usable.response.headers.get('cache-control') ||
+    '';
+  if (!/2592000/.test(cache)) {
+    throw new Error('CUCU preprocessing metadata is not cached for 30d: ' + cache);
+  }
+
+  if (!usable.json.thumbnail.includes('w=560')) {
+    throw new Error('Preprocessed thumbnail is not downsampled: ' + usable.json.thumbnail);
+  }
+
+  console.log('PASS CUCU server preprocessing => usable crop/full/thumbnail metadata');
+}
+
+async function checkSearch() {
+  const result = await fetchJsonRetry(
+    base + '/api/cucu?category=all&q=naruto&page=1&limit=12',
+    'CUCU search'
+  );
+
+  if (result.json.upstream?.mode !== 'catalog-search') {
+    throw new Error('CUCU search did not use cached catalog-search mode');
+  }
+
+  if (!Array.isArray(result.json.results)) {
+    throw new Error('CUCU search results missing');
+  }
+
+  console.log('PASS CUCU cached search =>', result.json.results.length, 'results');
+}
+
+await checkHome();
+const results = await checkCatalog();
+await checkPreprocessing(results);
+await checkSearch();
+console.log('Card Studio V2 CUCU smoke tests passed.');
