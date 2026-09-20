@@ -8,8 +8,6 @@ const ALLOWED_HOSTS = new Set([
   'www.stickyinkdesigns.com',
   'cucucovers.com',
   'www.cucucovers.com',
-  'blitzcovers.com',
-  'www.blitzcovers.com',
   'styledcards.com',
   'www.styledcards.com'
 ]);
