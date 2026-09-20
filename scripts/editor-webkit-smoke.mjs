@@ -114,6 +114,40 @@ try {
     'Undo must restore the pre-drag shape position'
   );
 
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  const imageInputs = page.locator('input[type="file"][accept="image/*"]');
+  assert.ok(await imageInputs.count() >= 2, 'background and image-layer file inputs must exist');
+
+  const tinyPng = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mNk+M9QzwAEYBxVSFUAAGMABf4C/WQAAAAASUVORK5CYII=',
+    'base64'
+  );
+  await imageInputs.last().setInputFiles({
+    name: 'webkit-smoke.png',
+    mimeType: 'image/png',
+    buffer: tinyPng
+  });
+
+  const imageWidth = page.getByLabel('Image Width').first();
+  await imageWidth.waitFor({ state: 'visible', timeout: 15000 });
+  assert.equal(Number(await imageWidth.inputValue()), 640);
+
+  await page.getByRole('tab', { name: 'Crop', exact: true }).click();
+  const layerCropLeft = page.getByLabel('Layer Crop Left');
+  await layerCropLeft.waitFor({ state: 'visible', timeout: 15000 });
+  await layerCropLeft.evaluate((node) => {
+    node.value = '0.1';
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Layer Crop Left"]');
+    return input && Math.abs(Number(input.value) - 0.1) < 0.001;
+  });
+  assert.ok(
+    Math.abs(Number(await layerCropLeft.inputValue()) - 0.1) < 0.001,
+    'imported image-layer crop controls must update in WebKit'
+  );
+
   const previewStyle = page.getByRole('group', { name: 'Preview style' });
   await previewStyle.getByRole('button', { name: 'Physical', exact: true }).click();
   assert.equal(await editorCanvas.evaluate((node) => node.style.touchAction), 'pan-y');
