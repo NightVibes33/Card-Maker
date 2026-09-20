@@ -4714,8 +4714,8 @@ export default function Page() {
                   type="button"
                   className="primaryAction librarySaveButton"
                   onClick={async () => {
-                    await saveProject(projectName);
-                    setProjectName('');
+                    const saved = await saveProject(projectName);
+                    if (saved) setProjectName('');
                   }}
                 >
                   Save Current Design
@@ -4758,7 +4758,21 @@ export default function Page() {
                       className="actionRow"
                       key={asset.id}
                       onClick={() => {
-                        patch({ background: 'idb://imports/' + asset.id, backgroundLabel: asset.name, sourceCrop: null, originalSourceCrop: null, zoom: 1, x: 0, y: 0, rotate: 0 });
+                        patch({
+                          background: 'idb://imports/' + asset.id,
+                          backgroundLabel: asset.name,
+                          sourceCrop: null,
+                          originalSourceCrop: null,
+                          zoom: 1,
+                          x: 0,
+                          y: 0,
+                          rotate: 0,
+                          flipX: false,
+                          fit: 'cover'
+                        });
+                        setSelectedElement('artwork');
+                        setShowOriginal(false);
+                        setActiveGuides({ x: null, y: null });
                         setTab('studio');
                         setStudioTool('crop');
                       }}
