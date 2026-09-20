@@ -67,6 +67,8 @@ const pageChecks = [
   [/favoriteOpsRef\.current\.has\(itemId\)/, 'favorite writes are serialized per card'],
   [/projectSaveInFlightRef\.current/, 'project saves reject overlapping double taps'],
   [/presetTransferInFlightRef\.current/, 'preset import and export operations are serialized'],
+  [/const cleanupInFlightRef = useRef\(false\)/, 'import cleanup has a synchronous concurrency guard'],
+  [/Finish the preset operation before cleaning imported images\./, 'import cleanup cannot overlap preset transfers'],
   [/function fillGrain\(/, 'grain rendering uses a cached pattern instead of per-frame dot loops'],
   [/imageLayers\.length > MAX_VISIBLE_IMAGE_LAYERS/, 'image hydration refuses unsafe visible-image counts'],
   [/visibleImageLayers\(designRef\.current\)\.length >= MAX_VISIBLE_IMAGE_LAYERS/, 'image-layer creation enforces the visible-image cap'],
