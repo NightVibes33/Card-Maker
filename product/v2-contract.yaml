@@ -390,6 +390,17 @@ features:
     file: app/globals.css
     contains:
       - "@supports (font: -apple-system-body)"
+  ios_save_to_photos:
+    file: app/page.jsx
+    contains:
+      - "Save 3× to Photos"
+      - "Save 2× to Photos"
+      - "Choose “Save Image” in the iOS share sheet"
+      - "navigator.share"
+      - "navigator.canShare"
+      - "photos-share-sheet"
+      - "makePngFile"
+      - "toDataURL('image/png')"
   exact_aircard_exports:
     file: app/page.jsx
     contains:
