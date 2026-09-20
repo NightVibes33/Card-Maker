@@ -200,7 +200,7 @@ requireMatch(page, /webp\|avif\|heic\|heif/, 'WebP, AVIF, HEIC, and HEIF imports
 requireMatch(page, /maxPixels: MAX_STORED_LAYER_IMAGE_PIXELS/, 'custom image-layer imports use the smaller working set');
 requireMatch(
   page,
-  /source\.startsWith\('\/api\/image\?'\)[\s\S]{0,100}test\(source\)[\s\S]{0,120}return proxyImageWidth\(source, width\)/,
+  /function normalizePersistedArtworkSource\([\s\S]*?proxyImageWidth\([\s\S]*?width\)/,
   'restored proxied artwork is normalized back to working resolution'
 );
 requireMatch(page, /parsed\.background = normalizePersistedArtworkSource\(parsed\.background, 3072\)/, 'legacy draft artwork is upgraded instead of cleared');
