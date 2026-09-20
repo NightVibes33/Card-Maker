@@ -120,7 +120,7 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
 
   if (url.pathname === '/manifest.webmanifest') {
-    event.respondWith(cacheFirst(event.request, SHELL_CACHE));
+    event.respondWith(staleWhileRevalidate(event.request, SHELL_CACHE));
     return;
   }
 
