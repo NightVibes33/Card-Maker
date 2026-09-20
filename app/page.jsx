@@ -409,6 +409,7 @@ function normalizeDesignState(value) {
   next.shadow = raw.shadow == null ? DEFAULTS.shadow : Boolean(raw.shadow);
 
   const seen = new Set();
+  let visibleImageCount = 0;
   next.customLayers = (Array.isArray(raw.customLayers) ? raw.customLayers : [])
     .slice(0, MAX_CUSTOM_LAYERS)
     .map(normalizeCustomLayer)
@@ -416,6 +417,12 @@ function normalizeDesignState(value) {
       if (!layer || seen.has(layer.id)) return false;
       seen.add(layer.id);
       return true;
+    })
+    .map((layer) => {
+      if (layer.type !== 'image' || !layer.src || layer.hidden) return layer;
+      visibleImageCount += 1;
+      if (visibleImageCount <= MAX_VISIBLE_IMAGE_LAYERS) return layer;
+      return { ...layer, hidden: true };
     });
   next.layerOrder = normalizeLayerOrder({
     ...next,
