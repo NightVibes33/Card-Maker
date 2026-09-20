@@ -916,6 +916,7 @@ function drawChip(ctx, d, pixelScale = 1) {
   const x = d.chipX * OUT_W;
   const y = d.chipY * OUT_H;
   const r = 30 * d.chipScale;
+  const inset = 9 * d.chipScale;
 
   ctx.save();
   ctx.translate(x + w / 2, y + h / 2);
@@ -945,21 +946,21 @@ function drawChip(ctx, d, pixelScale = 1) {
   ctx.strokeStyle = 'rgba(70,48,10,.52)';
   ctx.lineWidth = 6 * d.chipScale;
   ctx.beginPath();
-  ctx.moveTo(cx, y + 9);
-  ctx.lineTo(cx, y + h - 9);
-  ctx.moveTo(x + 9, cy);
-  ctx.lineTo(x + w - 9, cy);
+  ctx.moveTo(cx, y + inset);
+  ctx.lineTo(cx, y + h - inset);
+  ctx.moveTo(x + inset, cy);
+  ctx.lineTo(x + w - inset, cy);
   ctx.stroke();
 
   [0.25, 0.75].forEach((q) => {
     ctx.beginPath();
-    ctx.moveTo(x + w * q, y + 9);
+    ctx.moveTo(x + w * q, y + inset);
     ctx.lineTo(x + w * q, y + h * 0.3);
     ctx.quadraticCurveTo(cx, y + h * 0.36, cx, cy);
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(x + w * q, y + h - 9);
+    ctx.moveTo(x + w * q, y + h - inset);
     ctx.lineTo(x + w * q, y + h * 0.7);
     ctx.quadraticCurveTo(cx, y + h * 0.64, cx, cy);
     ctx.stroke();
@@ -1011,13 +1012,13 @@ function drawChipLayerAtOrigin(ctx, tone = 'gold', pixelScale = 1) {
 
   [0.25, 0.75].forEach((q) => {
     ctx.beginPath();
-    ctx.moveTo(x + w * q, y + 9);
+    ctx.moveTo(x + w * q, y + inset);
     ctx.lineTo(x + w * q, y + h * 0.3);
     ctx.quadraticCurveTo(0, y + h * 0.36, 0, 0);
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(x + w * q, y + h - 9);
+    ctx.moveTo(x + w * q, y + h - inset);
     ctx.lineTo(x + w * q, y + h * 0.7);
     ctx.quadraticCurveTo(0, y + h * 0.64, 0, 0);
     ctx.stroke();
