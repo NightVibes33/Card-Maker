@@ -307,7 +307,10 @@ function normalizeCustomLayer(layer) {
     normalized.radius = finiteClamp(layer.radius, 28, 0, Math.min(normalized.width, normalized.height) / 2);
     normalized.color = normalizeHexColor(layer.color, '#ffffff');
   } else if (type === 'image') {
-    normalized.src = typeof layer.src === 'string' ? layer.src : '';
+    normalized.src =
+      typeof layer.src === 'string' && isPersistableBackground(layer.src)
+        ? layer.src
+        : '';
     normalized.width = finiteClamp(layer.width, 640, 20, 1800);
     normalized.flipX = Boolean(layer.flipX);
     normalized.crop = normalizeCrop(layer.crop, 0.1);
@@ -325,7 +328,10 @@ function normalizeCustomLayer(layer) {
 function normalizeDesignState(value) {
   const raw = value && typeof value === 'object' ? value : {};
   const next = { ...DEFAULTS, ...raw };
-  next.background = typeof raw.background === 'string' ? raw.background : '';
+  next.background =
+    typeof raw.background === 'string' && isPersistableBackground(raw.background)
+      ? raw.background
+      : '';
   next.backgroundLabel = String(raw.backgroundLabel || DEFAULTS.backgroundLabel).slice(0, 120);
   next.sourceCrop = normalizeCrop(raw.sourceCrop, 0.1);
   next.originalSourceCrop = normalizeCrop(raw.originalSourceCrop, 0.1);
@@ -3258,7 +3264,13 @@ export default function Page() {
   }
 
   async function download(width, height, name) {
-    const file = makePngFile(width, height, name);
+    let file;
+    try {
+      file = makePngFile(width, height, name);
+    } catch {
+      setMessage('PNG export failed. Re-open the artwork or image layer and try again.');
+      return;
+    }
     const url = URL.createObjectURL(file);
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -3283,7 +3295,14 @@ export default function Page() {
       return;
     }
 
-    const file = makePngFile(width, height, name);
+    let file;
+    try {
+      file = makePngFile(width, height, name);
+    } catch {
+      setMessage('PNG export failed. Re-open the artwork or image layer and try again.');
+      return;
+    }
+
     const canShareFile = Boolean(
       navigator.share &&
       (!navigator.canShare || navigator.canShare({ files: [file] }))
