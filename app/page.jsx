@@ -408,7 +408,6 @@ function normalizeDesignState(value) {
   next.shadow = raw.shadow == null ? DEFAULTS.shadow : Boolean(raw.shadow);
 
   const seen = new Set();
-  let visibleImageCount = 0;
   next.customLayers = (Array.isArray(raw.customLayers) ? raw.customLayers : [])
     .slice(0, MAX_CUSTOM_LAYERS)
     .map(normalizeCustomLayer)
@@ -416,17 +415,29 @@ function normalizeDesignState(value) {
       if (!layer || seen.has(layer.id)) return false;
       seen.add(layer.id);
       return true;
-    })
-    .map((layer) => {
-      if (layer.type !== 'image' || !layer.src || layer.hidden) return layer;
-      visibleImageCount += 1;
-      if (visibleImageCount <= MAX_VISIBLE_IMAGE_LAYERS) return layer;
-      return { ...layer, hidden: true };
     });
   next.layerOrder = normalizeLayerOrder({
     ...next,
     layerOrder: Array.isArray(raw.layerOrder) ? raw.layerOrder : DEFAULTS.layerOrder
   });
+
+  const layerById = new Map(next.customLayers.map((layer) => [layer.id, layer]));
+  const visibleImageIdsTopDown = next.layerOrder
+    .slice()
+    .reverse()
+    .filter((id) => {
+      const layer = layerById.get(id);
+      return Boolean(layer?.type === 'image' && layer.src && !layer.hidden);
+    });
+
+  if (visibleImageIdsTopDown.length > MAX_VISIBLE_IMAGE_LAYERS) {
+    const keepVisible = new Set(visibleImageIdsTopDown.slice(0, MAX_VISIBLE_IMAGE_LAYERS));
+    next.customLayers = next.customLayers.map((layer) =>
+      layer.type === 'image' && layer.src && !layer.hidden && !keepVisible.has(layer.id)
+        ? { ...layer, hidden: true }
+        : layer
+    );
+  }
 
   return next;
 }
