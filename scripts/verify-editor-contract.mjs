@@ -22,6 +22,7 @@ const pageChecks = [
   [/if \(!hydrated\) return undefined;/, 'autosave waits for hydration'],
   [/function pointInRotatedBounds\(/, 'rotated geometry hit testing exists'],
   [/function pointInRotatedEllipse\(/, 'ellipse layers use true ellipse hit testing'],
+  [/function pointInRotatedRoundedRect\(/, 'rounded shape hit testing follows rendered corners'],
   [/const CONTACTLESS_BOUNDS = \{/, 'contactless selection uses rendered symbol bounds'],
   [/function customLayerSelectionStyle\(/, 'selection outlines use object geometry'],
   [/loadedImageLayerSourceKey === imageLayerSourceKey/, 'image layers are source-key gated'],
