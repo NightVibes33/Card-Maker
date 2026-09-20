@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { IMAGE_PROXY_VERSION } from '../../lib/imagePolicy';
 
 const ORIGIN = 'https://cucucovers.com';
 const DEFAULT_COLLECTION = 'all-card-covers';
@@ -63,7 +64,9 @@ function normalizeImageUrl(raw) {
 }
 
 function imageProxy(url, width = 0) {
-  return '/api/image?url=' + encodeURIComponent(url) + (width ? '&w=' + width : '');
+  return '/api/image?url=' + encodeURIComponent(url) +
+    (width ? '&w=' + width : '') +
+    '&v=' + encodeURIComponent(IMAGE_PROXY_VERSION);
 }
 
 function assetScore(raw, image = {}) {
