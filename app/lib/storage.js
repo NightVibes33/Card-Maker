@@ -29,12 +29,14 @@ function importMetadata(value = {}) {
   const id = truncateMetadataText(value.id, 160);
   const name = truncateMetadataText(value.name, 160);
   const type = truncateMetadataText(value.type, 80);
+  const rawCreatedAt = Number(value.createdAt);
+  const createdAt = Number.isFinite(rawCreatedAt) ? rawCreatedAt : Date.now();
 
   return {
     id,
     name: name || 'Imported image',
     type: type || 'image/*',
-    createdAt: Number(value.createdAt || Date.now())
+    createdAt
   };
 }
 const ART_CACHE = 'card-studio-art-v5';
