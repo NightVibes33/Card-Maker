@@ -1596,7 +1596,11 @@ function plausibleImageDimensions(width, height) {
 }
 
 function svgNumericLength(tag, name) {
-  const match = tag.match(new RegExp('\\b' + name + '\\s*=\\s*["\\']\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(?:px)?\\s*["\\']', 'i'));
+  const pattern =
+    "\\b" +
+    name +
+    "\\s*=\\s*[\\\"']\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(?:px)?\\s*[\\\"']";
+  const match = tag.match(new RegExp(pattern, 'i'));
   return match ? Number(match[1]) : 0;
 }
 
