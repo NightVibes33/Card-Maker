@@ -540,7 +540,7 @@ export default function Page() {
   const [source, setSource] = useState('');
   const [cucuItems, setCucuItems] = useState([]);
   const [cucuPage, setCucuPage] = useState(0);
-  const [cucuTotal, setCucuTotal] = useState(2199);
+  const [cucuTotal, setCucuTotal] = useState(2225);
   const [cucuHasMore, setCucuHasMore] = useState(true);
   const [cucuLoading, setCucuLoading] = useState(false);
   const canvasRef = useRef(null);
@@ -810,7 +810,7 @@ export default function Page() {
       if (!response.ok) throw new Error(json.error || 'CUCU catalog failed');
 
       const rawList = Array.isArray(json.results) ? json.results : [];
-      setCucuTotal(Number(json.total) || 2199);
+      setCucuTotal(Number(json.total) || 2225);
       setCucuHasMore(Boolean(json.hasMore));
 
       setMessage('Checking CUCU artwork…');
