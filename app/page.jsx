@@ -3313,7 +3313,7 @@ export default function Page() {
 
       const layer = customLayerMap.get(stackId);
       if (!layer || layer.hidden || Number(layer.opacity ?? 1) <= 0.01) continue;
-      if (layer.type === 'text' && String(layer.text ?? '').length === 0) continue;
+      if (layer.type === 'text' && !String(layer.text ?? '').trim()) continue;
       const bounds = customLayerBounds(
         layer,
         loadedImageLayerSourceKey === imageLayerSourceKey ? layerImages[layer.id] : null
@@ -3736,6 +3736,7 @@ export default function Page() {
           onPointerMove={previewMode === 'flat' ? pointerMove : undefined}
           onPointerUp={previewMode === 'flat' ? pointerUp : undefined}
           onPointerCancel={previewMode === 'flat' ? pointerUp : undefined}
+          onLostPointerCapture={previewMode === 'flat' ? pointerUp : undefined}
           onClick={previewMode === 'physical' ? () => {
             setPreviewMode('flat');
             setMessage('Flat preview enabled for editing');
