@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import sharp from 'sharp';
 
+export const runtime = 'nodejs';
+
 const ALLOWED_HOSTS = new Set([
   'cdn.shopify.com',
   'cucucovers.com',
