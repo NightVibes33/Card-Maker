@@ -2295,10 +2295,15 @@ export default function Page() {
         try {
           const storedRecent = JSON.parse(localStorage.getItem('aircard-recent-artwork-v1') || '[]');
           if (Array.isArray(storedRecent)) {
+            const seenRecentIds = new Set();
             setRecent(
               storedRecent
                 .map(normalizeStoredArtworkItem)
-                .filter((item) => item?.id)
+                .filter((item) => {
+                  if (!item?.id || seenRecentIds.has(item.id)) return false;
+                  seenRecentIds.add(item.id);
+                  return true;
+                })
                 .slice(0, 20)
             );
           }
