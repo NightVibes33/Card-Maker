@@ -67,6 +67,8 @@ const pageChecks = [
   [/Finish the image import before exporting\./, 'PNG exports do not race image imports'],
   [/const presetImportGenerationRef = useRef\(0\)/, 'preset imports use a generation token'],
   [/function invalidatePendingPresetImport\(\)/, 'newer card actions can invalidate stale preset imports'],
+  [/Finish cleaning imported images before editing\./, 'editor mutations are blocked during destructive import cleanup'],
+  [/className="cleanupShield"/, 'cleanup presents an interaction shield while deleting blobs'],
   [/if \(presetImportActiveRef\.current\) \{[\s\S]{0,120}presetImportGenerationRef\.current \+= 1;/, 'editor edits invalidate pending preset imports'],
   [/ensureCurrentPresetImport\(\);[\s\S]{0,100}presetImportActiveRef\.current = false;[\s\S]{0,100}patch\(\{ \.\.\.DEFAULTS, \.\.\.imported \}\)/, 'preset final apply does not self-cancel'],
   [/storedDraft = await dbGet\('kv', 'draft'\)/, 'cleanup protects IndexedDB autosave assets'],
@@ -142,6 +144,11 @@ requireMatch(
   css,
   /\.physicalChipReflection\{[^}]*transform:rotate\(var\(--chip-rotation,0deg\)\)/s,
   'physical chip reflection keeps its rotation when motion animation is disabled'
+);
+requireMatch(
+  css,
+  /\.cleanupShield\{[^}]*position:fixed;[^}]*z-index:120;[^}]*inset:0;/s,
+  'cleanup shield covers and blocks the editor during destructive maintenance'
 );
 
 requireMatch(sw, /\[ART_CACHE\]:\s*40/, 'full artwork cache is bounded');
