@@ -173,9 +173,19 @@ async function fetchMicrolinkProductAnchors(target) {
   });
 
   const json = await response.json().catch(() => ({}));
-  const anchors = json?.data?.products;
+  const raw = json?.data?.products;
+  const anchors =
+    Array.isArray(raw) ? raw :
+    Array.isArray(raw?.value) ? raw.value :
+    Array.isArray(raw?.data) ? raw.data :
+    Array.isArray(raw?.items) ? raw.items :
+    [];
 
-  if (!response.ok || json.status !== 'success' || !Array.isArray(anchors)) {
+  if (!response.ok || json.status !== 'success' || !anchors.length) {
+    console.log(
+      'Microlink products shape:',
+      JSON.stringify(raw)?.slice(0, 1200) || String(raw)
+    );
     throw new Error(
       'Microlink failed for ' + target + ': ' +
       (json?.message || json?.status || response.status)
