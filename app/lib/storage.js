@@ -1,5 +1,7 @@
 'use client';
 
+import { parseAllowedRemoteImageUrl } from './imagePolicy';
+
 const DB_NAME = 'aircard-studio-v2';
 const DB_VERSION = 2;
 const STORES = ['kv', 'favorites', 'projects', 'imports', 'importMeta', 'exports'];
@@ -240,13 +242,27 @@ export async function dbGetImportMetadata() {
 }
 
 export async function cacheArtwork(url) {
-  if (!url || typeof caches === 'undefined') return false;
+  if (!url || typeof caches === 'undefined' || typeof window === 'undefined') return false;
   try {
     let requestedWidth = 0;
+    let parsed;
     try {
-      const parsed = new URL(url, window.location.origin);
-      requestedWidth = Number(parsed.searchParams.get('w') || 0);
-    } catch {}
+      parsed = new URL(url, window.location.origin);
+    } catch {
+      return false;
+    }
+
+    if (
+      parsed.origin !== window.location.origin ||
+      parsed.pathname !== '/api/image'
+    ) {
+      return false;
+    }
+
+    const upstream = parsed.searchParams.get('url');
+    if (!upstream || !parseAllowedRemoteImageUrl(upstream)) return false;
+
+    requestedWidth = Number(parsed.searchParams.get('w') || 0);
 
     const isThumbnail = requestedWidth > 0 && requestedWidth <= 800;
     const cacheName = isThumbnail ? THUMB_CACHE : ART_CACHE;
