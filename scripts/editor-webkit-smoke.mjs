@@ -150,6 +150,17 @@ try {
     }, value);
   }
 
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  const earlyChipSwitch = page.getByRole('switch', { name: 'EMV Chip', exact: true });
+  const earlyContactlessSwitch = page.getByRole('switch', { name: 'Contactless', exact: true });
+  const earlyMaskedNumberSwitch = page.getByRole('switch', { name: 'Masked Number', exact: true });
+  if ((await earlyChipSwitch.getAttribute('aria-checked')) === 'true') await earlyChipSwitch.click();
+  if ((await earlyContactlessSwitch.getAttribute('aria-checked')) === 'true') await earlyContactlessSwitch.click();
+  if ((await earlyMaskedNumberSwitch.getAttribute('aria-checked')) === 'false') await earlyMaskedNumberSwitch.click();
+  assert.equal(await earlyChipSwitch.getAttribute('aria-checked'), 'false', 'precondition: EMV chip must be disabled');
+  assert.equal(await earlyContactlessSwitch.getAttribute('aria-checked'), 'false', 'precondition: Contactless must be disabled');
+  assert.equal(await earlyMaskedNumberSwitch.getAttribute('aria-checked'), 'true', 'precondition: Masked Number must be enabled');
+
   await page.getByRole('tab', { name: 'Discover', exact: true }).click();
   const earlyLibrarySkin = page.getByRole('button', { name: 'Use WebKit Library Skin', exact: true }).first();
   await earlyLibrarySkin.waitFor({ state: 'visible', timeout: 15000 });
@@ -246,6 +257,21 @@ try {
     await page.getByLabel('Text color').inputValue(),
     '#ffffff',
     'main Card Library import must restore the original card text color'
+  );
+  assert.equal(
+    await page.getByRole('switch', { name: 'EMV Chip', exact: true }).getAttribute('aria-checked'),
+    'true',
+    'main Card Library import must restore EMV Chip to enabled'
+  );
+  assert.equal(
+    await page.getByRole('switch', { name: 'Contactless', exact: true }).getAttribute('aria-checked'),
+    'true',
+    'main Card Library import must restore Contactless to enabled'
+  );
+  assert.equal(
+    await page.getByRole('switch', { name: 'Masked Number', exact: true }).getAttribute('aria-checked'),
+    'false',
+    'main Card Library import must restore Masked Number to disabled'
   );
 
   await page.getByRole('button', { name: /^EMV Chip Built-in hardware /i }).click();
