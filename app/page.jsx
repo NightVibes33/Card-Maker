@@ -2904,11 +2904,19 @@ export default function Page() {
       if (imported.background?.startsWith('idb://imports/')) {
         const oldId = imported.background.slice('idb://imports/'.length);
         imported.background = idMap[oldId] ? 'idb://imports/' + idMap[oldId] : '';
+      } else if (imported.background && !String(imported.background).startsWith('/api/image?')) {
+        imported.background = '';
       }
+
       imported.customLayers = (Array.isArray(imported.customLayers) ? imported.customLayers : []).map((layer) => {
-        if (!layer?.src?.startsWith('idb://imports/')) return layer;
-        const oldId = layer.src.slice('idb://imports/'.length);
-        return { ...layer, src: idMap[oldId] ? 'idb://imports/' + idMap[oldId] : '' };
+        if (!layer || layer.type !== 'image') return layer;
+        const src = String(layer.src || '');
+        if (src.startsWith('idb://imports/')) {
+          const oldId = src.slice('idb://imports/'.length);
+          return { ...layer, src: idMap[oldId] ? 'idb://imports/' + idMap[oldId] : '' };
+        }
+        if (src && !src.startsWith('/api/image?')) return { ...layer, src: '' };
+        return layer;
       });
 
       patch({ ...DEFAULTS, ...imported });
