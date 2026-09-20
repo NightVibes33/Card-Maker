@@ -5,7 +5,7 @@ import * as cheerio from 'cheerio';
 const ORIGIN = 'https://blitzcovers.com';
 const COLLECTION = '/collections/credit-card-cover';
 const PAGE_COUNT = 1;
-const PROXY = 'https://api.allorigins.win/raw?url=';
+const PROXY = 'https://api.allorigins.win/raw?url='; // one-shot snapshot proxy
 
 function cleanText(value = '') {
   return String(value).replace(/\s+/g, ' ').trim();
