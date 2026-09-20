@@ -81,6 +81,8 @@ const pageChecks = [
   [/const referencedPresetAssetIds = new Set\(\)/, 'preset import tracks only referenced embedded assets'],
   [/Preset is missing a referenced image asset/, 'preset import rejects missing referenced image blobs'],
   [/Undo returns to your previous card/, 'opening a saved project remains reversible'],
+  [/const undo = useCallback\(\(\) => \{[\s\S]{0,260}invalidatePendingImageImport\(\);[\s\S]{0,120}invalidatePendingPresetImport\(\);/, 'Undo cancels in-flight image and preset imports'],
+  [/const redo = useCallback\(\(\) => \{[\s\S]{0,260}invalidatePendingImageImport\(\);[\s\S]{0,120}invalidatePendingPresetImport\(\);/, 'Redo cancels in-flight image and preset imports'],
   [/const MAX_VISIBLE_IMAGE_LAYERS = 12;/, 'visible image layers have an iPhone memory cap'],
   [/name: safeDisplayText\(file\.name, 'Imported image', 160\)/, 'background import metadata is bounded before persistence'],
   [/name: safeDisplayText\(file\.name, 'Image layer', 160\)/, 'image-layer import metadata is bounded before persistence'],
