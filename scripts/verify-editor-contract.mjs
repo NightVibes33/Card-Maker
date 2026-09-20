@@ -23,6 +23,8 @@ const pageChecks = [
   [/draftReadFailed = true/, 'draft read failures are tracked separately from an empty draft'],
   [/setSaveStatus\('Autosave paused'\)/, 'unsafe draft hydration pauses autosave instead of overwriting storage'],
   [/function pointInRotatedBounds\(/, 'rotated geometry hit testing exists'],
+  [/const localPadding = Number\(padding \|\| 0\) \/ safeScale;/, 'transformed hit padding remains scale-independent'],
+  [/const hitPadding = Math\.max\(14, \(22 \* OUT_W\) \/ Math\.max\(1, rect\.width\)\);/, 'canvas hit padding tracks a true iPhone-sized touch target'],
   [/function pointInRotatedEllipse\(/, 'ellipse layers use true ellipse hit testing'],
   [/function pointInRotatedRoundedRect\(/, 'rounded shape hit testing follows rendered corners'],
   [/const CONTACTLESS_BOUNDS = \{/, 'contactless selection uses rendered symbol bounds'],
