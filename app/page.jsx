@@ -1895,6 +1895,7 @@ export default function Page() {
   const [cucuLoading, setCucuLoading] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [hydrated, setHydrated] = useState(false);
+  const [autosaveReady, setAutosaveReady] = useState(false);
   const [layerImages, setLayerImages] = useState({});
   const [loadedImageLayerSourceKey, setLoadedImageLayerSourceKey] = useState('[]');
   const [backgroundLoadError, setBackgroundLoadError] = useState('');
@@ -2085,9 +2086,15 @@ export default function Page() {
     let reloadGuardTimer = 0;
 
     async function hydrate() {
+      let autosaveSafe = false;
+      let draftReadFailed = false;
+
       try {
         const [draft, storedFavorites, storedProjects, storedImports, storedExports] = await Promise.all([
-          dbGet('kv', 'draft').catch(() => null),
+          dbGet('kv', 'draft').catch(() => {
+            draftReadFailed = true;
+            return null;
+          }),
           dbGetAll('favorites').catch(() => []),
           dbGetAll('projects').catch(() => []),
           dbGetImportMetadata().catch(() => []),
@@ -2096,26 +2103,28 @@ export default function Page() {
 
         if (cancelled) return;
 
-        if (designRef.current === startupDesign) {
-          let localDraft = null;
-          let localUpdatedAt = 0;
+        let localDraft = null;
+        let localUpdatedAt = 0;
 
-          try {
-            const legacy = localStorage.getItem('aircard-sticker-fvp-v3');
-            localUpdatedAt = Number(
-              localStorage.getItem('aircard-sticker-fvp-v3-updated-at') || 0
-            );
-            if (legacy) {
-              const parsed = JSON.parse(legacy);
-              if (parsed && typeof parsed === 'object') localDraft = parsed;
-            }
-          } catch {
-            try {
-              localStorage.removeItem('aircard-sticker-fvp-v3');
-              localStorage.removeItem('aircard-sticker-fvp-v3-updated-at');
-            } catch {}
+        try {
+          const legacy = localStorage.getItem('aircard-sticker-fvp-v3');
+          localUpdatedAt = Number(
+            localStorage.getItem('aircard-sticker-fvp-v3-updated-at') || 0
+          );
+          if (legacy) {
+            const parsed = JSON.parse(legacy);
+            if (parsed && typeof parsed === 'object') localDraft = parsed;
           }
+        } catch {
+          try {
+            localStorage.removeItem('aircard-sticker-fvp-v3');
+            localStorage.removeItem('aircard-sticker-fvp-v3-updated-at');
+          } catch {}
+        }
 
+        autosaveSafe = !draftReadFailed || Boolean(localDraft);
+
+        if (designRef.current === startupDesign) {
           const indexedDraft =
             draft?.design && typeof draft.design === 'object'
               ? draft.design
@@ -2219,6 +2228,11 @@ export default function Page() {
           controllerChangeHandler = async () => {
             if (controllerReloadInFlight || cancelled) return;
 
+            if (!autosaveSafe) {
+              setMessage('Update ready, but draft storage could not be read safely. Reload manually after storage recovers.');
+              return;
+            }
+
             if (!hasServiceWorkerController) {
               hasServiceWorkerController = true;
               return;
@@ -2280,7 +2294,14 @@ export default function Page() {
       } catch {
         setMessage('Local library could not fully load');
       } finally {
-        if (!cancelled) setHydrated(true);
+        if (!cancelled) {
+          setHydrated(true);
+          setAutosaveReady(autosaveSafe);
+          if (!autosaveSafe) {
+            setSaveStatus('Autosave paused');
+            setMessage('Draft storage could not be read safely. Autosave is paused to protect existing work.');
+          }
+        }
       }
     }
 
@@ -2303,7 +2324,7 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return undefined;
+    if (!hydrated || !autosaveReady) return undefined;
 
     setSaveStatus('Editing…');
     const timer = setTimeout(async () => {
@@ -2313,7 +2334,7 @@ export default function Page() {
     }, 420);
 
     return () => clearTimeout(timer);
-  }, [design, hydrated, persistDraftSnapshot]);
+  }, [autosaveReady, design, hydrated, persistDraftSnapshot]);
 
   useEffect(() => {
     try {
