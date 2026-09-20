@@ -1527,9 +1527,139 @@ export default function Page() {
       } else if (layer.type === 'image') {
         const layerImage = layerImages[layer.id];
         if (layerImage) {
-          const w = clamp(Number(layer.width || 320), 20, 1300);
-          const h = w / Math.max(0.1, layerImage.width / layerImage.height);
-          ctx.drawImage(layerImage, -w / 2, -h / 2, w, h);
+          const settings = { ...IMAGE_LAYER_DEFAULTS, ...(layer.adjustments || {}) };
+          const crop = layer.crop;
+          const sx = crop ? clamp(crop.x, 0, 1) * layerImage.width : 0;
+          const sy = crop ? clamp(crop.y, 0, 1) * layerImage.height : 0;
+          const sw = crop ? clamp(crop.w, 0.01, 1) * layerImage.width : layerImage.width;
+          const sh = crop ? clamp(crop.h, 0.01, 1) * layerImage.height : layerImage.height;
+          const ratio = sw / Math.max(1, sh);
+          const w = clamp(Number(layer.width || 640), 20, 1800);
+          const h = w / Math.max(0.1, ratio);
+          const exposureFactor = original ? 1 : Math.pow(2, Number(settings.exposure || 0));
+          const brightness = original ? 1 : clamp(Number(settings.brightness || 1) * exposureFactor, 0.2, 3);
+          const saturation = original ? 1 : clamp(Number(settings.saturation ?? 1), 0, 3);
+          const sharpBoost = original ? 0 : Math.max(0, Number(settings.sharpness || 0));
+          const contrast = original
+            ? 1
+            : clamp(Number(settings.contrast || 1) + sharpBoost * 0.22, 0.3, 2.5);
+          const blur = original
+            ? 0
+            : Math.max(0, Number(settings.blur || 0) + Math.max(0, -Number(settings.sharpness || 0)) * 0.09);
+
+          ctx.filter =
+            'brightness(' + brightness + ')' +
+            ' saturate(' + saturation + ')' +
+            ' contrast(' + contrast + ')' +
+            ' blur(' + blur * 7 + 'px)';
+          ctx.drawImage(layerImage, sx, sy, sw, sh, -w / 2, -h / 2, w, h);
+          ctx.filter = 'none';
+
+          if (!original) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(-w / 2, -h / 2, w, h);
+            ctx.clip();
+
+            const shadows = Number(settings.shadows || 0);
+            if (shadows !== 0) {
+              ctx.save();
+              ctx.globalCompositeOperation = shadows > 0 ? 'screen' : 'multiply';
+              ctx.globalAlpha = Math.abs(shadows) * 0.22;
+              ctx.fillStyle = shadows > 0 ? '#6f7890' : '#10141c';
+              ctx.fillRect(-w / 2, -h / 2, w, h);
+              ctx.restore();
+            }
+
+            const highlights = Number(settings.highlights || 0);
+            if (highlights !== 0) {
+              ctx.save();
+              ctx.globalCompositeOperation = highlights > 0 ? 'screen' : 'multiply';
+              ctx.globalAlpha = Math.abs(highlights) * 0.16;
+              ctx.fillStyle = highlights > 0 ? '#fff7ec' : '#7d8794';
+              ctx.fillRect(-w / 2, -h / 2, w, h);
+              ctx.restore();
+            }
+
+            const temperature = Number(settings.temperature || 0);
+            if (temperature !== 0) {
+              ctx.save();
+              ctx.globalCompositeOperation = 'soft-light';
+              ctx.globalAlpha = Math.abs(temperature) * 0.24;
+              ctx.fillStyle = temperature > 0 ? '#ff8a3d' : '#438cff';
+              ctx.fillRect(-w / 2, -h / 2, w, h);
+              ctx.restore();
+            }
+
+            const layerTint = Number(settings.tint || 0);
+            if (layerTint !== 0) {
+              ctx.save();
+              ctx.globalCompositeOperation = 'soft-light';
+              ctx.globalAlpha = Math.abs(layerTint) * 0.2;
+              ctx.fillStyle = layerTint > 0 ? '#d34cff' : '#38d887';
+              ctx.fillRect(-w / 2, -h / 2, w, h);
+              ctx.restore();
+            }
+
+            if (Number(settings.overlay || 0) > 0) {
+              const overlay = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+              overlay.addColorStop(0, 'rgba(0,0,0,' + Number(settings.overlay) * 0.55 + ')');
+              overlay.addColorStop(0.55, 'rgba(0,0,0,0)');
+              overlay.addColorStop(1, 'rgba(0,0,0,' + Number(settings.overlay) + ')');
+              ctx.fillStyle = overlay;
+              ctx.fillRect(-w / 2, -h / 2, w, h);
+            }
+
+            if (Number(settings.vignette || 0) > 0) {
+              const vignette = ctx.createRadialGradient(0, 0, Math.min(w, h) * 0.14, 0, 0, Math.max(w, h) * 0.66);
+              vignette.addColorStop(0, 'rgba(0,0,0,0)');
+              vignette.addColorStop(1, 'rgba(0,0,0,' + Number(settings.vignette) + ')');
+              ctx.fillStyle = vignette;
+              ctx.fillRect(-w / 2, -h / 2, w, h);
+            }
+
+            if (Number(settings.gloss || 0) > 0) {
+              const gloss = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+              gloss.addColorStop(0, 'rgba(255,255,255,' + Number(settings.gloss) * 0.42 + ')');
+              gloss.addColorStop(0.22, 'rgba(255,255,255,' + Number(settings.gloss) * 0.08 + ')');
+              gloss.addColorStop(0.5, 'rgba(255,255,255,0)');
+              ctx.fillStyle = gloss;
+              ctx.fillRect(-w / 2, -h / 2, w, h);
+            }
+
+            if (Number(settings.grain || 0) > 0) {
+              ctx.save();
+              ctx.globalAlpha = Number(settings.grain);
+              for (let i = 0; i < 900; i += 1) {
+                ctx.fillStyle = i % 3 ? '#000' : '#fff';
+                const gx = -w / 2 + ((i * 331) % Math.max(1, Math.floor(w)));
+                const gy = -h / 2 + ((i * 197) % Math.max(1, Math.floor(h)));
+                ctx.fillRect(gx, gy, 1.5, 1.5);
+              }
+              ctx.restore();
+            }
+
+            if (Number(settings.fade || 0) > 0) {
+              ctx.save();
+              ctx.globalCompositeOperation = 'screen';
+              ctx.globalAlpha = clamp(Number(settings.fade), 0, 1) * 0.34;
+              ctx.fillStyle = '#f6efe6';
+              ctx.fillRect(-w / 2, -h / 2, w, h);
+              ctx.restore();
+            }
+
+            if (Number(settings.effectTintStrength || 0) > 0) {
+              const [r, g, b] = hexToRgb(settings.effectTint || '#7b61ff');
+              ctx.save();
+              ctx.globalCompositeOperation = 'soft-light';
+              ctx.globalAlpha = clamp(Number(settings.effectTintStrength), 0, 1) * 0.52;
+              ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+              ctx.fillRect(-w / 2, -h / 2, w, h);
+              ctx.restore();
+            }
+
+            ctx.restore();
+          }
         }
       } else if (layer.type === 'chip') {
         drawChipLayerAtOrigin(ctx, layer.tone || 'gold');
