@@ -3789,8 +3789,32 @@ export default function Page() {
       return null;
     }
     setProjects((current) => [project, ...current]);
-    if (currentDesign.background.startsWith('/api/image?')) cacheArtwork(currentDesign.background);
-    setMessage(preview ? 'Saved to Library' : 'Saved to Library · preview unavailable');
+
+    const remoteArtwork = new Set();
+    if (currentDesign.background.startsWith('/api/image?')) {
+      remoteArtwork.add(currentDesign.background);
+    }
+    for (const layer of currentDesign.customLayers || []) {
+      if (layer?.type === 'image' && String(layer.src || '').startsWith('/api/image?')) {
+        remoteArtwork.add(layer.src);
+      }
+    }
+
+    let offlineCacheComplete = true;
+    if (remoteArtwork.size) {
+      const cacheResults = await Promise.all(
+        [...remoteArtwork].map((src) => cacheArtwork(src))
+      );
+      offlineCacheComplete = cacheResults.every(Boolean);
+    }
+
+    setMessage(
+      !preview
+        ? 'Saved to Library · preview unavailable'
+        : offlineCacheComplete
+          ? 'Saved to Library'
+          : 'Saved to Library · some remote art is not cached offline'
+    );
     return project;
   }
 
