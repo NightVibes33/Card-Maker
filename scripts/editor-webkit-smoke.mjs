@@ -12,6 +12,11 @@ const context = await browser.newContext({
   serviceWorkers: 'block',
   acceptDownloads: true
 });
+await context.addInitScript(() => {
+  try {
+    localStorage.setItem('aircard-install-dismissed-v2', '1');
+  } catch {}
+});
 const page = await context.newPage();
 const pageErrors = [];
 
@@ -478,6 +483,11 @@ const offlineContext = await browser.newContext({
   isMobile: true,
   hasTouch: true,
   serviceWorkers: 'allow'
+});
+await offlineContext.addInitScript(() => {
+  try {
+    localStorage.setItem('aircard-install-dismissed-v2', '1');
+  } catch {}
 });
 const offlinePage = await offlineContext.newPage();
 
