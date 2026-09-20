@@ -65,7 +65,7 @@ const pageChecks = [
   [/function textLayerLines\(/, 'multiline text is modeled explicitly'],
   [/function singleLineCardText\(/, 'built-in card text normalizes restored control characters'],
   [/const blockingAssetOperation = cleanupInProgress \|\| presetTransferInProgress;/, 'destructive asset transactions expose one editor-wide interaction lock'],
-  [/inert=\{blockingAssetOperation \? '' : undefined\}/, 'preset and cleanup transactions make the editor inert'],
+  [/inert=\{blockingAssetOperation \|\| undefined\}/, 'preset and cleanup transactions make the editor inert'],
   [/next\.numberText = singleLineCardText\(/, 'masked card number hydration uses single-line normalization'],
   [/next\.holderText = singleLineCardText\(/, 'card-holder hydration uses single-line normalization'],
   [/className="catalogArtworkFallback"/, 'failed catalog artwork has an in-app visual fallback'],
