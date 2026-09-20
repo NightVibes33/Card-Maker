@@ -945,6 +945,33 @@ try {
     'precondition: chip position must be dirty before main-library import'
   );
 
+  await page.getByRole('button', { name: 'Back to Artwork', exact: true }).click();
+  const dirtyArtworkValues = [
+    ['Artwork zoom', '1.8'],
+    ['Artwork horizontal position', '0.37'],
+    ['Artwork vertical position', '-0.22'],
+    ['Artwork rotation', '19']
+  ];
+  for (const [label, value] of dirtyArtworkValues) {
+    await page.getByLabel(label).evaluate((node, nextValue) => {
+      node.value = nextValue;
+      node.dispatchEvent(new Event('input', { bubbles: true }));
+      node.dispatchEvent(new Event('change', { bubbles: true }));
+    }, value);
+  }
+
+  await page.getByRole('tab', { name: 'Effects', exact: true }).click();
+  await page.getByLabel('Vignette intensity').evaluate((node) => {
+    node.value = '0.55';
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+    node.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  const dirtyContactless = page.getByRole('switch', { name: 'Contactless', exact: true });
+  if ((await dirtyContactless.getAttribute('aria-checked')) === 'true') await dirtyContactless.click();
+  const dirtyMaskedNumber = page.getByRole('switch', { name: 'Masked Number', exact: true });
+  if ((await dirtyMaskedNumber.getAttribute('aria-checked')) === 'false') await dirtyMaskedNumber.click();
+
   await page.getByRole('tab', { name: 'Discover', exact: true }).click();
   const mainLibrarySkin = page.getByRole('button', { name: 'Use WebKit Library Skin', exact: true }).first();
   await mainLibrarySkin.waitFor({ state: 'visible', timeout: 15000 });
@@ -958,6 +985,69 @@ try {
     true,
     'main Card Library selection must clear undo history from the previous project'
   );
+
+  const freshDraft = await page.evaluate(() => JSON.parse(localStorage.getItem('aircard-sticker-fvp-v3') || '{}'));
+  const exactDefaultState = {
+    gradient: 0,
+    fit: 'cover',
+    zoom: 1,
+    x: 0,
+    y: 0,
+    rotate: 0,
+    flipX: false,
+    exposure: 0,
+    brightness: 1,
+    saturation: 1,
+    contrast: 1,
+    highlights: 0,
+    shadows: 0,
+    temperature: 0,
+    tint: 0,
+    sharpness: 0,
+    blur: 0,
+    vignette: 0,
+    grain: 0,
+    gloss: 0,
+    overlay: 0,
+    fade: 0,
+    effectTint: '#7b61ff',
+    effectTintStrength: 0,
+    chip: true,
+    chipTone: 'gold',
+    chipX: 0.105,
+    chipY: 0.35,
+    chipScale: 1,
+    chipRotation: 0,
+    contactless: true,
+    contactlessX: 0.285,
+    contactlessY: 0.43,
+    contactlessScale: 1,
+    contactlessRotation: 0,
+    number: false,
+    numberText: '••••  ••••  ••••  4242',
+    holder: false,
+    holderText: 'CARD HOLDER',
+    expiry: false,
+    expiryText: '12/29',
+    badge: false,
+    badgeText: 'CARD',
+    textColor: '#ffffff',
+    shadow: true
+  };
+  for (const [key, expected] of Object.entries(exactDefaultState)) {
+    assert.deepEqual(
+      freshDraft[key],
+      expected,
+      `main Card Library import must hard-reset ${key} to the original default`
+    );
+  }
+  assert.deepEqual(freshDraft.customLayers, [], 'main Card Library import must clear every custom layer');
+  assert.deepEqual(
+    freshDraft.layerOrder,
+    ['builtin-chip', 'builtin-contactless', 'builtin-text'],
+    'main Card Library import must restore the original built-in layer order'
+  );
+  assert.ok(freshDraft.background, 'main Card Library import must keep only the newly selected artwork');
 
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
   assert.equal(
@@ -975,6 +1065,16 @@ try {
     await page.getByLabel('Text color').inputValue(),
     '#ffffff',
     'main Card Library selection must restore the default card text color'
+  );
+  assert.equal(
+    await page.getByRole('switch', { name: 'Contactless', exact: true }).getAttribute('aria-checked'),
+    'true',
+    'main Card Library selection must restore Contactless to enabled'
+  );
+  assert.equal(
+    await page.getByRole('switch', { name: 'Masked Number', exact: true }).getAttribute('aria-checked'),
+    'false',
+    'main Card Library selection must restore Masked Number to disabled'
   );
 
   await page.getByRole('button', { name: /^EMV Chip Built-in hardware /i }).click();
