@@ -639,7 +639,7 @@ function StoreCatalog({
       {!loading && !error && !items.length ? (
         <div className="stateCard">
           <strong>No card skins found</strong>
-          <span>Try another CUCU collection or search term.</span>
+          <span>Try another collection or search term.</span>
         </div>
       ) : null}
     </section>
@@ -1459,7 +1459,7 @@ export default function Page() {
 
     setCucuLoading(true);
     setCatalogError('');
-    setMessage(search ? 'Searching CUCU…' : 'Loading CUCU Covers…');
+    setMessage(search ? 'Searching card library…' : 'Loading card skins…');
 
     try {
       const params = new URLSearchParams({
@@ -1471,7 +1471,7 @@ export default function Page() {
 
       const response = await fetch('/api/cucu?' + params.toString());
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'CUCU catalog failed');
+      if (!response.ok) throw new Error(json.error || 'Card library failed');
 
       const rawList = Array.isArray(json.results) ? json.results : [];
       setCucuTotal(Number(json.total) || 0);
@@ -1502,7 +1502,7 @@ export default function Page() {
           : 'No usable card skins on this page'
       );
     } catch (error) {
-      const text = error?.message || 'CUCU catalog failed';
+      const text = error?.message || 'Card library failed';
       setCatalogError(text);
       setMessage(text);
     } finally {
@@ -2424,7 +2424,7 @@ export default function Page() {
     <main className="studio">
       <header className="largeTitleBar">
         <div>
-          <span className="kicker">AirCard</span>
+          <span className="kicker">Design Studio</span>
           <h1>Card Studio</h1>
         </div>
         <button type="button" className="navTextButton" onClick={reset}>New</button>
@@ -2443,7 +2443,7 @@ export default function Page() {
           <div className="tabScreen discoverScreen">
             <section className="discoverHero">
               <div>
-                <span className="eyebrow">CUCU Covers</span>
+                <span className="eyebrow">Card Library</span>
                 <h2>Discover a card skin</h2>
               </div>
               <button type="button" className="surpriseButton" onClick={surpriseMe}>Surprise Me</button>
@@ -2465,7 +2465,7 @@ export default function Page() {
               ) : null}
             </div>
 
-            <div className="categoryScroller discoverCategories" role="tablist" aria-label="CUCU collection">
+            <div className="categoryScroller discoverCategories" role="tablist" aria-label="Card skin collection">
               {CUCU_CATEGORIES.map(([value, label]) => (
                 <button
                   type="button"
@@ -2515,7 +2515,7 @@ export default function Page() {
             ) : null}
 
             <StoreCatalog
-              storeName="CUCU Covers"
+              storeName="Card Library"
               categoryLabel={cucuCategoryLabel}
               items={cucuItems}
               total={cucuTotal}
@@ -3097,7 +3097,7 @@ export default function Page() {
 
             <button type="button" className="secondaryAction bigAction" onClick={() => saveProject()}>Save Design to Library</button>
 
-            <p className="legalNote">Artwork rights remain with their respective owners. CUCU card-skin media is screened in-app for usable card artwork before export.</p>
+            <p className="legalNote">Artwork rights remain with their respective owners. Card-skin media is screened in-app for usable card artwork before export.</p>
           </div>
         )}
       </div>
