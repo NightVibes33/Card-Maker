@@ -112,8 +112,41 @@ async function checkCucuCatalog() {
   if ((Number(first.total) || 0) < 2000) {
     throw new Error('CUCU catalog total unexpectedly small: ' + first.total);
   }
-  if (first.source !== 'CUCU Covers · All Card Covers') {
+  if (first.source !== 'CUCU Covers · All Card Skins') {
     throw new Error('CUCU catalog source mismatch: ' + first.source);
+  }
+
+  const expectedCategories = [
+    'All Card Skins',
+    'Best Sellers',
+    'New Arrivals',
+    'Anime',
+    'Cars',
+    'Sports',
+    'Artistic',
+    'Cute & Kawaii',
+    'Pets',
+    'Classic Art',
+    'Funny',
+    'Memes',
+    'Retro & Nostalgic',
+    'Animals',
+    'Crypto'
+  ];
+
+  const categoryLabels = Array.isArray(first.categories)
+    ? first.categories.map((entry) => entry.label)
+    : [];
+
+  for (const label of expectedCategories) {
+    if (!categoryLabels.includes(label)) {
+      throw new Error('CUCU category missing from API: ' + label);
+    }
+  }
+
+  const catalogCache = firstResult.response.headers.get('cache-control') || '';
+  if (!/s-maxage=21600/.test(catalogCache)) {
+    throw new Error('CUCU catalog is not edge cached for 6h: ' + catalogCache);
   }
 
   const invalidFirst = first.results.find((item) =>
@@ -194,6 +227,10 @@ async function checkBlitzCatalog() {
     throw new Error('Blitz image proxy returned ' + imageResponse.status);
   }
   const type = imageResponse.headers.get('content-type') || '';
+  const blitzCache = imageResponse.headers.get('cdn-cache-control') || imageResponse.headers.get('cache-control') || '';
+  if (!/2592000|604800/.test(blitzCache)) {
+    throw new Error('Blitz image is not long-lived cached: ' + blitzCache);
+  }
   if (!type.startsWith('image/')) {
     throw new Error('Blitz image proxy returned ' + type);
   }
@@ -223,10 +260,27 @@ async function checkBlitzCatalog() {
   );
 }
 
+async function checkBrowseTaxonomy() {
+  const response = await fetch(base + '/');
+  if (!response.ok) throw new Error('Home page returned ' + response.status);
+  const html = await response.text();
+
+  for (const label of ['CUCU', 'Blitz', 'All Card Skins', 'Best Sellers', 'New Arrivals', 'Cute & Kawaii']) {
+    if (!html.includes(label)) throw new Error('Browse UI missing real source/category label: ' + label);
+  }
+
+  if (/Original ↗|Open the original|>Cartoon<|>TV</i.test(html)) {
+    throw new Error('Browse UI still contains fake taxonomy or outbound storefront controls');
+  }
+
+  console.log('PASS Browse taxonomy => CUCU + Blitz sources, real CUCU collections, no storefront redirects');
+}
+
 await check('Naruto', /naruto|konohagakure|akatsuki/i);
 await check('SpongeBob', /spongebob|bikini bottom|krusty/i);
 await check('Rick and Morty', /rick|morty|portal|meeseeks/i);
 await check('Wednesday', /wednesday/i);
+await checkBrowseTaxonomy();
 await checkBlitzCatalog();
 await checkCucuCatalog();
 console.log('CUCU + Blitz direct-card catalog smoke tests passed; live storefront search checks completed.');
