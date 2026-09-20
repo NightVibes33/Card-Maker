@@ -256,6 +256,17 @@ function normalizeCrop(crop, minSize = 0.1) {
   };
 }
 
+function cropsEqual(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    Math.abs(Number(a.x) - Number(b.x)) < 1e-9 &&
+    Math.abs(Number(a.y) - Number(b.y)) < 1e-9 &&
+    Math.abs(Number(a.w) - Number(b.w)) < 1e-9 &&
+    Math.abs(Number(a.h) - Number(b.h)) < 1e-9
+  );
+}
+
 function normalizeImageAdjustments(value) {
   const raw = value && typeof value === 'object' ? value : {};
   return {
@@ -2954,21 +2965,22 @@ export default function Page() {
       if (edge === 'top') top = Math.min(value, 0.9 - bottom);
       if (edge === 'bottom') bottom = Math.min(value, 0.9 - top);
 
-      return {
-        sourceCrop: {
-          x: left,
-          y: top,
-          w: Math.max(0.1, 1 - left - right),
-          h: Math.max(0.1, 1 - top - bottom)
-        }
+      const nextCrop = {
+        x: left,
+        y: top,
+        w: Math.max(0.1, 1 - left - right),
+        h: Math.max(0.1, 1 - top - bottom)
       };
+      return cropsEqual(crop, nextCrop) ? {} : { sourceCrop: nextCrop };
     }, true, 'crop:' + edge);
   }
 
   function updateLayerCropEdge(id, edge, rawValue) {
     const value = clamp(Number(rawValue), 0, 0.9);
-    patch((current) => ({
-      customLayers: (current.customLayers || []).map((layer) => {
+    patch((current) => {
+      const layers = current.customLayers || [];
+      let changed = false;
+      const nextLayers = layers.map((layer) => {
         if (layer.id !== id || layer.type !== 'image' || layer.locked) return layer;
         const crop = layer.crop || { x: 0, y: 0, w: 1, h: 1 };
         let left = clamp(crop.x, 0, 0.9);
@@ -2981,17 +2993,20 @@ export default function Page() {
         if (edge === 'top') top = Math.min(value, 0.9 - bottom);
         if (edge === 'bottom') bottom = Math.min(value, 0.9 - top);
 
-        return {
-          ...layer,
-          crop: {
-            x: left,
-            y: top,
-            w: Math.max(0.1, 1 - left - right),
-            h: Math.max(0.1, 1 - top - bottom)
-          }
+        const nextCrop = {
+          x: left,
+          y: top,
+          w: Math.max(0.1, 1 - left - right),
+          h: Math.max(0.1, 1 - top - bottom)
         };
-      })
-    }), true, 'layer-crop:' + id + ':' + edge);
+        if (cropsEqual(crop, nextCrop)) return layer;
+
+        changed = true;
+        return { ...layer, crop: nextCrop };
+      });
+
+      return changed ? { customLayers: nextLayers } : {};
+    }, true, 'layer-crop:' + id + ':' + edge);
   }
 
   function addTextLayer() {
@@ -3255,14 +3270,21 @@ export default function Page() {
       const layer = (current.customLayers || []).find((entry) => entry.id === selectedElement);
       if (layer?.type === 'image') {
         if (layer.locked) return {};
+        const currentSettings = {
+          ...IMAGE_LAYER_DEFAULTS,
+          ...(layer.adjustments || {})
+        };
+        const deltaKeys = Object.keys(delta || {});
+        if (deltaKeys.every((keyName) => Object.is(currentSettings[keyName], delta[keyName]))) {
+          return {};
+        }
         return {
           customLayers: (current.customLayers || []).map((entry) =>
             entry.id === layer.id
               ? {
                   ...entry,
                   adjustments: {
-                    ...IMAGE_LAYER_DEFAULTS,
-                    ...(entry.adjustments || {}),
+                    ...currentSettings,
                     ...delta
                   }
                 }
