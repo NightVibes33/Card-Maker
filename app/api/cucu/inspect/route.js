@@ -18,6 +18,7 @@ const SAFE_IMAGE_TYPES = new Set([
   'image/gif'
 ]);
 const MAX_ANALYSIS_BYTES = 8 * 1024 * 1024;
+const MAX_ANALYSIS_PIXELS = 40_000_000;
 
 function allowed(url) {
   return (
@@ -156,13 +157,24 @@ export async function GET(request) {
     }
 
     const buffer = await readLimitedBody(response, MAX_ANALYSIS_BYTES);
-    const metadata = await sharp(buffer).metadata();
-    const naturalWidth = Number(metadata.width || 0);
-    const naturalHeight = Number(metadata.height || 0);
+    const metadata = await sharp(buffer, {
+      animated: false,
+      limitInputPixels: MAX_ANALYSIS_PIXELS
+    }).metadata();
+    const rawWidth = Number(metadata.width || 0);
+    const rawHeight = Number(metadata.height || 0);
+    const orientation = Number(metadata.orientation || 1);
+    const swapsAxes = orientation >= 5 && orientation <= 8;
+    const naturalWidth = swapsAxes ? rawHeight : rawWidth;
+    const naturalHeight = swapsAxes ? rawWidth : rawHeight;
     if (!naturalWidth || !naturalHeight) throw new Error('CUCU artwork dimensions unavailable');
 
     const naturalRatio = naturalWidth / naturalHeight;
-    const prepared = await sharp(buffer)
+    const prepared = await sharp(buffer, {
+      animated: false,
+      limitInputPixels: MAX_ANALYSIS_PIXELS
+    })
+      .rotate()
       .resize({ width: 128, height: 128, fit: 'inside', withoutEnlargement: true })
       .ensureAlpha()
       .raw()
