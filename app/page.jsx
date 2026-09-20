@@ -2424,7 +2424,6 @@ export default function Page() {
     <main className="studio">
       <header className="largeTitleBar">
         <div>
-          <span className="kicker">Design Studio</span>
           <h1>Card Studio</h1>
         </div>
         <button type="button" className="navTextButton" onClick={reset}>New</button>
