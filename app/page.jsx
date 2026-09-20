@@ -8,6 +8,7 @@ import {
   dbDelete,
   dbGet,
   dbGetAll,
+  dbGetImportMetadata,
   dbPut,
   makeId
 } from './lib/storage';
@@ -1521,6 +1522,15 @@ function isPersistableBackground(src = '') {
   return src.startsWith('/api/image?') || src.startsWith('idb://imports/');
 }
 
+function importListItem(asset = {}) {
+  return {
+    id: asset.id,
+    name: asset.name || 'Imported image',
+    type: asset.type || 'image/*',
+    createdAt: Number(asset.createdAt || Date.now())
+  };
+}
+
 function imageLayerSourceKeyForDesign(value) {
   return JSON.stringify(
     (value?.customLayers || [])
@@ -1709,7 +1719,7 @@ export default function Page() {
           dbGet('kv', 'draft').catch(() => null),
           dbGetAll('favorites').catch(() => []),
           dbGetAll('projects').catch(() => []),
-          dbGetAll('imports').catch(() => []),
+          dbGetImportMetadata().catch(() => []),
           dbGetAll('exports').catch(() => [])
         ]);
 
@@ -2679,7 +2689,7 @@ export default function Page() {
       setMessage('Could not save the imported image. Free some device storage and try again.');
       return;
     }
-    setImports((current) => [asset, ...current.filter((entry) => entry.id !== id)]);
+    setImports((current) => [importListItem(asset), ...current.filter((entry) => entry.id !== id)]);
 
     patch({
       background: 'idb://imports/' + id,
@@ -2744,7 +2754,7 @@ export default function Page() {
       setMessage('Could not save the image layer. Free some device storage and try again.');
       return;
     }
-    setImports((current) => [asset, ...current.filter((entry) => entry.id !== assetId)]);
+    setImports((current) => [importListItem(asset), ...current.filter((entry) => entry.id !== assetId)]);
     patch((current) => ({
       layerOrder: insertCustomLayerBelowHardware(current, layerId),
       customLayers: [
@@ -3361,7 +3371,7 @@ export default function Page() {
         return layer;
       });
 
-      const nextImports = await dbGetAll('imports');
+      const nextImports = await dbGetImportMetadata();
       patch({ ...DEFAULTS, ...imported });
       presetApplied = true;
       setSelectedElement('artwork');
