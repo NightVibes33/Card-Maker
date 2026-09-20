@@ -120,6 +120,34 @@ try {
     'Undo must restore the pre-drag shape position'
   );
 
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Layer horizontal position"]');
+    return input && Number(input.value) > 0.55;
+  });
+  assert.ok(
+    Number(await layerX.inputValue()) > 0.55,
+    'Redo must restore the dragged shape position'
+  );
+
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  const duplicateShape = page.getByRole('button', { name: 'Duplicate', exact: true });
+  await duplicateShape.click();
+  await page.waitForFunction(() => {
+    return [...document.querySelectorAll('button')].filter(
+      (node) => /^Shape shape /i.test(node.getAttribute('aria-label') || '')
+    ).length >= 2;
+  });
+
+  const deleteShape = page.getByRole('button', { name: 'Delete', exact: true });
+  await deleteShape.click();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.waitForFunction(() => {
+    return [...document.querySelectorAll('button')].filter(
+      (node) => /^Shape shape /i.test(node.getAttribute('aria-label') || '')
+    ).length >= 2;
+  });
+
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
   const imageInputs = page.locator('input[type="file"][accept="image/*"]');
   assert.ok(await imageInputs.count() >= 2, 'background and image-layer file inputs must exist');
