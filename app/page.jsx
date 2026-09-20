@@ -2214,7 +2214,7 @@ export default function Page() {
     const value = clamp(Number(rawValue), 0, 0.48);
     patch((current) => ({
       customLayers: (current.customLayers || []).map((layer) => {
-        if (layer.id !== id || layer.type !== 'image') return layer;
+        if (layer.id !== id || layer.type !== 'image' || layer.locked) return layer;
         const crop = layer.crop || { x: 0, y: 0, w: 1, h: 1 };
         let left = clamp(crop.x, 0, 0.9);
         let top = clamp(crop.y, 0, 0.9);
@@ -2351,6 +2351,7 @@ export default function Page() {
     patch((current) => ({
       customLayers: (current.customLayers || []).map((layer) => {
         if (layer.id !== id) return layer;
+        if (layer.locked && !Object.prototype.hasOwnProperty.call(delta || {}, 'locked')) return layer;
         const updated = { ...layer, ...delta };
 
         if (updated.type === 'shape') {
@@ -2426,6 +2427,7 @@ export default function Page() {
     patch((current) => {
       const layer = (current.customLayers || []).find((entry) => entry.id === selectedElement);
       if (layer?.type === 'image') {
+        if (layer.locked) return {};
         return {
           customLayers: (current.customLayers || []).map((entry) =>
             entry.id === layer.id
@@ -2966,6 +2968,7 @@ export default function Page() {
   const activeImageAvailable = selectedImageLayer
     ? Boolean(selectedImageLayer.src)
     : Boolean(design.background);
+  const activeImageEditable = activeImageAvailable && !Boolean(selectedImageLayer?.locked);
   const activeImageLabel = selectedImageLayer
     ? (selectedImageLayer.name || 'Image Layer')
     : 'Artwork';
@@ -3267,6 +3270,7 @@ export default function Page() {
                     <div className="cropControlBlock">
                       <SliderRow
                         label="Layer Crop Left"
+                        disabled={Boolean(selectedImageLayer.locked)}
                         value={selectedImageLayer.crop?.x || 0}
                         min={0}
                         max={0.48}
@@ -3276,6 +3280,7 @@ export default function Page() {
                       />
                       <SliderRow
                         label="Layer Crop Right"
+                        disabled={Boolean(selectedImageLayer.locked)}
                         value={selectedImageLayer.crop ? Math.max(0, 1 - selectedImageLayer.crop.x - selectedImageLayer.crop.w) : 0}
                         min={0}
                         max={0.48}
@@ -3285,6 +3290,7 @@ export default function Page() {
                       />
                       <SliderRow
                         label="Layer Crop Top"
+                        disabled={Boolean(selectedImageLayer.locked)}
                         value={selectedImageLayer.crop?.y || 0}
                         min={0}
                         max={0.48}
@@ -3294,6 +3300,7 @@ export default function Page() {
                       />
                       <SliderRow
                         label="Layer Crop Bottom"
+                        disabled={Boolean(selectedImageLayer.locked)}
                         value={selectedImageLayer.crop ? Math.max(0, 1 - selectedImageLayer.crop.y - selectedImageLayer.crop.h) : 0}
                         min={0}
                         max={0.48}
@@ -3305,6 +3312,7 @@ export default function Page() {
                     <button
                       type="button"
                       className="settingsResetButton"
+                      disabled={Boolean(selectedImageLayer.locked)}
                       onClick={() => updateLayer(selectedImageLayer.id, { crop: selectedImageLayer.originalCrop || null })}
                     >
                       Reset Layer Crop
@@ -3407,18 +3415,18 @@ export default function Page() {
                       {selectedLayer.type === 'image' ? (
                         <>
                           <div className="groupRow">
-                            <button type="button" className="iconTextButton" onClick={() => updateLayer(selectedLayer.id, { flipX: !selectedLayer.flipX })}>
+                            <button type="button" className="iconTextButton" disabled={Boolean(selectedLayer.locked)} onClick={() => updateLayer(selectedLayer.id, { flipX: !selectedLayer.flipX })}>
                               <span>{selectedLayer.flipX ? 'Unflip Image' : 'Flip Image Horizontally'}</span>
                             </button>
                           </div>
-                          <SliderRow label="Image Width" value={selectedLayer.width || 640} min={20} max={1800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
+                          <SliderRow label="Image Width" value={selectedLayer.width || 640} min={20} max={1800} step={1} disabled={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
                         </>
                       ) : null}
-                      <SliderRow label="Layer horizontal position" value={selectedLayer.x ?? 0.5} min={0} max={1} step={0.005} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateLayer(selectedLayer.id, { x: value })} />
-                      <SliderRow label="Layer vertical position" value={selectedLayer.y ?? 0.5} min={0} max={1} step={0.005} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateLayer(selectedLayer.id, { y: value })} />
-                      <SliderRow label="Layer scale" value={selectedLayer.scale || 1} min={0.1} max={6} step={0.01} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
-                      <SliderRow label="Layer rotation" value={selectedLayer.rotation || 0} min={-180} max={180} step={1} suffix="°" onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} />
-                      <button type="button" className="settingsResetButton" onClick={() => updateLayer(selectedLayer.id, { x: 0.5, y: 0.5, scale: 1, rotation: 0, flipX: false })}>Reset Layer Position</button>
+                      <SliderRow label="Layer horizontal position" value={selectedLayer.x ?? 0.5} min={0} max={1} step={0.005} disabled={Boolean(selectedLayer.locked)} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateLayer(selectedLayer.id, { x: value })} />
+                      <SliderRow label="Layer vertical position" value={selectedLayer.y ?? 0.5} min={0} max={1} step={0.005} disabled={Boolean(selectedLayer.locked)} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateLayer(selectedLayer.id, { y: value })} />
+                      <SliderRow label="Layer scale" value={selectedLayer.scale || 1} min={0.1} max={6} step={0.01} disabled={Boolean(selectedLayer.locked)} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
+                      <SliderRow label="Layer rotation" value={selectedLayer.rotation || 0} min={-180} max={180} step={1} suffix="°" disabled={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} />
+                      <button type="button" className="settingsResetButton" disabled={Boolean(selectedLayer.locked)} onClick={() => updateLayer(selectedLayer.id, { x: 0.5, y: 0.5, scale: 1, rotation: 0, flipX: false })}>Reset Layer Position</button>
                     </>
                   ) : null}
 
@@ -3480,23 +3488,23 @@ export default function Page() {
                   <h3 className="sectionLabel">PRESETS</h3>
                   <div className="presetScroller">
                     {Object.keys(ADJUSTMENT_PRESETS).map((name) => (
-                      <button type="button" key={name} disabled={!activeImageAvailable} onClick={() => applyAdjustmentPreset(name)}>{name}</button>
+                      <button type="button" key={name} disabled={!activeImageEditable} onClick={() => applyAdjustmentPreset(name)}>{name}</button>
                     ))}
                   </div>
                 </section>
 
                 <Group title={'IMAGE · ' + activeImageLabel}>
-                  <SliderRow label="Exposure" value={activeImageSettings.exposure} min={-1} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ exposure: value })} />
-                  <SliderRow label="Brightness" value={activeImageSettings.brightness} min={0.4} max={1.7} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ brightness: value })} />
-                  <SliderRow label="Contrast" value={activeImageSettings.contrast} min={0.45} max={1.8} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ contrast: value })} />
-                  <SliderRow label="Saturation" value={activeImageSettings.saturation} min={0} max={2.4} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ saturation: value })} />
-                  <SliderRow label="Highlights" value={activeImageSettings.highlights} min={-1} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ highlights: value })} />
-                  <SliderRow label="Shadows" value={activeImageSettings.shadows} min={-1} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ shadows: value })} />
-                  <SliderRow label="Temperature" value={activeImageSettings.temperature} min={-1} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ temperature: value })} />
-                  <SliderRow label="Tint" value={activeImageSettings.tint} min={-1} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ tint: value })} />
-                  <SliderRow label="Sharpness" value={activeImageSettings.sharpness} min={-1} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ sharpness: value })} />
-                  <SliderRow label="Blur" value={activeImageSettings.blur} min={0} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ blur: value })} />
-                  <button type="button" className="settingsResetButton" disabled={!activeImageAvailable} onClick={() => applyAdjustmentPreset('Original')}>Reset Adjustments</button>
+                  <SliderRow label="Exposure" value={activeImageSettings.exposure} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ exposure: value })} />
+                  <SliderRow label="Brightness" value={activeImageSettings.brightness} min={0.4} max={1.7} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ brightness: value })} />
+                  <SliderRow label="Contrast" value={activeImageSettings.contrast} min={0.45} max={1.8} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ contrast: value })} />
+                  <SliderRow label="Saturation" value={activeImageSettings.saturation} min={0} max={2.4} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ saturation: value })} />
+                  <SliderRow label="Highlights" value={activeImageSettings.highlights} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ highlights: value })} />
+                  <SliderRow label="Shadows" value={activeImageSettings.shadows} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ shadows: value })} />
+                  <SliderRow label="Temperature" value={activeImageSettings.temperature} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ temperature: value })} />
+                  <SliderRow label="Tint" value={activeImageSettings.tint} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ tint: value })} />
+                  <SliderRow label="Sharpness" value={activeImageSettings.sharpness} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ sharpness: value })} />
+                  <SliderRow label="Blur" value={activeImageSettings.blur} min={0} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ blur: value })} />
+                  <button type="button" className="settingsResetButton" disabled={!activeImageEditable} onClick={() => applyAdjustmentPreset('Original')}>Reset Adjustments</button>
                 </Group>
               </>
             ) : null}
@@ -3514,20 +3522,20 @@ export default function Page() {
                 </div>
 
                 <Group title={'EFFECTS · ' + activeImageLabel}>
-                  <SliderRow label="Vignette intensity" value={activeImageSettings.vignette} min={0} max={0.8} step={0.01} disabled={!activeImageAvailable} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patchImageTarget({ vignette: value })} />
-                  <SliderRow label="Grain" value={activeImageSettings.grain} min={0} max={0.22} step={0.005} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ grain: value })} />
-                  <SliderRow label="Gloss" value={activeImageSettings.gloss} min={0} max={0.8} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ gloss: value })} />
-                  <SliderRow label="Dark Overlay" value={activeImageSettings.overlay} min={0} max={0.75} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ overlay: value })} />
-                  <SliderRow label="Fade" value={activeImageSettings.fade} min={0} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ fade: value })} />
-                  <label className={'colorRow ' + (!activeImageAvailable ? 'disabledRow' : '')}>
+                  <SliderRow label="Vignette intensity" value={activeImageSettings.vignette} min={0} max={0.8} step={0.01} disabled={!activeImageEditable} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patchImageTarget({ vignette: value })} />
+                  <SliderRow label="Grain" value={activeImageSettings.grain} min={0} max={0.22} step={0.005} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ grain: value })} />
+                  <SliderRow label="Gloss" value={activeImageSettings.gloss} min={0} max={0.8} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ gloss: value })} />
+                  <SliderRow label="Dark Overlay" value={activeImageSettings.overlay} min={0} max={0.75} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ overlay: value })} />
+                  <SliderRow label="Fade" value={activeImageSettings.fade} min={0} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ fade: value })} />
+                  <label className={'colorRow ' + (!activeImageEditable ? 'disabledRow' : '')}>
                     <span>Color Tint</span>
-                    <input aria-label="Effect tint color" type="color" disabled={!activeImageAvailable} value={activeImageSettings.effectTint || '#7b61ff'} onChange={(event) => patchImageTarget({ effectTint: event.target.value })} />
+                    <input aria-label="Effect tint color" type="color" disabled={!activeImageEditable} value={activeImageSettings.effectTint || '#7b61ff'} onChange={(event) => patchImageTarget({ effectTint: event.target.value })} />
                   </label>
-                  <SliderRow label="Tint Strength" value={activeImageSettings.effectTintStrength} min={0} max={1} step={0.01} disabled={!activeImageAvailable} onChange={(value) => patchImageTarget({ effectTintStrength: value })} />
+                  <SliderRow label="Tint Strength" value={activeImageSettings.effectTintStrength} min={0} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ effectTintStrength: value })} />
                   <button
                     type="button"
                     className="settingsResetButton"
-                    disabled={!activeImageAvailable}
+                    disabled={!activeImageEditable}
                     onClick={() => patchImageTarget(
                       selectedImageLayer
                         ? { vignette: 0, grain: 0, gloss: 0, overlay: 0, fade: 0, effectTintStrength: 0 }
