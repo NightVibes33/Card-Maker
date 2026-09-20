@@ -4304,8 +4304,7 @@ export default function Page() {
       version: 2,
       app: 'AirCard Card Studio',
       exportedAt: new Date().toISOString(),
-      design: JSON.parse(JSON.stringify(currentDesign)),
-      assets: {}
+      design: JSON.parse(JSON.stringify(currentDesign))
     };
 
     const refs = new Set();
@@ -4318,6 +4317,7 @@ export default function Page() {
       }
     }
 
+    const assets = [];
     let embeddedBytes = 0;
     let estimatedEncodedBytes = 0;
 
@@ -4338,14 +4338,15 @@ export default function Page() {
         throw new Error('This design would create a preset that is too large to export safely');
       }
 
-      payload.assets[id] = {
+      assets.push({
+        id,
         name: asset.name,
         type: asset.type,
-        data: await blobToDataUrl(asset.blob)
-      };
+        blob: asset.blob
+      });
     }
 
-    return payload;
+    return { payload, assets };
   }
 
   async function exportPresetJson() {
@@ -4369,7 +4370,7 @@ export default function Page() {
     let anchor = null;
 
     try {
-      const payload = await serializePreset();
+      const { payload, assets } = await serializePreset();
       const parts = [
         '{"version":2,"app":',
         JSON.stringify(payload.app),
@@ -4381,18 +4382,19 @@ export default function Page() {
       ];
 
       let firstAsset = true;
-      for (const [id, asset] of Object.entries(payload.assets || {})) {
+      for (const asset of assets) {
         if (!firstAsset) parts.push(',');
         firstAsset = false;
+        const dataUrl = await blobToDataUrl(asset.blob);
         parts.push(
-          JSON.stringify(id),
+          JSON.stringify(asset.id),
           ':{"name":',
           JSON.stringify(asset.name || ''),
           ',"type":',
           JSON.stringify(asset.type || 'image/*'),
-          ',"data":"',
-          asset.data,
-          '"}'
+          ',"data":',
+          JSON.stringify(dataUrl),
+          '}'
         );
       }
       parts.push('}}');
