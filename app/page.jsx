@@ -49,6 +49,7 @@ const DEFAULTS = {
   background: '',
   backgroundLabel: 'Midnight',
   sourceCrop: null,
+  originalSourceCrop: null,
   gradient: 0,
   fit: 'cover',
   zoom: 1,
@@ -294,8 +295,11 @@ function drawContactless(ctx, d) {
   ctx.restore();
 }
 
-function SliderRow({ label, value, min, max, step, onChange, suffix = '', disabled = false }) {
+function SliderRow({ label, value, min, max, step, onChange, suffix = '', disabled = false, formatValue }) {
   const decimals = step >= 1 ? 0 : step < 0.01 ? 3 : 2;
+  const displayValue = formatValue
+    ? formatValue(Number(value))
+    : Number(value).toFixed(decimals) + suffix;
   const emit = (event) => {
     const next = clamp(Number(event.currentTarget.value), Number(min), Number(max));
     if (Number.isFinite(next)) onChange(next);
@@ -305,10 +309,11 @@ function SliderRow({ label, value, min, max, step, onChange, suffix = '', disabl
     <label className={'sliderRow ' + (disabled ? 'isDisabled' : '')}>
       <div className="rowHeader">
         <span>{label}</span>
-        <span className="rowValue">{Number(value).toFixed(decimals)}{suffix}</span>
+        <span className="rowValue">{displayValue}</span>
       </div>
       <input
         aria-label={label}
+        aria-valuetext={displayValue}
         type="range"
         value={value}
         min={min}
@@ -780,6 +785,7 @@ export default function Page() {
   const [favoriteIds, setFavoriteIds] = useState(new Set());
   const [favorites, setFavorites] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [projectName, setProjectName] = useState('');
   const [imports, setImports] = useState([]);
   const [exportHistory, setExportHistory] = useState([]);
   const [expertMode, setExpertMode] = useState(false);
@@ -870,7 +876,7 @@ export default function Page() {
 
   const rememberArtwork = useCallback((item) => {
     setRecent((current) => {
-      const next = [item, ...current.filter((entry) => entry.id !== item.id)].slice(0, 10);
+      const next = [item, ...current.filter((entry) => entry.id !== item.id)].slice(0, 20);
       try {
         localStorage.setItem('aircard-recent-artwork-v1', JSON.stringify(next));
       } catch {}
@@ -1266,7 +1272,13 @@ export default function Page() {
       if (layer.type === 'text') {
         const size = clamp(Number(layer.fontSize || 54), 10, 240);
         const weight = clamp(Number(layer.weight || 700), 100, 900);
-        ctx.font = weight + ' ' + size + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+        const fontFamily = {
+          system: '-apple-system, BlinkMacSystemFont, sans-serif',
+          rounded: 'ui-rounded, -apple-system, BlinkMacSystemFont, sans-serif',
+          serif: 'ui-serif, Georgia, serif',
+          mono: 'ui-monospace, SFMono-Regular, Menlo, monospace'
+        }[layer.fontFamily] || '-apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.font = weight + ' ' + size + 'px ' + fontFamily;
         ctx.fillStyle = layer.color || '#ffffff';
         ctx.textAlign = layer.align || 'center';
         ctx.shadowColor = layer.shadow ? 'rgba(0,0,0,.5)' : 'transparent';
@@ -1474,6 +1486,7 @@ export default function Page() {
       background: item.image,
       backgroundLabel: item.title,
       sourceCrop: item.sourceCrop || null,
+      originalSourceCrop: item.sourceCrop || null,
       zoom: item.sourceCrop ? 1 : 1.06,
       x: 0,
       y: 0,
@@ -1511,6 +1524,7 @@ export default function Page() {
       background: 'idb://imports/' + id,
       backgroundLabel: asset.name,
       sourceCrop: null,
+      originalSourceCrop: null,
       zoom: 1,
       x: 0,
       y: 0,
@@ -1562,6 +1576,31 @@ export default function Page() {
     setMessage('Image layer added');
   }
 
+  function updateCropEdge(edge, rawValue) {
+    const value = clamp(Number(rawValue), 0, 0.48);
+    patch((current) => {
+      const crop = current.sourceCrop || { x: 0, y: 0, w: 1, h: 1 };
+      let left = clamp(crop.x, 0, 0.9);
+      let top = clamp(crop.y, 0, 0.9);
+      let right = clamp(1 - crop.x - crop.w, 0, 0.9);
+      let bottom = clamp(1 - crop.y - crop.h, 0, 0.9);
+
+      if (edge === 'left') left = Math.min(value, 0.9 - right);
+      if (edge === 'right') right = Math.min(value, 0.9 - left);
+      if (edge === 'top') top = Math.min(value, 0.9 - bottom);
+      if (edge === 'bottom') bottom = Math.min(value, 0.9 - top);
+
+      return {
+        sourceCrop: {
+          x: left,
+          y: top,
+          w: Math.max(0.1, 1 - left - right),
+          h: Math.max(0.1, 1 - top - bottom)
+        }
+      };
+    });
+  }
+
   function addTextLayer() {
     const id = makeId('layer');
     patch((current) => ({
@@ -1579,6 +1618,7 @@ export default function Page() {
           opacity: 1,
           color: '#ffffff',
           fontSize: 58,
+          fontFamily: 'system',
           weight: 700,
           letterSpacing: 0,
           align: 'center',
