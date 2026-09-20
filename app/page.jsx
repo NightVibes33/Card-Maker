@@ -4168,12 +4168,17 @@ export default function Page() {
   
       const addDesignRefs = (value) => {
         if (!value || typeof value !== 'object') return;
-        if (value.background?.startsWith('idb://imports/')) {
-          referenced.add(value.background.slice('idb://imports/'.length));
+
+        const background = typeof value.background === 'string' ? value.background : '';
+        if (background.startsWith('idb://imports/')) {
+          referenced.add(background.slice('idb://imports/'.length));
         }
-        for (const layer of value.customLayers || []) {
-          if (layer?.src?.startsWith('idb://imports/')) {
-            referenced.add(layer.src.slice('idb://imports/'.length));
+
+        const layers = Array.isArray(value.customLayers) ? value.customLayers : [];
+        for (const layer of layers) {
+          const src = typeof layer?.src === 'string' ? layer.src : '';
+          if (src.startsWith('idb://imports/')) {
+            referenced.add(src.slice('idb://imports/'.length));
           }
         }
       };
