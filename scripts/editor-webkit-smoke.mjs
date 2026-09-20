@@ -545,6 +545,24 @@ try {
     'unsafe SVG must not create an image layer'
   );
 
+  const escapedCssSvg = Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><style>.x{fill:u\\72l(https://example.com/remote.png)}</style><rect class="x" width="120" height="80"/></svg>'
+  );
+  await imageInputs.last().setInputFiles({
+    name: 'unsafe-css-escape.svg',
+    mimeType: 'image/svg+xml',
+    buffer: escapedCssSvg
+  });
+  await page.getByText('SVG contains unsupported active or remote content.', { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 10000
+  });
+  assert.equal(
+    await page.getByLabel('Image Width').count(),
+    0,
+    'CSS-escaped remote SVG references must not create an image layer'
+  );
+
   const tinyPng = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mNk+M9QzwAEYBxVSFUAAGMABf4C/WQAAAAASUVORK5CYII=',
     'base64'
