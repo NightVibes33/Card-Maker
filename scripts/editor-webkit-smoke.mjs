@@ -290,11 +290,16 @@ try {
     'Undo must restore the pre-drag shape position'
   );
 
-  // A no-op edit must not clear the redo stack. Switch to Card, choose the
-  // already-selected Rectangle type, then require Redo to remain available.
+  // A no-op edit must not clear the redo stack. Reselect the shape
+  // explicitly so this contract does not depend on incidental selection state
+  // from the preceding canvas gesture/Undo sequence.
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  const shapeForNoOp = page.getByRole('button', { name: /^Shape shape /i }).first();
+  await shapeForNoOp.waitFor({ state: 'visible', timeout: 5000 });
+  await shapeForNoOp.click();
   const currentRectangle = page.getByRole('group', { name: 'Shape type' })
     .getByRole('button', { name: 'Rectangle', exact: true });
+  await currentRectangle.waitFor({ state: 'visible', timeout: 5000 });
   assert.equal(await currentRectangle.getAttribute('aria-pressed'), 'true');
   await currentRectangle.click();
   assert.equal(
