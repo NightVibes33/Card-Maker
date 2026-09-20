@@ -2075,6 +2075,11 @@ export default function Page() {
   }, []);
 
   const patch = useCallback((next, recordHistory = true, historyKey = '') => {
+    if (cleanupInFlightRef.current) {
+      setMessage('Finish cleaning imported images before editing.');
+      return designRef.current;
+    }
+
     if (presetImportActiveRef.current) {
       presetImportGenerationRef.current += 1;
     }
@@ -2125,6 +2130,10 @@ export default function Page() {
   }, [replaceDesign]);
 
   const undo = useCallback(() => {
+    if (cleanupInFlightRef.current) {
+      setMessage('Finish cleaning imported images before using Undo.');
+      return;
+    }
     invalidatePendingPresetImport();
     historyGroupRef.current = { key: '', at: 0 };
     const previous = undoRef.current.pop();
@@ -2138,6 +2147,10 @@ export default function Page() {
   }, [replaceDesign]);
 
   const redo = useCallback(() => {
+    if (cleanupInFlightRef.current) {
+      setMessage('Finish cleaning imported images before using Redo.');
+      return;
+    }
     invalidatePendingPresetImport();
     historyGroupRef.current = { key: '', at: 0 };
     const next = redoRef.current.pop();
@@ -3446,6 +3459,10 @@ export default function Page() {
   }
 
   function useArtwork(item) {
+    if (cleanupInFlightRef.current) {
+      setMessage('Finish cleaning imported images before changing artwork.');
+      return;
+    }
     invalidatePendingImageImport();
     invalidatePendingPresetImport();
     const workingImage = proxyImageWidth(item.image, 3072);
@@ -4141,6 +4158,10 @@ export default function Page() {
 
   function openProject(project) {
     if (!project?.design) return;
+    if (cleanupInFlightRef.current) {
+      setMessage('Finish cleaning imported images before opening a design.');
+      return;
+    }
     invalidatePendingImageImport();
     invalidatePendingPresetImport();
     if (projectOpsRef.current.has(String(project.id || ''))) {
@@ -4624,6 +4645,10 @@ export default function Page() {
   }
 
   function reset() {
+    if (cleanupInFlightRef.current) {
+      setMessage('Finish cleaning imported images before starting a new card.');
+      return;
+    }
     invalidatePendingImageImport();
     invalidatePendingPresetImport();
     historyGroupRef.current = { key: '', at: 0 };
@@ -6294,6 +6319,13 @@ export default function Page() {
           </div>
         )}
       </div>
+
+      {cleanupInProgress ? (
+        <div className="cleanupShield" role="status" aria-live="assertive" aria-busy="true">
+          <span className="spinner" aria-hidden="true" />
+          <strong>Cleaning unused imports…</strong>
+        </div>
+      ) : null}
 
       <nav className="tabBar" role="tablist" aria-label="Card Studio sections">
         {TAB_ITEMS.map(([value, label]) => (
