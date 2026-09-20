@@ -284,12 +284,23 @@ function normalizeCrop(crop, minSize = 0.1) {
   if (!crop || typeof crop !== 'object') return null;
   const width = finiteClamp(crop.w, 1, minSize, 1);
   const height = finiteClamp(crop.h, 1, minSize, 1);
-  return {
+  const normalized = {
     x: finiteClamp(crop.x, 0, 0, 1 - width),
     y: finiteClamp(crop.y, 0, 0, 1 - height),
     w: width,
     h: height
   };
+
+  if (
+    Math.abs(normalized.x) < 1e-9 &&
+    Math.abs(normalized.y) < 1e-9 &&
+    Math.abs(normalized.w - 1) < 1e-9 &&
+    Math.abs(normalized.h - 1) < 1e-9
+  ) {
+    return null;
+  }
+
+  return normalized;
 }
 
 function cropsEqual(a, b) {
@@ -4042,13 +4053,13 @@ export default function Page() {
       if (edge === 'top') top = Math.min(value, 0.9 - bottom);
       if (edge === 'bottom') bottom = Math.min(value, 0.9 - top);
 
-      const nextCrop = {
+      const nextCrop = normalizeCrop({
         x: left,
         y: top,
         w: Math.max(0.1, 1 - left - right),
         h: Math.max(0.1, 1 - top - bottom)
-      };
-      return cropsEqual(crop, nextCrop) ? {} : { sourceCrop: nextCrop };
+      });
+      return cropsEqual(normalizeCrop(crop), nextCrop) ? {} : { sourceCrop: nextCrop };
     }, true, 'crop:' + edge);
   }
 
@@ -4070,13 +4081,13 @@ export default function Page() {
         if (edge === 'top') top = Math.min(value, 0.9 - bottom);
         if (edge === 'bottom') bottom = Math.min(value, 0.9 - top);
 
-        const nextCrop = {
+        const nextCrop = normalizeCrop({
           x: left,
           y: top,
           w: Math.max(0.1, 1 - left - right),
           h: Math.max(0.1, 1 - top - bottom)
-        };
-        if (cropsEqual(crop, nextCrop)) return layer;
+        });
+        if (cropsEqual(normalizeCrop(crop), nextCrop)) return layer;
 
         changed = true;
         return { ...layer, crop: nextCrop };
