@@ -74,6 +74,8 @@ const pageChecks = [
   [/disabled=\{imageImportInProgress\} onClick=\{\(\) => layerUploadRef\.current\?\.click\(\)\}/, 'image-layer import entry point is disabled while processing'],
   [/favoriteOpsRef\.current\.has\(itemId\)/, 'favorite writes are serialized per card'],
   [/projectSaveInFlightRef\.current/, 'project saves reject overlapping double taps'],
+  [/const historySaved = await recordExport/, 'export history status reflects durable storage writes'],
+  [/export history could not be stored/, 'successful exports report history persistence failure separately'],
   [/presetTransferInFlightRef\.current/, 'preset import and export operations are serialized'],
   [/const imageImportInFlightRef = useRef\(false\)/, 'image imports use a synchronous concurrency guard'],
   [/Finish the image import before cleaning imported images\./, 'cleanup cannot overlap an in-flight image import'],
