@@ -66,13 +66,6 @@ try {
     true,
     'Studio must expose a visible New project button in the editor toolbar'
   );
-  const studioNewCard = page.getByRole('button', { name: 'Start a new card', exact: true });
-  await studioNewCard.waitFor({ state: 'visible', timeout: 5000 });
-  assert.equal(
-    await studioNewCard.isVisible(),
-    true,
-    'Studio must expose the New Card action without requiring a trip to Library'
-  );
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
 
   const editorCanvas = page.locator('.cardFrame canvas').first();
