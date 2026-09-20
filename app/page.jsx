@@ -4205,12 +4205,16 @@ export default function Page() {
     patch((current) => {
       const source = (current.customLayers || []).find((layer) => layer.id === id);
       if (!source) return {};
+      const offsetDuplicateCoordinate = (rawValue) => {
+        const value = clamp(Number(rawValue ?? 0.5), 0, 1);
+        return clamp(value + (value > 0.94 ? -0.03 : 0.03), 0, 1);
+      };
       const copy = {
         ...source,
         id: makeId('layer'),
         name: (source.name || source.type) + ' Copy',
-        x: clamp(Number(source.x ?? 0.5) + 0.03, 0, 1),
-        y: clamp(Number(source.y ?? 0.5) + 0.03, 0, 1)
+        x: offsetDuplicateCoordinate(source.x),
+        y: offsetDuplicateCoordinate(source.y)
       };
       const order = normalizeLayerOrder(current);
       const sourceIndex = order.indexOf(id);
