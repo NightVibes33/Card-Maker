@@ -2308,6 +2308,7 @@ export default function Page() {
   const gestureHistoryRecorded = useRef(false);
   const draftSaveQueueRef = useRef(Promise.resolve());
   const draftSaveVersionRef = useRef(0);
+  const autosavePausedBaselineRef = useRef(null);
   const favoriteOpsRef = useRef(new Set());
   const projectSaveInFlightRef = useRef(false);
   const projectOpsRef = useRef(new Set());
@@ -2753,6 +2754,7 @@ export default function Page() {
         if (!cancelled) {
           setHydrated(true);
           setAutosaveReady(autosaveSafe);
+          autosavePausedBaselineRef.current = autosaveSafe ? null : designRef.current;
           if (!autosaveSafe) {
             setSaveStatus('Autosave paused');
             setMessage('Draft storage could not be read safely. Autosave is paused to protect existing work.');
@@ -2793,7 +2795,30 @@ export default function Page() {
   }, [autosaveReady, design, hydrated, persistDraftSnapshot]);
 
   useEffect(() => {
-    if (!hydrated || !autosaveReady) return undefined;
+    if (!hydrated || autosaveReady) return undefined;
+    if (autosavePausedBaselineRef.current === design) return undefined;
+
+    const timer = window.setTimeout(() => {
+      const snapshot = JSON.parse(JSON.stringify(design));
+      if (snapshot.background && !isPersistableBackground(snapshot.background)) {
+        snapshot.background = '';
+      }
+
+      try {
+        const now = Date.now();
+        localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(snapshot));
+        localStorage.setItem('aircard-sticker-fvp-v3-updated-at', String(now));
+        if (designRef.current === design) {
+          autosavePausedBaselineRef.current = design;
+        }
+      } catch {}
+    }, 420);
+
+    return () => window.clearTimeout(timer);
+  }, [autosaveReady, design, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return undefined;
 
     let lastFlushAt = 0;
     const flushDraftBeforeSuspend = () => {
@@ -2808,12 +2833,23 @@ export default function Page() {
 
       // localStorage is synchronous, so this survives iOS suspending the page
       // before an IndexedDB transaction or debounced autosave can finish.
+      // When IndexedDB hydration was unsafe, only update this recovery copy
+      // after the user has actually changed the hydrated design.
+      if (!autosaveReady && autosavePausedBaselineRef.current === designRef.current) {
+        return;
+      }
+
       try {
         localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(snapshot));
         localStorage.setItem('aircard-sticker-fvp-v3-updated-at', String(now));
+        if (!autosaveReady) {
+          autosavePausedBaselineRef.current = designRef.current;
+        }
       } catch {}
 
-      persistDraftSnapshot(snapshot).catch(() => {});
+      if (autosaveReady) {
+        persistDraftSnapshot(snapshot).catch(() => {});
+      }
     };
 
     const onVisibilityChange = () => {
