@@ -4275,7 +4275,7 @@ export default function Page() {
     const copy = {
       ...project,
       id: makeId('project'),
-      name: (project.name || 'Design') + ' Copy',
+      name: safeDisplayText((project.name || 'Design') + ' Copy', 'Design Copy', 160),
       design: JSON.parse(JSON.stringify(project.design || DEFAULTS)),
       createdAt: Date.now(),
       updatedAt: Date.now()
