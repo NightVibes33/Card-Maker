@@ -75,16 +75,22 @@ try {
   await topBadge.click();
 
   // Direct chip drag must target the chip rather than nearby contactless art.
+  // Card controls above can auto-scroll the page, so remeasure the canvas
+  // immediately before any absolute-coordinate pointer gesture.
+  await editorCanvas.scrollIntoViewIfNeeded();
+  const chipGestureBox = await editorCanvas.boundingBox();
+  assert.ok(chipGestureBox, 'chip drag requires a visible editor canvas');
+
   const chipStartX = 0.105 + (255 / 2) / 1536;
   const chipStartY = 0.35 + (188 / 2) / 969;
   await page.mouse.move(
-    initialCanvasBox.x + initialCanvasBox.width * chipStartX,
-    initialCanvasBox.y + initialCanvasBox.height * chipStartY
+    chipGestureBox.x + chipGestureBox.width * chipStartX,
+    chipGestureBox.y + chipGestureBox.height * chipStartY
   );
   await page.mouse.down();
   await page.mouse.move(
-    initialCanvasBox.x + initialCanvasBox.width * chipStartX + 34,
-    initialCanvasBox.y + initialCanvasBox.height * chipStartY,
+    chipGestureBox.x + chipGestureBox.width * chipStartX + 34,
+    chipGestureBox.y + chipGestureBox.height * chipStartY,
     { steps: 4 }
   );
   await page.mouse.up();
@@ -100,15 +106,20 @@ try {
   });
 
   // Contactless overlaps the chip's padded touch region; stack order must
-  // still select Contactless at its own center.
+  // still select Contactless at its own center. Remeasure after the Position
+  // controls/Undo interaction because those can scroll the sticky editor.
+  await editorCanvas.scrollIntoViewIfNeeded();
+  const contactlessGestureBox = await editorCanvas.boundingBox();
+  assert.ok(contactlessGestureBox, 'contactless drag requires a visible editor canvas');
+
   await page.mouse.move(
-    initialCanvasBox.x + initialCanvasBox.width * 0.285,
-    initialCanvasBox.y + initialCanvasBox.height * 0.43
+    contactlessGestureBox.x + contactlessGestureBox.width * 0.285,
+    contactlessGestureBox.y + contactlessGestureBox.height * 0.43
   );
   await page.mouse.down();
   await page.mouse.move(
-    initialCanvasBox.x + initialCanvasBox.width * 0.285 + 34,
-    initialCanvasBox.y + initialCanvasBox.height * 0.43,
+    contactlessGestureBox.x + contactlessGestureBox.width * 0.285 + 34,
+    contactlessGestureBox.y + contactlessGestureBox.height * 0.43,
     { steps: 4 }
   );
   await page.mouse.up();
