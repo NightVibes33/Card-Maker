@@ -40,7 +40,7 @@ export async function GET(request) {
 
   // Shopify's CDN can resize source artwork before it reaches our function.
   // Browse thumbnails use this; Studio/export continue to request the original.
-  if (width >= 160 && /(^|\.)cucucovers\.com$/i.test(url.hostname)) {
+  if (width >= 160 && (/^cdn\.shopify\.com$/i.test(url.hostname) || /(^|\.)cucucovers\.com$/i.test(url.hostname))) {
     url.searchParams.set('width', String(width));
   }
 
