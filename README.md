@@ -23,7 +23,6 @@ Real CUCU collections exposed in the app:
 - Animals
 - Crypto
 
-Blitz Covers has been removed completely.
 
 ## CUCU catalog implementation
 
