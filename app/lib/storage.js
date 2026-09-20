@@ -236,12 +236,32 @@ export function blobToDataUrl(blob) {
 }
 
 export function dataUrlToBlob(dataUrl) {
-  const [header, body] = String(dataUrl).split(',');
+  const text = String(dataUrl || '');
+  const comma = text.indexOf(',');
+  if (comma < 0) throw new Error('Invalid data URL');
+
+  const header = text.slice(0, comma);
   const type = header.match(/data:([^;]+)/)?.[1] || 'application/octet-stream';
-  const bytes = atob(body || '');
-  const output = new Uint8Array(bytes.length);
-  for (let i = 0; i < bytes.length; i += 1) output[i] = bytes.charCodeAt(i);
-  return new Blob([output], { type });
+
+  if (!/;base64/i.test(header)) {
+    return new Blob([decodeURIComponent(text.slice(comma + 1))], { type });
+  }
+
+  // Decode in base64-aligned chunks so large preset/image exports do not
+  // allocate one huge binary string plus a second equally large Uint8Array.
+  const chunks = [];
+  const chunkChars = 32768; // multiple of 4
+  for (let offset = comma + 1; offset < text.length; offset += chunkChars) {
+    const encoded = text.slice(offset, Math.min(text.length, offset + chunkChars));
+    const decoded = atob(encoded);
+    const bytes = new Uint8Array(decoded.length);
+    for (let i = 0; i < decoded.length; i += 1) {
+      bytes[i] = decoded.charCodeAt(i);
+    }
+    chunks.push(bytes);
+  }
+
+  return new Blob(chunks, { type });
 }
 
 export function makeId(prefix = 'item') {
