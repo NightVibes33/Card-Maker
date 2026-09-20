@@ -1180,6 +1180,15 @@ export default function Page() {
     [design.gradient]
   );
 
+  const imageLayerSourceKey = useMemo(
+    () => JSON.stringify(
+      (design.customLayers || [])
+        .filter((layer) => layer.type === 'image' && layer.src)
+        .map((layer) => ({ id: layer.id, src: layer.src }))
+    ),
+    [design.customLayers]
+  );
+
   const renderAssetsReady = useMemo(() => {
     if (design.background && !image) return false;
     return (design.customLayers || []).every(
@@ -1381,6 +1390,8 @@ export default function Page() {
         return;
       }
 
+      setImage(null);
+      setMessage('Loading artwork…');
       let src = design.background;
 
       if (src.startsWith('idb://imports/')) {
@@ -1421,24 +1432,35 @@ export default function Page() {
 
     async function hydrateLayers() {
       const next = {};
-      const imageLayers = (design.customLayers || []).filter((layer) => layer.type === 'image' && layer.src);
+      let failed = false;
+      const imageLayers = JSON.parse(imageLayerSourceKey || '[]');
+
+      setLayerImages({});
 
       for (const layer of imageLayers) {
         let src = layer.src;
         if (src.startsWith('idb://imports/')) {
           const id = src.slice('idb://imports/'.length);
           const asset = await dbGet('imports', id);
-          if (!asset?.blob) continue;
+          if (!asset?.blob) {
+            failed = true;
+            continue;
+          }
           src = URL.createObjectURL(asset.blob);
           urls.push(src);
         }
 
         try {
           next[layer.id] = await loadSearchImage(src);
-        } catch {}
+        } catch {
+          failed = true;
+        }
       }
 
-      if (!cancelled) setLayerImages(next);
+      if (!cancelled) {
+        setLayerImages(next);
+        if (failed) setMessage('Some image layers could not load');
+      }
     }
 
     hydrateLayers();
@@ -1447,7 +1469,7 @@ export default function Page() {
       cancelled = true;
       urls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [design.customLayers]);
+  }, [imageLayerSourceKey]);
 
   const renderCard = useCallback((ctx, width, height, options = {}) => {
     if (!ctx) return;
