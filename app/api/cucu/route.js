@@ -292,6 +292,7 @@ function flattenProduct(product) {
     subtitle: 'CUCU Covers',
     image: imageProxy(candidates[0].src),
     thumbnail: imageProxy(candidates[0].src, 560),
+    inspectUrls: candidates.slice(0, 3).map((asset) => '/api/cucu/inspect?url=' + encodeURIComponent(asset.src)),
     candidateImages: candidates.map((asset) => imageProxy(asset.src)),
     directAssetUrls: candidates.map((asset) => asset.src),
     source: 'CUCU Covers',
