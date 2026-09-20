@@ -24,7 +24,7 @@ function openDb() {
   dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const db = request.result;
       const tx = request.transaction;
 
@@ -37,7 +37,7 @@ function openDb() {
       // Version 2 separates lightweight import-list metadata from large image
       // blobs. Migrate existing imports once so Library hydration never needs
       // to deserialize every stored photo into React memory again.
-      if (request.oldVersion < 2 && tx && db.objectStoreNames.contains('imports')) {
+      if (event.oldVersion < 2 && tx && db.objectStoreNames.contains('imports')) {
         const importsStore = tx.objectStore('imports');
         const metaStore = tx.objectStore('importMeta');
         const cursorRequest = importsStore.openCursor();
