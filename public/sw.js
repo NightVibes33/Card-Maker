@@ -1,12 +1,14 @@
 const SHELL_CACHE = 'card-studio-shell-v3';
-const ART_CACHE = 'card-studio-art-v3';
+const ART_CACHE = 'card-studio-art-v4';
+const THUMB_CACHE = 'card-studio-thumb-v1';
 const CATALOG_CACHE = 'card-studio-catalog-v3';
 const STATIC_CACHE = 'card-studio-static-v3';
 
 const SHELL = ['/manifest.webmanifest'];
 const CACHE_LIMITS = {
   [SHELL_CACHE]: 16,
-  [ART_CACHE]: 180,
+  [ART_CACHE]: 40,
+  [THUMB_CACHE]: 160,
   [CATALOG_CACHE]: 80,
   [STATIC_CACHE]: 120
 };
@@ -43,12 +45,13 @@ self.addEventListener('activate', (event) => {
     caches.keys()
       .then((keys) => Promise.all(
         keys
-          .filter((key) => ![SHELL_CACHE, ART_CACHE, CATALOG_CACHE, STATIC_CACHE].includes(key))
+          .filter((key) => ![SHELL_CACHE, ART_CACHE, THUMB_CACHE, CATALOG_CACHE, STATIC_CACHE].includes(key))
           .map((key) => caches.delete(key))
       ))
       .then(() => Promise.all([
         trimCache(SHELL_CACHE),
         trimCache(ART_CACHE),
+        trimCache(THUMB_CACHE),
         trimCache(CATALOG_CACHE),
         trimCache(STATIC_CACHE)
       ]))
@@ -103,7 +106,8 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
 
   if (url.pathname === '/api/image') {
-    event.respondWith(cacheFirst(event.request, ART_CACHE));
+    const cacheName = url.searchParams.has('w') ? THUMB_CACHE : ART_CACHE;
+    event.respondWith(cacheFirst(event.request, cacheName));
     return;
   }
 
