@@ -3671,12 +3671,9 @@ export default function Page() {
           <button
             type="button"
             className="primaryAction"
-            onClick={() => isIOS
-              ? sharePng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png', true)
-              : share()
-            }
+            onClick={() => nativeExportPng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}
           >
-            {isIOS ? 'Save to Photos' : 'Share 3× PNG'}
+            Save / Share 3× Image
           </button>
         </Modal>
       ) : null}
