@@ -17,6 +17,7 @@ const OUT_H = 969;
 const CARD_RATIO = OUT_W / OUT_H;
 const MAX_IMAGE_IMPORT_BYTES = 30 * 1024 * 1024;
 const MAX_PRESET_IMPORT_BYTES = 64 * 1024 * 1024;
+const MAX_PRESET_EMBEDDED_BYTES = 30 * 1024 * 1024;
 const MAX_CUSTOM_LAYERS = 200;
 const MAX_PRESET_ASSETS = 200;
 const MAX_IMAGE_PIXELS = 65_000_000;
@@ -3152,48 +3153,71 @@ export default function Page() {
   }
 
   async function serializePreset() {
+    const currentDesign = designRef.current;
     const payload = {
       version: 2,
       app: 'AirCard Card Studio',
       exportedAt: new Date().toISOString(),
-      design: JSON.parse(JSON.stringify(design)),
+      design: JSON.parse(JSON.stringify(currentDesign)),
       assets: {}
     };
 
     const refs = new Set();
-    if (design.background?.startsWith('idb://imports/')) {
-      refs.add(design.background.slice('idb://imports/'.length));
+    if (currentDesign.background?.startsWith('idb://imports/')) {
+      refs.add(currentDesign.background.slice('idb://imports/'.length));
     }
-    for (const layer of design.customLayers || []) {
+    for (const layer of currentDesign.customLayers || []) {
       if (layer.src?.startsWith('idb://imports/')) {
         refs.add(layer.src.slice('idb://imports/'.length));
       }
     }
 
+    const assets = [];
+    let embeddedBytes = 0;
+
     for (const id of refs) {
       const asset = await dbGet('imports', id);
-      if (asset?.blob) {
-        payload.assets[id] = {
-          name: asset.name,
-          type: asset.type,
-          data: await blobToDataUrl(asset.blob)
-        };
+      if (!asset?.blob) {
+        throw new Error('A referenced imported image is missing');
       }
+
+      embeddedBytes += Number(asset.blob.size || 0);
+      if (embeddedBytes > MAX_PRESET_EMBEDDED_BYTES) {
+        throw new Error('This design has too much imported image data for a safe preset export');
+      }
+      assets.push([id, asset]);
+    }
+
+    for (const [id, asset] of assets) {
+      payload.assets[id] = {
+        name: asset.name,
+        type: asset.type,
+        data: await blobToDataUrl(asset.blob)
+      };
     }
 
     return payload;
   }
 
   async function exportPresetJson() {
-    const payload = await serializePreset();
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = (design.backgroundLabel || 'aircard-design').replace(/[^a-z0-9_-]+/gi, '-') + '.aircard.json';
-    anchor.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1200);
-    setMessage('Design preset exported');
+    try {
+      const payload = await serializePreset();
+      const json = JSON.stringify(payload, null, 2);
+      if (new Blob([json]).size > MAX_PRESET_IMPORT_BYTES) {
+        throw new Error('The generated preset is too large to export safely');
+      }
+
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = (payload.design.backgroundLabel || 'aircard-design').replace(/[^a-z0-9_-]+/gi, '-') + '.aircard.json';
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1200);
+      setMessage('Design preset exported');
+    } catch (error) {
+      setMessage(error?.message || 'Design preset could not be exported');
+    }
   }
 
   async function importPresetJson(event) {
