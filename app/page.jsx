@@ -1986,6 +1986,7 @@ export default function Page() {
   const [loadedImageLayerSourceKey, setLoadedImageLayerSourceKey] = useState('[]');
   const [backgroundLoadError, setBackgroundLoadError] = useState('');
   const [layerLoadError, setLayerLoadError] = useState('');
+  const [imageImportInProgress, setImageImportInProgress] = useState(false);
   const canvasRef = useRef(null);
   const fullPreviewCanvasRef = useRef(null);
   const uploadRef = useRef(null);
@@ -2012,6 +2013,7 @@ export default function Page() {
   const presetTransferInFlightRef = useRef(false);
   const cleanupInFlightRef = useRef(false);
   const exportInFlightRef = useRef(false);
+  const imageImportInFlightRef = useRef(false);
 
   const gradient = useMemo(
     () => GRADIENTS.find((item) => item.id === design.gradient) || GRADIENTS[0],
@@ -3364,6 +3366,23 @@ export default function Page() {
     }
   }
 
+  async function withImageImportLock(task) {
+    if (imageImportInFlightRef.current) {
+      setMessage('Another image import is still processing');
+      return false;
+    }
+
+    imageImportInFlightRef.current = true;
+    setImageImportInProgress(true);
+    try {
+      await task();
+      return true;
+    } finally {
+      imageImportInFlightRef.current = false;
+      setImageImportInProgress(false);
+    }
+  }
+
   function useArtwork(item) {
     const workingImage = proxyImageWidth(item.image, 3072);
     patch({
@@ -3391,6 +3410,7 @@ export default function Page() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    await withImageImportLock(async () => {
     if (file.type && !file.type.startsWith('image/')) {
       setMessage('Choose an image file.');
       return;
@@ -3448,12 +3468,14 @@ export default function Page() {
     setStudioTool('crop');
     setTab('studio');
     setMessage('Imported image ready to crop');
+    });
   }
 
   async function uploadLayerImage(event) {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    await withImageImportLock(async () => {
     if ((designRef.current.customLayers || []).length >= MAX_CUSTOM_LAYERS) {
       setMessage('Layer limit reached. Delete a layer before adding another.');
       return;
@@ -3540,6 +3562,7 @@ export default function Page() {
     }));
     setSelectedElement(layerId);
     setMessage('Image layer added');
+    });
   }
 
   function updateCropEdge(edge, rawValue) {
@@ -5226,7 +5249,7 @@ export default function Page() {
             <div ref={loadMoreRef} className="infiniteSentinel" aria-hidden="true" />
 
             <div className="discoverImportRow">
-              <button type="button" className="secondaryAction uploadAction" onClick={() => uploadRef.current?.click()}>
+              <button type="button" className="secondaryAction uploadAction" disabled={imageImportInProgress} onClick={() => uploadRef.current?.click()}>
                 <IOSIcon name="photo" size={21} />
                 <span>Import Photo or File</span>
               </button>
@@ -5342,7 +5365,7 @@ export default function Page() {
                         <span>{design.flipX ? 'Unflip' : 'Flip'}</span>
                       </button>
                     </div>
-                    <button type="button" className="actionRow" onClick={() => uploadRef.current?.click()}>
+                    <button type="button" className="actionRow" disabled={imageImportInProgress} onClick={() => uploadRef.current?.click()}>
                       <span><strong>Replace Artwork</strong><small>Photos or Files</small></span>
                       <IOSIcon name="photo" size={19} />
                     </button>
@@ -5607,7 +5630,7 @@ export default function Page() {
 <Group title="CUSTOM LAYERS" footer="Image, text, and shape layers are embedded into the final AirCard PNG.">
                   <div className="layerAddRow">
                     <button type="button" onClick={addTextLayer}>+ Text</button>
-                    <button type="button" onClick={() => layerUploadRef.current?.click()}>+ Image / Logo</button>
+                    <button type="button" disabled={imageImportInProgress} onClick={() => layerUploadRef.current?.click()}>+ Image / Logo</button>
                     <button type="button" onClick={addShapeLayer}>+ Shape</button>
                     <button type="button" onClick={addChipLayer}>+ Chip</button>
                     <button type="button" onClick={addContactlessLayer}>+ Contactless</button>
