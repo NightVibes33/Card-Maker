@@ -2417,7 +2417,62 @@ export default function Page() {
                     <span><strong>Replace Artwork</strong><small>Photos or Files</small></span>
                     <IOSIcon name="photo" size={19} />
                   </button>
-                  <button type="button" className="settingsResetButton" disabled={!design.background} onClick={() => patch({ fit: 'cover', zoom: 1, x: 0, y: 0, rotate: 0, flipX: false })}>
+                  <div className="cropControlBlock">
+                    <SliderRow
+                      label="Crop Left"
+                      value={design.sourceCrop?.x || 0}
+                      min={0}
+                      max={0.48}
+                      step={0.005}
+                      disabled={!design.background}
+                      formatValue={(value) => Math.round(value * 100) + '%'}
+                      onChange={(value) => updateCropEdge('left', value)}
+                    />
+                    <SliderRow
+                      label="Crop Right"
+                      value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.x - design.sourceCrop.w) : 0}
+                      min={0}
+                      max={0.48}
+                      step={0.005}
+                      disabled={!design.background}
+                      formatValue={(value) => Math.round(value * 100) + '%'}
+                      onChange={(value) => updateCropEdge('right', value)}
+                    />
+                    <SliderRow
+                      label="Crop Top"
+                      value={design.sourceCrop?.y || 0}
+                      min={0}
+                      max={0.48}
+                      step={0.005}
+                      disabled={!design.background}
+                      formatValue={(value) => Math.round(value * 100) + '%'}
+                      onChange={(value) => updateCropEdge('top', value)}
+                    />
+                    <SliderRow
+                      label="Crop Bottom"
+                      value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.y - design.sourceCrop.h) : 0}
+                      min={0}
+                      max={0.48}
+                      step={0.005}
+                      disabled={!design.background}
+                      formatValue={(value) => Math.round(value * 100) + '%'}
+                      onChange={(value) => updateCropEdge('bottom', value)}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="settingsResetButton"
+                    disabled={!design.background}
+                    onClick={() => patch({
+                      sourceCrop: design.originalSourceCrop || null,
+                      fit: 'cover',
+                      zoom: design.originalSourceCrop ? 1 : 1.06,
+                      x: 0,
+                      y: 0,
+                      rotate: 0,
+                      flipX: false
+                    })}
+                  >
                     Reset Crop
                   </button>
                 </Group>
@@ -2433,9 +2488,9 @@ export default function Page() {
 
                   {selectedElement === 'artwork' ? (
                     <>
-                      <SliderRow label="Artwork zoom" value={design.zoom} min={0.5} max={5} step={0.01} disabled={!design.background} onChange={(value) => patch({ zoom: value })} />
-                      <SliderRow label="Artwork horizontal position" value={design.x} min={-1.5} max={1.5} step={0.01} disabled={!design.background} onChange={(value) => patch({ x: value })} />
-                      <SliderRow label="Artwork vertical position" value={design.y} min={-1.5} max={1.5} step={0.01} disabled={!design.background} onChange={(value) => patch({ y: value })} />
+                      <SliderRow label="Artwork zoom" value={design.zoom} min={0.5} max={5} step={0.01} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ zoom: value })} />
+                      <SliderRow label="Artwork horizontal position" value={design.x} min={-1.5} max={1.5} step={0.01} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ x: value })} />
+                      <SliderRow label="Artwork vertical position" value={design.y} min={-1.5} max={1.5} step={0.01} disabled={!design.background} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ y: value })} />
                       <SliderRow label="Artwork rotation" value={design.rotate} min={-180} max={180} step={1} suffix="°" disabled={!design.background} onChange={(value) => patch({ rotate: value })} />
                     </>
                   ) : null}
@@ -2443,8 +2498,8 @@ export default function Page() {
                   {selectedElement === 'chip' && design.chip ? (
                     <>
                       <SliderRow label="Chip size" value={design.chipScale} min={0.5} max={2} step={0.01} onChange={(value) => patch({ chipScale: value })} />
-                      <SliderRow label="Chip horizontal position" value={design.chipX} min={0} max={0.82} step={0.005} onChange={(value) => patch({ chipX: value })} />
-                      <SliderRow label="Chip vertical position" value={design.chipY} min={0} max={0.8} step={0.005} onChange={(value) => patch({ chipY: value })} />
+                      <SliderRow label="Chip horizontal position" value={design.chipX} min={0} max={0.82} step={0.005} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ chipX: value })} />
+                      <SliderRow label="Chip vertical position" value={design.chipY} min={0} max={0.8} step={0.005} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ chipY: value })} />
                       <SliderRow label="Chip rotation" value={design.chipRotation} min={-45} max={45} step={1} suffix="°" onChange={(value) => patch({ chipRotation: value })} />
                     </>
                   ) : null}
@@ -2499,7 +2554,7 @@ export default function Page() {
 
             {studioTool === 'effects' ? (
               <Group title="EFFECTS">
-                <SliderRow label="Vignette intensity" value={design.vignette} min={0} max={0.8} step={0.01} onChange={(value) => patch({ vignette: value })} />
+                <SliderRow label="Vignette intensity" value={design.vignette} min={0} max={0.8} step={0.01} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ vignette: value })} />
                 <SliderRow label="Grain" value={design.grain} min={0} max={0.22} step={0.005} onChange={(value) => patch({ grain: value })} />
                 <SliderRow label="Gloss" value={design.gloss} min={0} max={0.8} step={0.01} onChange={(value) => patch({ gloss: value })} />
                 <SliderRow label="Dark Overlay" value={design.overlay} min={0} max={0.75} step={0.01} onChange={(value) => patch({ overlay: value })} />
@@ -2559,8 +2614,10 @@ export default function Page() {
                 <Group title="CUSTOM LAYERS" footer="Image, text, and shape layers are embedded into the final AirCard PNG.">
                   <div className="layerAddRow">
                     <button type="button" onClick={addTextLayer}>+ Text</button>
-                    <button type="button" onClick={() => layerUploadRef.current?.click()}>+ Image</button>
+                    <button type="button" onClick={() => layerUploadRef.current?.click()}>+ Image / Logo</button>
                     <button type="button" onClick={addShapeLayer}>+ Shape</button>
+                    <button type="button" onClick={() => { patch({ chip: true }); setSelectedElement('chip'); }}>+ Chip</button>
+                    <button type="button" onClick={() => { patch({ contactless: true }); setSelectedElement('contactless'); }}>+ Contactless</button>
                   </div>
                   <input ref={layerUploadRef} type="file" accept="image/*" hidden onChange={uploadLayerImage} />
 
@@ -2582,10 +2639,27 @@ export default function Page() {
                     {selectedLayer.type === 'text' ? (
                       <>
                         <input className="iosTextField" aria-label="Layer text" value={selectedLayer.text || ''} onChange={(event) => updateLayer(selectedLayer.id, { text: event.target.value })} />
+                        <label className="selectRow">
+                          <span>Font</span>
+                          <select aria-label="Text layer font" value={selectedLayer.fontFamily || 'system'} onChange={(event) => updateLayer(selectedLayer.id, { fontFamily: event.target.value })}>
+                            <option value="system">System</option>
+                            <option value="rounded">Rounded</option>
+                            <option value="serif">Serif</option>
+                            <option value="mono">Monospace</option>
+                          </select>
+                        </label>
+                        <div className="textAlignRow" role="group" aria-label="Text alignment">
+                          {['left', 'center', 'right'].map((align) => (
+                            <button type="button" key={align} className={(selectedLayer.align || 'center') === align ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { align })}>
+                              {align[0].toUpperCase() + align.slice(1)}
+                            </button>
+                          ))}
+                        </div>
                         <SliderRow label="Font Size" value={selectedLayer.fontSize || 58} min={10} max={240} step={1} onChange={(value) => updateLayer(selectedLayer.id, { fontSize: value })} />
                         <SliderRow label="Weight" value={selectedLayer.weight || 700} min={100} max={900} step={100} onChange={(value) => updateLayer(selectedLayer.id, { weight: value })} />
                         <SliderRow label="Letter Spacing" value={selectedLayer.letterSpacing || 0} min={-4} max={30} step={1} onChange={(value) => updateLayer(selectedLayer.id, { letterSpacing: value })} />
                         <label className="colorRow"><span>Color</span><input type="color" value={selectedLayer.color || '#ffffff'} onChange={(event) => updateLayer(selectedLayer.id, { color: event.target.value })} /></label>
+                        <SwitchRow label="Text Shadow" value={Boolean(selectedLayer.shadow)} onChange={(value) => updateLayer(selectedLayer.id, { shadow: value })} />
                       </>
                     ) : null}
                     {selectedLayer.type === 'shape' ? (
@@ -2640,7 +2714,25 @@ export default function Page() {
 
             <section className="browseSection">
               <div className="browseHeading"><h2>My Designs</h2><span>{projects.length}</span></div>
-              <button type="button" className="primaryAction librarySaveButton" onClick={() => saveProject()}>Save Current Design</button>
+              <div className="projectSaveComposer">
+                <input
+                  className="iosTextField"
+                  aria-label="Project name"
+                  placeholder="Name this design"
+                  value={projectName}
+                  onChange={(event) => setProjectName(event.target.value.slice(0, 60))}
+                />
+                <button
+                  type="button"
+                  className="primaryAction librarySaveButton"
+                  onClick={async () => {
+                    await saveProject(projectName);
+                    setProjectName('');
+                  }}
+                >
+                  Save Current Design
+                </button>
+              </div>
               {projects.length ? (
                 <div className="projectGrid">
                   {projects.map((project) => (
