@@ -322,6 +322,77 @@ try {
 
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
 
+  // Built-in hardware uses a separate transform path from custom layers.
+  // Exercise it explicitly so direct-manipulation regressions cannot hide
+  // behind the custom shape/image coverage above.
+  await page.getByRole('button', { name: /^EMV Chip Built-in hardware /i }).click();
+  await page.getByRole('tab', { name: 'Position', exact: true }).click();
+
+  const chipX = page.getByLabel('Chip horizontal position');
+  const chipY = page.getByLabel('Chip vertical position');
+  const chipScale = page.getByLabel('Chip size');
+  const chipXBefore = Number(await chipX.inputValue());
+  const chipYBefore = Number(await chipY.inputValue());
+  const chipScaleBefore = Number(await chipScale.inputValue());
+
+  const chipCanvasBox = await editorCanvas.boundingBox();
+  assert.ok(chipCanvasBox, 'built-in chip test requires a visible editor canvas');
+
+  const chipCenterX =
+    chipCanvasBox.x +
+    chipCanvasBox.width * (chipXBefore + ((255 * chipScaleBefore) / 2) / 1536);
+  const chipCenterY =
+    chipCanvasBox.y +
+    chipCanvasBox.height * (chipYBefore + ((188 * chipScaleBefore) / 2) / 969);
+
+  await page.mouse.move(chipCenterX, chipCenterY);
+  await page.mouse.down();
+  await page.mouse.move(chipCenterX + 32, chipCenterY, { steps: 4 });
+  await page.mouse.up();
+
+  await page.waitForFunction((before) => {
+    const input = document.querySelector('input[aria-label="Chip horizontal position"]');
+    return input && Number(input.value) > before;
+  }, chipXBefore);
+  assert.ok(
+    Number(await chipX.inputValue()) > chipXBefore,
+    'direct canvas drag must move the built-in EMV chip'
+  );
+
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.waitForFunction((before) => {
+    const input = document.querySelector('input[aria-label="Chip horizontal position"]');
+    return input && Math.abs(Number(input.value) - before) < 0.002;
+  }, chipXBefore);
+
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  await page.getByRole('button', { name: /^Contactless Built-in hardware /i }).click();
+  await page.getByRole('tab', { name: 'Position', exact: true }).click();
+
+  const contactlessRotation = page.getByLabel('Contactless rotation');
+  const contactlessRotationBefore = Number(await contactlessRotation.inputValue());
+  await contactlessRotation.evaluate((node) => {
+    node.value = '24';
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Contactless rotation"]');
+    return input && Math.abs(Number(input.value) - 24) < 0.001;
+  });
+  assert.equal(
+    Number(await contactlessRotation.inputValue()),
+    24,
+    'built-in contactless rotation control must update in WebKit'
+  );
+
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.waitForFunction((before) => {
+    const input = document.querySelector('input[aria-label="Contactless rotation"]');
+    return input && Math.abs(Number(input.value) - before) < 0.001;
+  }, contactlessRotationBefore);
+
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+
   await page.getByRole('button', { name: '+ Chip', exact: true }).click();
   const customChipFinish = page.getByRole('radiogroup', { name: 'Custom chip finish' });
   await customChipFinish.waitFor({ state: 'visible', timeout: 5000 });
