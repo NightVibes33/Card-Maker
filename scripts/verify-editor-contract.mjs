@@ -50,6 +50,8 @@ const pageChecks = [
   [/setSelectedElement\('artwork'\);[\s\S]{0,220}setStudioTool\('crop'\)/, 'Library artwork selection targets the background before crop editing'],
   [/for \(const snapshot of undoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves undo history assets'],
   [/for \(const snapshot of redoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves redo history assets'],
+  [/for \(const layer of currentDesign\.customLayers \|\| \[\]\)/, 'project saving scans custom layers for remote artwork'],
+  [/some remote art is not cached offline/, 'project saving reports incomplete offline artwork caching'],
   [/const referencedPresetAssetIds = new Set\(\)/, 'preset import tracks only referenced embedded assets'],
   [/Preset is missing a referenced image asset/, 'preset import rejects missing referenced image blobs'],
   [/Undo returns to your previous card/, 'opening a saved project remains reversible'],
