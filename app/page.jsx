@@ -434,6 +434,23 @@ function hexToRgb(hex = '#000000') {
   return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
 }
 
+let textMeasureCanvas = null;
+
+function textLayerFontFamily(fontFamily) {
+  return {
+    system: '-apple-system, BlinkMacSystemFont, sans-serif',
+    rounded: 'ui-rounded, -apple-system, BlinkMacSystemFont, sans-serif',
+    serif: 'ui-serif, Georgia, serif',
+    mono: 'ui-monospace, SFMono-Regular, Menlo, monospace'
+  }[fontFamily] || '-apple-system, BlinkMacSystemFont, sans-serif';
+}
+
+function textLayerFontCss(layer) {
+  const size = clamp(Number(layer?.fontSize ?? 58), 10, 240);
+  const weight = clamp(Number(layer?.weight ?? 700), 100, 900);
+  return weight + ' ' + size + 'px ' + textLayerFontFamily(layer?.fontFamily);
+}
+
 function measureTrackedText(ctx, text, tracking = 0) {
   const chars = Array.from(String(text || ''));
   if (!chars.length) return 0;
@@ -490,17 +507,39 @@ function customLayerBounds(layer, layerImage) {
 
   const size = clamp(Number(layer.fontSize ?? 58), 10, 240);
   const tracking = Number(layer.letterSpacing ?? 0);
-  const chars = Array.from(String(layer.text ?? 'Text'));
-  const estimatedWidth = Math.max(
+  const text = String(layer.text ?? 'Text');
+  const chars = Array.from(text);
+  let measuredWidth = Math.max(
     size * 0.5,
     chars.reduce(
       (width, char) => width + size * (char === ' ' ? 0.34 : /[ilI1|]/.test(char) ? 0.3 : /[MW@#]/.test(char) ? 0.82 : 0.58),
       0
     ) + Math.max(0, chars.length - 1) * tracking
   );
+  let ascent = size * 0.9;
+  let descent = size * 0.28;
+
+  if (typeof document !== 'undefined') {
+    textMeasureCanvas ||= document.createElement('canvas');
+    const measureCtx = textMeasureCanvas.getContext('2d');
+    if (measureCtx) {
+      measureCtx.font = textLayerFontCss(layer);
+      measuredWidth = Math.max(size * 0.25, measureTrackedText(measureCtx, text, tracking));
+      const metrics = measureCtx.measureText(text || 'M');
+      ascent = Math.max(size * 0.55, Number(metrics.actualBoundingBoxAscent || 0));
+      descent = Math.max(size * 0.15, Number(metrics.actualBoundingBoxDescent || 0));
+    }
+  }
+
+  const shadowPad = layer.shadow ? 16 : 0;
   const align = layer.align || 'center';
-  const left = align === 'left' ? 0 : align === 'right' ? -estimatedWidth : -estimatedWidth / 2;
-  return { left, top: -size * 0.9, right: left + estimatedWidth, bottom: size * 0.28 };
+  const left = align === 'left' ? 0 : align === 'right' ? -measuredWidth : -measuredWidth / 2;
+  return {
+    left: left - shadowPad,
+    top: -ascent - shadowPad,
+    right: left + measuredWidth + shadowPad,
+    bottom: descent + shadowPad
+  };
 }
 
 function pointInRotatedBounds(px, py, cx, cy, rotation, scale, bounds, padding = 0) {
@@ -2093,15 +2132,7 @@ export default function Page() {
       ctx.scale(layer.type === 'image' && layer.flipX ? -scale : scale, scale);
 
       if (layer.type === 'text') {
-        const size = clamp(Number(layer.fontSize || 54), 10, 240);
-        const weight = clamp(Number(layer.weight || 700), 100, 900);
-        const fontFamily = {
-          system: '-apple-system, BlinkMacSystemFont, sans-serif',
-          rounded: 'ui-rounded, -apple-system, BlinkMacSystemFont, sans-serif',
-          serif: 'ui-serif, Georgia, serif',
-          mono: 'ui-monospace, SFMono-Regular, Menlo, monospace'
-        }[layer.fontFamily] || '-apple-system, BlinkMacSystemFont, sans-serif';
-        ctx.font = weight + ' ' + size + 'px ' + fontFamily;
+        ctx.font = textLayerFontCss(layer);
         ctx.fillStyle = layer.color || '#ffffff';
         ctx.textAlign = layer.align || 'center';
         ctx.shadowColor = layer.shadow ? 'rgba(0,0,0,.5)' : 'transparent';
