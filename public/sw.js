@@ -1,6 +1,7 @@
 const SHELL_CACHE = 'aircard-shell-v2';
 const ART_CACHE = 'aircard-art-v2';
 const CATALOG_CACHE = 'aircard-catalog-v2';
+const STATIC_CACHE = 'aircard-static-v2';
 
 const SHELL = ['/', '/manifest.webmanifest'];
 
@@ -17,7 +18,7 @@ self.addEventListener('activate', (event) => {
     caches.keys()
       .then((keys) => Promise.all(
         keys
-          .filter((key) => ![SHELL_CACHE, ART_CACHE, CATALOG_CACHE].includes(key))
+          .filter((key) => ![SHELL_CACHE, ART_CACHE, CATALOG_CACHE, STATIC_CACHE].includes(key))
           .map((key) => caches.delete(key))
       ))
       .then(() => self.clients.claim())
@@ -62,8 +63,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.pathname === '/api/cucu') {
+  if (url.pathname.startsWith('/api/cucu')) {
     event.respondWith(staleWhileRevalidate(event.request, CATALOG_CACHE));
+    return;
+  }
+
+  if (url.pathname.startsWith('/_next/static/') || /\.(?:js|css|woff2?|png|jpg|jpeg|webp|svg|ico)$/i.test(url.pathname)) {
+    event.respondWith(cacheFirst(event.request, STATIC_CACHE));
     return;
   }
 
