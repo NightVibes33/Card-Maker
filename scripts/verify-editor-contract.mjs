@@ -207,6 +207,7 @@ requireMatch(inspectRoute, /IMAGE_PROXY_VERSION/, 'inspected artwork URLs use th
 requireMatch(storage, /await cache\.delete\(url\);[\s\S]{0,120}await cache\.put\(url, existing\.clone\(\)\)/, 'explicit offline saves refresh cache eviction priority');
 requireMatch(storage, /if \(!db\) throw new Error\('IndexedDB unavailable'\);/, 'durable IndexedDB writes fail instead of reporting fake success');
 requireMatch(storage, /if \(settled\) \{[\s\S]{0,80}db\.close\(\);/, 'late IndexedDB upgrade success closes orphaned connections');
+requireMatch(storage, /db\.onclose = \(\) => \{[\s\S]{0,80}dbPromise = null;/, 'unexpected IndexedDB closure resets the cached connection');
 requireMatch(storage, /const CACHE_ARTWORK_TIMEOUT_MS = 12000;/, 'offline artwork caching has a mobile-network timeout');
 requireMatch(storage, /signal: controller\.signal/, 'offline artwork cache fetches are abortable');
 requireMatch(page, /dbGetImportMetadata\(\)/, 'Library hydrates import metadata instead of blobs');
