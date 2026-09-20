@@ -2798,7 +2798,11 @@ export default function Page() {
       const factor = lastDistance.current ? distance / Math.max(1, lastDistance.current) : 1;
       const angleDelta = lastAngle.current == null ? 0 : ((angle - lastAngle.current) * 180) / Math.PI;
       const transformed = Math.abs(factor - 1) > 0.0005 || Math.abs(angleDelta) > 0.02;
-      if (transformed) recordGestureHistory();
+      const gestureLayer = target !== 'artwork' && target !== 'chip' && target !== 'contactless'
+        ? (designRef.current.customLayers || []).find((layer) => layer.id === target)
+        : null;
+      const transformBlocked = Boolean(gestureLayer?.locked);
+      if (transformed && !transformBlocked) recordGestureHistory();
 
       if (target === 'chip') {
         patch((current) => ({
@@ -2811,17 +2815,19 @@ export default function Page() {
           contactlessRotation: clamp(Number(current.contactlessRotation || 0) + angleDelta, -180, 180)
         }), false);
       } else if (target !== 'artwork') {
-        patch((current) => ({
-          customLayers: (current.customLayers || []).map((layer) =>
-            layer.id === target && !layer.locked
-              ? {
-                  ...layer,
-                  scale: clamp(Number(layer.scale ?? 1) * factor, 0.1, 6),
-                  rotation: clamp(Number(layer.rotation || 0) + angleDelta, -180, 180)
-                }
-              : layer
-          )
-        }), false);
+        if (!transformBlocked) {
+          patch((current) => ({
+            customLayers: (current.customLayers || []).map((layer) =>
+              layer.id === target
+                ? {
+                    ...layer,
+                    scale: clamp(Number(layer.scale ?? 1) * factor, 0.1, 6),
+                    rotation: clamp(Number(layer.rotation || 0) + angleDelta, -180, 180)
+                  }
+                : layer
+            )
+          }), false);
+        }
       } else {
         patch((current) => ({
           zoom: clamp(current.zoom * factor, 0.5, 5),
@@ -3035,14 +3041,22 @@ export default function Page() {
           ref={canvasRef}
           width={OUT_W}
           height={OUT_H}
-          onPointerDown={pointerDown}
-          onPointerMove={pointerMove}
-          onPointerUp={pointerUp}
-          onPointerCancel={pointerUp}
-          aria-label="Editable card preview. Drag the selected element. Use two fingers to scale and rotate."
+          onPointerDown={previewMode === 'flat' ? pointerDown : undefined}
+          onPointerMove={previewMode === 'flat' ? pointerMove : undefined}
+          onPointerUp={previewMode === 'flat' ? pointerUp : undefined}
+          onPointerCancel={previewMode === 'flat' ? pointerUp : undefined}
+          onClick={previewMode === 'physical' ? () => {
+            setPreviewMode('flat');
+            setMessage('Flat preview enabled for editing');
+          } : undefined}
+          aria-label={
+            previewMode === 'flat'
+              ? 'Editable card preview. Drag the selected element. Use two fingers to scale and rotate.'
+              : 'Physical card preview. Tap to return to Flat editing mode.'
+          }
         />
 
-        {tab === 'studio' && guidesEnabled ? (
+        {tab === 'studio' && previewMode === 'flat' && guidesEnabled ? (
           <div className="cardGuides" aria-hidden="true">
             <i className="guide bleedEdge" />
             <i className="guide cropBoundary" />
@@ -3055,7 +3069,7 @@ export default function Page() {
           </div>
         ) : null}
 
-        {tab === 'studio' && selectedElement === 'chip' && design.chip ? (
+        {tab === 'studio' && previewMode === 'flat' && selectedElement === 'chip' && design.chip ? (
           <div
             className="selectionOutline chipSelection"
             aria-hidden="true"
@@ -3069,7 +3083,7 @@ export default function Page() {
           />
         ) : null}
 
-        {tab === 'studio' && selectedElement === 'contactless' && design.contactless ? (
+        {tab === 'studio' && previewMode === 'flat' && selectedElement === 'contactless' && design.contactless ? (
           <div
             className="selectionOutline contactlessSelection"
             aria-hidden="true"
@@ -3091,12 +3105,13 @@ export default function Page() {
               left: (design.chipX * 100) + '%',
               top: (design.chipY * 100) + '%',
               width: ((255 * design.chipScale / OUT_W) * 100) + '%',
-              height: ((188 * design.chipScale / OUT_H) * 100) + '%'
+              height: ((188 * design.chipScale / OUT_H) * 100) + '%',
+              transform: 'rotate(' + Number(design.chipRotation || 0) + 'deg)'
             }}
           />
         ) : null}
 
-        {tab === 'studio' && selectedLayer ? (
+        {tab === 'studio' && previewMode === 'flat' && selectedLayer ? (
           <div
             className="selectionOutline layerSelection"
             aria-hidden="true"
