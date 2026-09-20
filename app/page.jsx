@@ -302,6 +302,7 @@ function normalizeCustomLayer(layer) {
       : 'system';
     normalized.weight = Math.round(finiteClamp(layer.weight, 700, 100, 900) / 100) * 100;
     normalized.letterSpacing = finiteClamp(layer.letterSpacing, 0, -4, 30);
+    normalized.lineHeight = finiteClamp(layer.lineHeight, 1.18, 0.8, 2);
     normalized.align = ['left', 'center', 'right'].includes(layer.align) ? layer.align : 'center';
     normalized.shadow = Boolean(layer.shadow);
   } else if (type === 'shape') {
@@ -454,6 +455,15 @@ function textLayerFontCss(layer) {
   return weight + ' ' + size + 'px ' + textLayerFontFamily(layer?.fontFamily);
 }
 
+function textLayerLines(layer) {
+  return String(layer?.text ?? 'Text').replace(/\r\n?/g, '\n').split('\n');
+}
+
+function textLayerLineAdvance(layer) {
+  const size = clamp(Number(layer?.fontSize ?? 58), 10, 240);
+  return size * clamp(Number(layer?.lineHeight ?? 1.18), 0.8, 2);
+}
+
 function measureTrackedText(ctx, text, tracking = 0) {
   const chars = Array.from(String(text || ''));
   if (!chars.length) return 0;
@@ -510,14 +520,17 @@ function customLayerBounds(layer, layerImage) {
 
   const size = clamp(Number(layer.fontSize ?? 58), 10, 240);
   const tracking = Number(layer.letterSpacing ?? 0);
-  const text = String(layer.text ?? 'Text');
-  const chars = Array.from(text);
+  const lines = textLayerLines(layer);
+  const lineAdvance = textLayerLineAdvance(layer);
   let measuredWidth = Math.max(
     size * 0.5,
-    chars.reduce(
-      (width, char) => width + size * (char === ' ' ? 0.34 : /[ilI1|]/.test(char) ? 0.3 : /[MW@#]/.test(char) ? 0.82 : 0.58),
-      0
-    ) + Math.max(0, chars.length - 1) * tracking
+    ...lines.map((line) => {
+      const chars = Array.from(line);
+      return chars.reduce(
+        (width, char) => width + size * (char === ' ' ? 0.34 : /[ilI1|]/.test(char) ? 0.3 : /[MW@#]/.test(char) ? 0.82 : 0.58),
+        0
+      ) + Math.max(0, chars.length - 1) * tracking;
+    })
   );
   let ascent = size * 0.9;
   let descent = size * 0.28;
@@ -527,8 +540,11 @@ function customLayerBounds(layer, layerImage) {
     const measureCtx = textMeasureCanvas.getContext('2d');
     if (measureCtx) {
       measureCtx.font = textLayerFontCss(layer);
-      measuredWidth = Math.max(size * 0.25, measureTrackedText(measureCtx, text, tracking));
-      const metrics = measureCtx.measureText(text || 'M');
+      measuredWidth = Math.max(
+        size * 0.25,
+        ...lines.map((line) => measureTrackedText(measureCtx, line, tracking))
+      );
+      const metrics = measureCtx.measureText(lines.find(Boolean) || 'M');
       ascent = Math.max(size * 0.55, Number(metrics.actualBoundingBoxAscent || 0));
       descent = Math.max(size * 0.15, Number(metrics.actualBoundingBoxDescent || 0));
     }
@@ -537,11 +553,13 @@ function customLayerBounds(layer, layerImage) {
   const shadowPad = layer.shadow ? 16 : 0;
   const align = layer.align || 'center';
   const left = align === 'left' ? 0 : align === 'right' ? -measuredWidth : -measuredWidth / 2;
+  const firstBaseline = -((lines.length - 1) * lineAdvance) / 2;
+  const lastBaseline = firstBaseline + (lines.length - 1) * lineAdvance;
   return {
     left: left - shadowPad,
-    top: -ascent - shadowPad,
+    top: firstBaseline - ascent - shadowPad,
     right: left + measuredWidth + shadowPad,
-    bottom: descent + shadowPad
+    bottom: lastBaseline + descent + shadowPad
   };
 }
 
@@ -2156,7 +2174,18 @@ export default function Page() {
         ctx.textAlign = layer.align || 'center';
         ctx.shadowColor = layer.shadow ? 'rgba(0,0,0,.5)' : 'transparent';
         ctx.shadowBlur = layer.shadow ? 12 : 0;
-        drawTrackedText(ctx, layer.text ?? 'Text', 0, 0, Number(layer.letterSpacing || 0));
+        const lines = textLayerLines(layer);
+        const lineAdvance = textLayerLineAdvance(layer);
+        const firstBaseline = -((lines.length - 1) * lineAdvance) / 2;
+        lines.forEach((line, index) => {
+          drawTrackedText(
+            ctx,
+            line,
+            0,
+            firstBaseline + index * lineAdvance,
+            Number(layer.letterSpacing || 0)
+          );
+        });
       } else if (layer.type === 'shape') {
         const w = clamp(Number(layer.width || 260), 20, 1200);
         const h = clamp(Number(layer.height || 120), 20, 800);
@@ -2740,6 +2769,7 @@ export default function Page() {
           fontFamily: 'system',
           weight: 700,
           letterSpacing: 0,
+          lineHeight: 1.18,
           align: 'center',
           shadow: true,
           locked: false
@@ -4338,7 +4368,13 @@ export default function Page() {
                     <fieldset className="layerEditorFieldset" disabled={Boolean(selectedLayer.locked)}>
                     {selectedLayer.type === 'text' ? (
                       <>
-                        <input className="iosTextField" aria-label="Layer text" value={selectedLayer.text ?? ''} onChange={(event) => updateLayer(selectedLayer.id, { text: event.target.value })} />
+                        <textarea
+                          className="iosTextField iosTextArea"
+                          aria-label="Layer text"
+                          rows={3}
+                          value={selectedLayer.text ?? ''}
+                          onChange={(event) => updateLayer(selectedLayer.id, { text: event.target.value.slice(0, 500) })}
+                        />
                         <label className="selectRow">
                           <span>Font</span>
                           <select aria-label="Text layer font" value={selectedLayer.fontFamily || 'system'} onChange={(event) => updateLayer(selectedLayer.id, { fontFamily: event.target.value })}>
@@ -4358,6 +4394,7 @@ export default function Page() {
                         <SliderRow label="Font Size" value={selectedLayer.fontSize || 58} min={10} max={240} step={1} onChange={(value) => updateLayer(selectedLayer.id, { fontSize: value })} />
                         <SliderRow label="Weight" value={selectedLayer.weight || 700} min={100} max={900} step={100} onChange={(value) => updateLayer(selectedLayer.id, { weight: value })} />
                         <SliderRow label="Letter Spacing" value={selectedLayer.letterSpacing || 0} min={-4} max={30} step={1} onChange={(value) => updateLayer(selectedLayer.id, { letterSpacing: value })} />
+                        <SliderRow label="Line Height" value={selectedLayer.lineHeight ?? 1.18} min={0.8} max={2} step={0.01} formatValue={(value) => value.toFixed(2) + '×'} onChange={(value) => updateLayer(selectedLayer.id, { lineHeight: value })} />
                         <label className="colorRow"><span>Color</span><input type="color" value={selectedLayer.color || '#ffffff'} onChange={(event) => updateLayer(selectedLayer.id, { color: event.target.value })} /></label>
                         <SwitchRow label="Text Shadow" value={Boolean(selectedLayer.shadow)} onChange={(value) => updateLayer(selectedLayer.id, { shadow: value })} />
                       </>
@@ -4416,6 +4453,7 @@ export default function Page() {
                             <NumericField label="Exact Font Size" value={selectedLayer.fontSize || 58} min={10} max={240} step={1} onChange={(value) => updateLayer(selectedLayer.id, { fontSize: value })} />
                             <NumericField label="Exact Font Weight" value={selectedLayer.weight || 700} min={100} max={900} step={100} onChange={(value) => updateLayer(selectedLayer.id, { weight: value })} />
                             <NumericField label="Exact Letter Spacing" value={selectedLayer.letterSpacing || 0} min={-4} max={30} step={0.1} onChange={(value) => updateLayer(selectedLayer.id, { letterSpacing: value })} />
+                            <NumericField label="Exact Line Height" value={selectedLayer.lineHeight ?? 1.18} min={0.8} max={2} step={0.01} onChange={(value) => updateLayer(selectedLayer.id, { lineHeight: value })} suffix="×" />
                           </>
                         ) : null}
                         {selectedLayer.type === 'shape' ? (
