@@ -301,7 +301,6 @@ function normalizeCustomLayer(layer) {
   if (!type) return null;
 
   const normalized = {
-    ...layer,
     id,
     type,
     name: String(layer.name || type).slice(0, 80),
@@ -353,7 +352,7 @@ function normalizeCustomLayer(layer) {
 
 function normalizeDesignState(value) {
   const raw = value && typeof value === 'object' ? value : {};
-  const next = { ...DEFAULTS, ...raw };
+  const next = { ...DEFAULTS };
   next.background = normalizePersistedArtworkSource(raw.background, 3072);
   next.backgroundLabel = String(raw.backgroundLabel || DEFAULTS.backgroundLabel).slice(0, 120);
   next.sourceCrop = normalizeCrop(raw.sourceCrop, 0.1);
