@@ -4717,6 +4717,10 @@ export default function Page() {
   }
 
   async function saveProject(nameOverride = '') {
+    if (!hydrated) {
+      setMessage('Library is still loading. Try saving again once it is ready.');
+      return null;
+    }
     if (projectCountRef.current + projectOpsRef.current.size >= MAX_SAVED_PROJECTS) {
       setMessage('Project limit reached. Delete an older saved design before saving another.');
       return null;
@@ -7083,6 +7087,7 @@ export default function Page() {
                   type="button"
                   className="primaryAction librarySaveButton"
                   disabled={
+                    !hydrated ||
                     projectSaveInProgress ||
                     imageImportInProgress ||
                     presetTransferInProgress ||
@@ -7291,7 +7296,7 @@ export default function Page() {
               </button>
             </Group>
 
-            <button type="button" className="secondaryAction bigAction" disabled={projectSaveInProgress || imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={() => saveProject()}>
+            <button type="button" className="secondaryAction bigAction" disabled={!hydrated || projectSaveInProgress || imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={() => saveProject()}>
               {projectSaveInProgress ? 'Saving Design…' : 'Save Design to Library'}
             </button>
 
