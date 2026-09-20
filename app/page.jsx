@@ -4745,9 +4745,8 @@ export default function Page() {
 
       assets.push({
         id,
-        name: asset.name,
-        type: asset.type,
-        blob: asset.blob
+        name: safeDisplayText(asset.name, 'Preset asset', 160),
+        type: safeDisplayText(asset.type, 'image/*', 80)
       });
     }
 
@@ -4789,9 +4788,14 @@ export default function Page() {
 
       let firstAsset = true;
       for (const asset of assets) {
+        const stored = await dbGet('imports', asset.id);
+        if (!stored?.blob) {
+          throw new Error('A referenced imported image disappeared during preset export');
+        }
+
         if (!firstAsset) parts.push(',');
         firstAsset = false;
-        const dataUrl = await blobToDataUrl(asset.blob);
+        const dataUrl = await blobToDataUrl(stored.blob);
         parts.push(
           JSON.stringify(asset.id),
           ':{"name":',
