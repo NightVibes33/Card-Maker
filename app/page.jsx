@@ -1697,6 +1697,8 @@ export default function Page() {
   const gestureTarget = useRef('artwork');
   const gestureStartDesign = useRef(null);
   const gestureHistoryRecorded = useRef(false);
+  const draftSaveQueueRef = useRef(Promise.resolve());
+  const draftSaveVersionRef = useRef(0);
 
   const gradient = useMemo(
     () => GRADIENTS.find((item) => item.id === design.gradient) || GRADIENTS[0],
@@ -1793,6 +1795,41 @@ export default function Page() {
     setHistoryVersion((value) => value + 1);
     setMessage('Redid change');
   }, [replaceDesign]);
+
+  const persistDraftSnapshot = useCallback((snapshot) => {
+    const version = ++draftSaveVersionRef.current;
+    const copy = JSON.parse(JSON.stringify(snapshot || designRef.current));
+    if (copy.background && !isPersistableBackground(copy.background)) copy.background = '';
+
+    const work = draftSaveQueueRef.current
+      .catch(() => {})
+      .then(async () => {
+        let indexedDbSaved = false;
+        let localSaved = false;
+
+        try {
+          await dbPut('kv', {
+            id: 'draft',
+            design: copy,
+            updatedAt: Date.now()
+          });
+          indexedDbSaved = true;
+        } catch {}
+
+        try {
+          localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(copy));
+          localSaved = true;
+        } catch {}
+
+        return {
+          success: indexedDbSaved || localSaved,
+          version
+        };
+      });
+
+    draftSaveQueueRef.current = work.then(() => undefined, () => undefined);
+    return work;
+  }, []);
 
   const rememberArtwork = useCallback((item) => {
     setRecent((current) => {
@@ -1901,14 +1938,9 @@ export default function Page() {
 
             controllerReloadInFlight = true;
             const snapshot = designRef.current;
+            const result = await persistDraftSnapshot(snapshot);
 
-            try {
-              await dbPut('kv', {
-                id: 'draft',
-                design: snapshot,
-                updatedAt: Date.now()
-              });
-            } catch {
+            if (!result.success) {
               controllerReloadInFlight = false;
               setSaveStatus('Save failed');
               setMessage('Update ready, but the latest edit could not be saved. Reload manually when it is safe.');
@@ -1919,6 +1951,8 @@ export default function Page() {
               controllerReloadInFlight = false;
               return;
             }
+
+            setSaveStatus('Saved');
 
             try {
               localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(snapshot));
@@ -1971,31 +2005,13 @@ export default function Page() {
 
     setSaveStatus('Editing…');
     const timer = setTimeout(async () => {
-      const copy = { ...design };
-      if (copy.background && !isPersistableBackground(copy.background)) copy.background = '';
-
-      let indexedDbSaved = false;
-      let localSaved = false;
-
-      try {
-        await dbPut('kv', {
-          id: 'draft',
-          design: copy,
-          updatedAt: Date.now()
-        });
-        indexedDbSaved = true;
-      } catch {}
-
-      try {
-        localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(copy));
-        localSaved = true;
-      } catch {}
-
-      setSaveStatus(indexedDbSaved || localSaved ? 'Saved' : 'Save failed');
+      const result = await persistDraftSnapshot(designRef.current);
+      if (result.version !== draftSaveVersionRef.current) return;
+      setSaveStatus(result.success ? 'Saved' : 'Save failed');
     }, 420);
 
     return () => clearTimeout(timer);
-  }, [design, hydrated]);
+  }, [design, hydrated, persistDraftSnapshot]);
 
   useEffect(() => {
     try {
