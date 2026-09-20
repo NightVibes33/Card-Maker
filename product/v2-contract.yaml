@@ -135,6 +135,8 @@ features:
       - "Artwork vertical position"
       - "Artwork rotation"
       - "flipX"
+      - "Artwork fit in Position"
+      - "Reset Position"
   adjustment_controls:
     file: app/page.jsx
     contains:
@@ -201,6 +203,7 @@ features:
     file: app/page.jsx
     contains:
       - "bleedEdge"
+      - "cropBoundary"
       - "safeEdge"
       - "textSafe"
       - "chipZone"
@@ -327,6 +330,10 @@ features:
     contains:
       - "Expert Mode"
       - "EXPERT VALUES"
+      - "Exact numerical access to every global transform, adjustment, effect, and card-hardware parameter."
+      - "Effect Tint Strength"
+      - "Contactless X"
+      - "Chip Rotation"
   accessible_range_values:
     file: app/page.jsx
     contains:
