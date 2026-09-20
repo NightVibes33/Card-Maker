@@ -3456,16 +3456,28 @@ export default function Page() {
 
   function openProject(project) {
     if (!project?.design) return;
-    undoRef.current = [];
-    redoRef.current = [];
+
     historyGroupRef.current = { key: '', at: 0 };
-    setHistoryVersion((value) => value + 1);
-    replaceDesign({ ...DEFAULTS, ...project.design });
+    const current = designRef.current;
+    const next = normalizeDesignState({ ...DEFAULTS, ...project.design });
+    const changed = JSON.stringify(current) !== JSON.stringify(next);
+
+    if (changed) {
+      undoRef.current = [...undoRef.current.slice(-49), current];
+      redoRef.current = [];
+      setHistoryVersion((value) => value + 1);
+      replaceDesign(next, false);
+    }
+
     setSelectedElement('artwork');
     setShowOriginal(false);
     setActiveGuides({ x: null, y: null });
     setTab('studio');
-    setMessage((project.name || 'Design') + ' opened');
+    setMessage(
+      changed
+        ? (project.name || 'Design') + ' opened · Undo returns to your previous card'
+        : (project.name || 'Design') + ' is already open'
+    );
   }
 
   async function duplicateProject(project) {
