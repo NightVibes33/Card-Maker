@@ -157,13 +157,13 @@ function IOSIcon({ name, size = 24 }) {
     'aria-hidden': true
   };
 
-  if (name === 'browse') {
+  if (name === 'browse' || name === 'discover') {
     return <svg {...common}><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.3 15.3 4.7 4.7"/></svg>;
   }
-  if (name === 'edit') {
+  if (name === 'edit' || name === 'studio') {
     return <svg {...common}><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/><path d="M4 12h4M12 12h8"/><circle cx="10" cy="12" r="2"/></svg>;
   }
-  if (name === 'layers') {
+  if (name === 'layers' || name === 'library') {
     return <svg {...common}><rect x="4" y="4" width="12" height="12" rx="2.8"/><rect x="8" y="8" width="12" height="12" rx="2.8"/></svg>;
   }
   if (name === 'export') {
@@ -742,15 +742,36 @@ async function prepareCleanResults(items, maxItems = items.length) {
 }
 
 function isPersistableBackground(src = '') {
-  return src.startsWith('/api/image?');
+  return src.startsWith('/api/image?') || src.startsWith('idb://imports/');
 }
 
 export default function Page() {
-  const [tab, setTab] = useState('browse');
+  const [tab, setTab] = useState('discover');
+  const [studioTool, setStudioTool] = useState('position');
   const [design, setDesign] = useState(DEFAULTS);
   const [image, setImage] = useState(null);
   const [recent, setRecent] = useState([]);
   const [message, setMessage] = useState('Ready');
+  const [saveStatus, setSaveStatus] = useState('Saved');
+  const [favoriteIds, setFavoriteIds] = useState(new Set());
+  const [favorites, setFavorites] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [imports, setImports] = useState([]);
+  const [exportHistory, setExportHistory] = useState([]);
+  const [expertMode, setExpertMode] = useState(false);
+  const [guidesEnabled, setGuidesEnabled] = useState(true);
+  const [activeGuides, setActiveGuides] = useState({ x: false, y: false });
+  const [selectedElement, setSelectedElement] = useState('artwork');
+  const [previewMode, setPreviewMode] = useState('flat');
+  const [showOriginal, setShowOriginal] = useState(false);
+  const [showExportPreview, setShowExportPreview] = useState(false);
+  const [menuItem, setMenuItem] = useState(null);
+  const [installHelp, setInstallHelp] = useState(false);
+  const [online, setOnline] = useState(true);
+  const [query, setQuery] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [featured, setFeatured] = useState({});
+  const [catalogError, setCatalogError] = useState('');
   const [cucuCategory, setCucuCategory] = useState('all');
   const [cucuCategoryLabel, setCucuCategoryLabel] = useState('All Card Skins');
   const [cucuItems, setCucuItems] = useState([]);
@@ -758,22 +779,69 @@ export default function Page() {
   const [cucuTotal, setCucuTotal] = useState(2225);
   const [cucuHasMore, setCucuHasMore] = useState(true);
   const [cucuLoading, setCucuLoading] = useState(false);
+  const [historyVersion, setHistoryVersion] = useState(0);
+  const [layerImages, setLayerImages] = useState({});
   const canvasRef = useRef(null);
+  const fullPreviewCanvasRef = useRef(null);
   const uploadRef = useRef(null);
+  const layerUploadRef = useRef(null);
+  const presetImportRef = useRef(null);
+  const loadMoreRef = useRef(null);
   const pointers = useRef(new Map());
   const lastPoint = useRef(null);
   const lastDistance = useRef(null);
+  const lastAngle = useRef(null);
+  const undoRef = useRef([]);
+  const redoRef = useRef([]);
+  const applyingHistory = useRef(false);
 
   const gradient = useMemo(
     () => GRADIENTS.find((item) => item.id === design.gradient) || GRADIENTS[0],
     [design.gradient]
   );
 
-  const patch = useCallback((next) => {
+  const patch = useCallback((next, recordHistory = true) => {
     setDesign((current) => {
       const delta = typeof next === 'function' ? next(current) : next;
-      return { ...current, ...delta };
+      const updated = { ...current, ...delta };
+      if (JSON.stringify(updated) === JSON.stringify(current)) return current;
+
+      if (recordHistory && !applyingHistory.current) {
+        undoRef.current = [...undoRef.current.slice(-49), current];
+        redoRef.current = [];
+        setHistoryVersion((value) => value + 1);
+      }
+
+      return updated;
     });
+  }, []);
+
+  const undo = useCallback(() => {
+    const previous = undoRef.current.pop();
+    if (!previous) return;
+
+    applyingHistory.current = true;
+    setDesign((current) => {
+      redoRef.current = [...redoRef.current.slice(-49), current];
+      return previous;
+    });
+    applyingHistory.current = false;
+    setHistoryVersion((value) => value + 1);
+    setMessage('Undid change');
+  }, []);
+
+  const redo = useCallback(() => {
+    const next = redoRef.current.pop();
+    if (!next) return;
+
+    applyingHistory.current = true;
+    setDesign((current) => {
+      undoRef.current = [...undoRef.current.slice(-49), current];
+      return next;
+    });
+    applyingHistory.current = false;
+    setHistoryVersion((value) => value + 1);
+    setMessage('Redid change');
   }, []);
 
   const rememberArtwork = useCallback((item) => {
