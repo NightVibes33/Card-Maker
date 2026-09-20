@@ -290,13 +290,31 @@ try {
     'Undo must restore the pre-drag shape position'
   );
 
-  // A no-op edit must not clear the redo stack. Reselect the shape
-  // explicitly so this contract does not depend on incidental selection state
-  // from the preceding canvas gesture/Undo sequence.
+  // Prove Redo itself works before involving any tool/selection changes.
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Layer horizontal position"]');
+    return input && Number(input.value) > 0.55;
+  });
+  assert.ok(
+    Number(await layerX.inputValue()) > 0.55,
+    'Redo must restore the dragged shape position'
+  );
+
+  // Recreate the redo stack, then verify an unchanged shape option does not
+  // clear it. This isolates the no-op history contract from selection state.
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Layer horizontal position"]');
+    return input && Math.abs(Number(input.value) - 0.5) < 0.001;
+  });
+
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
   const shapeForNoOp = page.getByRole('button', { name: /^Shape shape /i }).first();
   await shapeForNoOp.waitFor({ state: 'visible', timeout: 5000 });
-  await shapeForNoOp.click();
+  if (!/selected/i.test(await shapeForNoOp.getAttribute('aria-label') || '')) {
+    await shapeForNoOp.click();
+  }
   const currentRectangle = page.getByRole('group', { name: 'Shape type' })
     .getByRole('button', { name: 'Rectangle', exact: true });
   await currentRectangle.waitFor({ state: 'visible', timeout: 5000 });
@@ -308,16 +326,6 @@ try {
     'a no-op layer edit must preserve redo history'
   );
   await page.getByRole('tab', { name: 'Position', exact: true }).click();
-
-  await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await page.waitForFunction(() => {
-    const input = document.querySelector('input[aria-label="Layer horizontal position"]');
-    return input && Number(input.value) > 0.55;
-  });
-  assert.ok(
-    Number(await layerX.inputValue()) > 0.55,
-    'Redo must restore the dragged shape position'
-  );
 
   const layerScale = page.getByLabel('Layer Scale');
   const layerRotation = page.getByLabel('Layer Rotation');
