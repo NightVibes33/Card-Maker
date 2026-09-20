@@ -4115,7 +4115,7 @@ export default function Page() {
             })
           }), false);
         }
-      } else {
+      } else if (designRef.current.background) {
         if (moved) recordGestureHistory();
         patch((current) => {
           const rawX = clamp(current.x + dx, -1.5, 1.5);
@@ -4143,7 +4143,10 @@ export default function Page() {
       const gestureLayer = target !== 'artwork' && target !== 'chip' && target !== 'contactless'
         ? (designRef.current.customLayers || []).find((layer) => layer.id === target)
         : null;
-      const transformBlocked = Boolean(gestureLayer?.locked);
+      const transformBlocked = Boolean(
+        gestureLayer?.locked ||
+        (target === 'artwork' && !designRef.current.background)
+      );
       if (transformed && !transformBlocked) recordGestureHistory();
 
       if (target === 'chip') {
@@ -4170,7 +4173,7 @@ export default function Page() {
             )
           }), false);
         }
-      } else {
+      } else if (!transformBlocked) {
         patch((current) => ({
           zoom: clamp(current.zoom * factor, 0.5, 5),
           rotate: clamp(current.rotate + angleDelta, -180, 180)
