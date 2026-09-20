@@ -125,9 +125,19 @@ async function checkPreprocessing(results) {
   console.log('PASS CUCU server preprocessing => usable crop/full/thumbnail metadata');
 }
 
-async function checkSearch() {
+async function checkSearch(catalogResults) {
+  const firstTitle = String(catalogResults[0]?.title || '');
+  const token = firstTitle
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length >= 4 && !['card','credit','debit','skin','skins','cover','covers'].includes(word))
+    .sort((a, b) => b.length - a.length)[0];
+
+  if (!token) throw new Error('Could not derive a real CUCU search token from: ' + firstTitle);
+
   const result = await fetchJsonRetry(
-    base + '/api/cucu?category=all&q=naruto&page=1&limit=12',
+    base + '/api/cucu?category=all&q=' + encodeURIComponent(token) + '&page=1&limit=12',
     'CUCU search'
   );
 
@@ -135,15 +145,23 @@ async function checkSearch() {
     throw new Error('CUCU search did not use cached catalog-search mode');
   }
 
-  if (!Array.isArray(result.json.results)) {
-    throw new Error('CUCU search results missing');
+  if (!Array.isArray(result.json.results) || result.json.results.length < 1) {
+    throw new Error('CUCU search returned no matches for known catalog token: ' + token);
   }
 
-  console.log('PASS CUCU cached search =>', result.json.results.length, 'results');
+  const matched = result.json.results.some((item) =>
+    String(item.title || '').toLowerCase().includes(token) ||
+    String(item.mediaAlt || '').toLowerCase().includes(token)
+  );
+  if (!matched) {
+    throw new Error('CUCU search returned results but not the known token: ' + token);
+  }
+
+  console.log('PASS CUCU cached search =>', token, result.json.results.length, 'results');
 }
 
 await checkHome();
 const results = await checkCatalog();
 await checkPreprocessing(results);
-await checkSearch();
+await checkSearch(results);
 console.log('Card Studio V2 CUCU smoke tests passed.');
