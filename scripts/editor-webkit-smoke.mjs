@@ -79,12 +79,24 @@ await page.route('**/api/cucu**', async (route) => {
   });
 });
 
-await page.route('**/api/image**', async (route) => {
+let holdEditorHighRes = true;
+const heldEditorHighResRoutes = [];
+
+async function fulfillCatalogImage(route) {
   await route.fulfill({
     status: 200,
     contentType: 'image/png',
     body: catalogSkinPng
   });
+}
+
+await page.route('**/api/image**', async (route) => {
+  const url = new URL(route.request().url());
+  if (holdEditorHighRes && url.searchParams.get('w') === '3072') {
+    heldEditorHighResRoutes.push(route);
+    return;
+  }
+  await fulfillCatalogImage(route);
 });
 
 const imageLayerUpload = await sharp({
@@ -174,6 +186,36 @@ try {
   await earlyLibrarySkin.click();
   await page.locator('#panel-studio').waitFor({ state: 'visible', timeout: 10000 });
 
+  // Keep every 3072px request blocked and require the already-decoded Library
+  // thumbnail to paint Studio anyway. This proves a visible card never turns
+  // into a blank/loading card during the Library -> editor handoff.
+  await page.waitForFunction(
+    () => {
+      const canvas = document.querySelector('.cardFrame canvas');
+      const ctx = canvas?.getContext('2d');
+      if (!canvas || !ctx) return false;
+      const pixel = ctx.getImageData(
+        Math.floor(canvas.width * 0.82),
+        Math.floor(canvas.height * 0.18),
+        1,
+        1
+      ).data;
+      return (
+        pixel[0] >= 40 && pixel[0] <= 80 &&
+        pixel[1] >= 75 && pixel[1] <= 115 &&
+        pixel[2] >= 190 && pixel[2] <= 240
+      );
+    },
+    null,
+    { timeout: 1000 }
+  );
+  console.log('PASS Library -> Studio decoded preview handoff is immediate before 3072px load');
+
+  holdEditorHighRes = false;
+  for (const route of heldEditorHighResRoutes.splice(0)) {
+    await fulfillCatalogImage(route);
+  }
+
   assert.equal(
     await page.getByRole('button', { name: 'Undo', exact: true }).isDisabled(),
     true,
@@ -230,11 +272,17 @@ try {
     textColor: '#ffffff',
     shadow: true
   };
-  for (const [key, expected] of Object.entries(earlyDefaultState)) {
+  const earlyLibraryExpectedState = {
+    ...earlyDefaultState,
+    // Library previews use -2.25% inset on each edge, which is exactly a
+    // 4.5% total size increase when reproduced by the Studio artwork scale.
+    zoom: 1.045
+  };
+  for (const [key, expected] of Object.entries(earlyLibraryExpectedState)) {
     assert.deepEqual(
       earlyFreshDraft[key],
       expected,
-      `main Card Library import must hard-reset ${key} to the original default`
+      `main Card Library import must reset ${key} to the Library-card baseline`
     );
   }
   assert.deepEqual(earlyFreshDraft.customLayers, [], 'main Card Library import must clear every custom layer');
@@ -329,6 +377,11 @@ try {
     'Library Recent import must reset chip position'
   );
   assert.equal(libraryTabFreshDraft.contactless, true, 'Library Recent import must restore built-in Contactless');
+  assert.equal(
+    libraryTabFreshDraft.zoom,
+    1.045,
+    'Library Recent import must preserve the exact 2.25%-per-edge Library framing in Studio'
+  );
   assert.deepEqual(
     libraryTabFreshDraft.customLayers,
     [],
