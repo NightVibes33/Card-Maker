@@ -26,6 +26,10 @@ jobs:
         run: npm run verify:editor
       - name: Build production app
         run: npm run build
+      - name: Install WebKit editor smoke runtime
+        run: |
+          npm install --no-save --no-package-lock playwright@1.55.0
+          npx playwright install --with-deps webkit
       - name: Start production server
         run: |
           npm start -- -p 3000 > /tmp/card-maker.log 2>&1 &
@@ -40,6 +44,8 @@ jobs:
           exit 1
       - name: Smoke test real search and images
         run: node scripts/smoke.mjs
+      - name: Smoke test mobile WebKit editor
+        run: node scripts/editor-webkit-smoke.mjs
       - name: Show server log on failure
         if: failure()
         run: cat /tmp/card-maker.log || true
