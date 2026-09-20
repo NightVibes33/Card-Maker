@@ -69,6 +69,9 @@ requireMatch(storage, /const DB_VERSION = 2;/, 'IndexedDB schema includes import
 requireMatch(storage, /'importMeta'/, 'import metadata store exists');
 requireMatch(storage, /export async function dbGetImportMetadata\(/, 'metadata-only import listing exists');
 requireMatch(page, /dbGetImportMetadata\(\)/, 'Library hydrates import metadata instead of blobs');
+requireMatch(page, /const MAX_STORED_IMAGE_PIXELS = 12_000_000;/, 'local image working-set pixels are bounded');
+requireMatch(page, /const MAX_STORED_IMAGE_DIMENSION = 4096;/, 'local image working-set dimensions are bounded');
+requireMatch(page, /async function prepareLocalImageBlob\(/, 'oversized local images are downsampled before persistence');
 if (/dbGetAll\('imports'\)/.test(page)) {
   throw new Error('Editor contract failed: Library must not hydrate full import blobs into React state');
 }
