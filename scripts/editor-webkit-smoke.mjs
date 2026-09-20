@@ -351,8 +351,10 @@ try {
     node.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await page.getByRole('tab', { name: 'Discover', exact: true }).click();
-  const discoverUploadInput = page.locator('input[type="file"][accept="image/*"]').first();
-  await discoverUploadInput.setInputFiles({
+  const discoverChooserPromise = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Import Photo or File', exact: true }).click();
+  const discoverChooser = await discoverChooserPromise;
+  await discoverChooser.setFiles({
     name: 'fresh-main-menu-import.png',
     mimeType: 'image/png',
     buffer: imageLayerUpload
@@ -400,8 +402,10 @@ try {
     node.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await page.getByRole('tab', { name: 'Crop', exact: true }).click();
-  const replaceUploadInput = page.locator('input[type="file"][accept="image/*"]').first();
-  await replaceUploadInput.setInputFiles({
+  const replaceChooserPromise = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: /Replace Artwork/i }).click();
+  const replaceChooser = await replaceChooserPromise;
+  await replaceChooser.setFiles({
     name: 'replacement-artwork.png',
     mimeType: 'image/png',
     buffer: catalogSkinPng
