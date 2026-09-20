@@ -1828,11 +1828,16 @@ export default function Page() {
 
     if (recordHistory) {
       const now = Date.now();
-      const automaticKey = historyKey || (
-        typeof next === 'function'
-          ? ''
-          : Object.keys(delta || {}).sort().join('|')
-      );
+      const autoKey = deltaKeys.length === 1 ? deltaKeys[0] : '';
+      const autoValue = autoKey ? delta[autoKey] : undefined;
+      const discreteKeys = new Set(['fit', 'gradient', 'chipTone']);
+      const canAutoGroup =
+        !historyKey &&
+        typeof next !== 'function' &&
+        Boolean(autoKey) &&
+        typeof autoValue !== 'boolean' &&
+        !discreteKeys.has(autoKey);
+      const automaticKey = historyKey || (canAutoGroup ? 'design:' + autoKey : '');
       const previousGroup = historyGroupRef.current;
       const coalesced = Boolean(
         automaticKey &&
@@ -3240,7 +3245,27 @@ export default function Page() {
       return;
     }
 
-    const key = 'layer:' + id + ':' + Object.keys(delta || {}).sort().join('|');
+    const deltaKeys = Object.keys(delta || {});
+    const continuousLayerKeys = new Set([
+      'text',
+      'color',
+      'x',
+      'y',
+      'scale',
+      'rotation',
+      'opacity',
+      'width',
+      'height',
+      'radius',
+      'fontSize',
+      'weight',
+      'letterSpacing',
+      'lineHeight'
+    ]);
+    const key =
+      deltaKeys.length === 1 && continuousLayerKeys.has(deltaKeys[0])
+        ? 'layer:' + id + ':' + deltaKeys[0]
+        : '';
     patch((current) => {
       const layers = current.customLayers || [];
       let changed = false;
@@ -3360,7 +3385,11 @@ export default function Page() {
   }
 
   function patchImageTarget(delta) {
-    const key = 'image:' + selectedElement + ':' + Object.keys(delta || {}).sort().join('|');
+    const deltaKeys = Object.keys(delta || {});
+    const key =
+      deltaKeys.length === 1
+        ? 'image:' + selectedElement + ':' + deltaKeys[0]
+        : '';
     patch((current) => {
       const layer = (current.customLayers || []).find((entry) => entry.id === selectedElement);
       if (layer?.type === 'image') {
