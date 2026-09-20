@@ -26,6 +26,7 @@ const MAX_UNPROBED_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_PRESET_IMPORT_BYTES = 48 * 1024 * 1024;
 const MAX_PRESET_EMBEDDED_BYTES = 30 * 1024 * 1024;
 const MAX_CUSTOM_LAYERS = 200;
+const MAX_SAVED_PROJECTS = 200;
 const MAX_VISIBLE_IMAGE_LAYERS = 12;
 const MAX_VISIBLE_IMAGE_DECODE_PIXELS = 24_000_000;
 const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS + 1;
@@ -4493,6 +4494,10 @@ export default function Page() {
   }
 
   async function saveProject(nameOverride = '') {
+    if (projects.length + projectOpsRef.current.size >= MAX_SAVED_PROJECTS) {
+      setMessage('Project limit reached. Delete an older saved design before saving another.');
+      return null;
+    }
     if (imageImportInFlightRef.current) {
       setMessage('Finish the image import before saving this design.');
       return null;
@@ -4647,6 +4652,12 @@ export default function Page() {
 
   async function duplicateProject(project) {
     await withProjectOperation(project?.id, async () => {
+    const pendingOtherProjectOps = Math.max(0, projectOpsRef.current.size - 1);
+    if (projects.length + pendingOtherProjectOps >= MAX_SAVED_PROJECTS) {
+      setMessage('Project limit reached. Delete an older saved design before duplicating.');
+      return;
+    }
+
     const copy = {
       ...project,
       id: makeId('project'),
@@ -6735,7 +6746,13 @@ export default function Page() {
                 <button
                   type="button"
                   className="primaryAction librarySaveButton"
-                  disabled={projectSaveInProgress || imageImportInProgress || presetTransferInProgress || cleanupInProgress}
+                  disabled={
+                    projectSaveInProgress ||
+                    imageImportInProgress ||
+                    presetTransferInProgress ||
+                    cleanupInProgress ||
+                    projects.length >= MAX_SAVED_PROJECTS
+                  }
                   onClick={async () => {
                     const saved = await saveProject(projectName);
                     if (saved) setProjectName('');
