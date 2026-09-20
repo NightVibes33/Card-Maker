@@ -2944,6 +2944,21 @@ export default function Page() {
     [design.customLayers, selectedElement]
   );
 
+  useEffect(() => {
+    if (selectedElement === 'artwork') return;
+    if (selectedElement === 'chip') {
+      if (!design.chip) setSelectedElement('artwork');
+      return;
+    }
+    if (selectedElement === 'contactless') {
+      if (!design.contactless) setSelectedElement('artwork');
+      return;
+    }
+    if (!(design.customLayers || []).some((layer) => layer.id === selectedElement)) {
+      setSelectedElement('artwork');
+    }
+  }, [design.chip, design.contactless, design.customLayers, selectedElement]);
+
   const selectedImageLayer = selectedLayer?.type === 'image' ? selectedLayer : null;
   const activeImageSettings = selectedImageLayer
     ? { ...IMAGE_LAYER_DEFAULTS, ...(selectedImageLayer.adjustments || {}) }
@@ -3002,7 +3017,7 @@ export default function Page() {
         <button
           type="button"
           className="beforeAfterButton"
-          disabled={!activeImageAvailable}
+          disabled={!activeImageAvailable || !renderAssetsReady}
           onPointerDown={() => setShowOriginal(true)}
           onPointerUp={() => setShowOriginal(false)}
           onPointerCancel={() => setShowOriginal(false)}
