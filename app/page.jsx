@@ -4087,7 +4087,10 @@ export default function Page() {
           const parsedFallback = JSON.parse(fallbackDraft);
           addDesignRefs(parsedFallback);
         }
-      } catch {}
+      } catch {
+        setMessage('Could not verify the fallback draft, so no imported images were removed.');
+        return;
+      }
   
       let storedProjects;
       try {
