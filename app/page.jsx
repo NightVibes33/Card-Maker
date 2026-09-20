@@ -1792,6 +1792,11 @@ export default function Page() {
               return;
             }
 
+            if (cancelled) {
+              controllerReloadInFlight = false;
+              return;
+            }
+
             try {
               localStorage.setItem('aircard-sticker-fvp-v3', JSON.stringify(snapshot));
             } catch {}
