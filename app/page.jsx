@@ -1911,7 +1911,6 @@ function normalizeStoredArtworkItem(item) {
       : image;
 
   return {
-    ...item,
     id,
     title: safeDisplayText(item.title, 'Card Skin', 160),
     image,
