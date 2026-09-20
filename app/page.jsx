@@ -635,6 +635,37 @@ function pointInRotatedEllipse(px, py, cx, cy, rotation, scale, width, height, p
   return (local.x * local.x) / (rx * rx) + (local.y * local.y) / (ry * ry) <= 1;
 }
 
+function pointInRotatedRoundedRect(
+  px,
+  py,
+  cx,
+  cy,
+  rotation,
+  scale,
+  width,
+  height,
+  radius,
+  padding = 0
+) {
+  const local = pointToLocal(px, py, cx, cy, rotation, scale);
+  const halfW = Math.max(1, Number(width || 0) / 2 + padding);
+  const halfH = Math.max(1, Number(height || 0) / 2 + padding);
+  const corner = clamp(
+    Number(radius || 0) + padding,
+    0,
+    Math.min(halfW, halfH)
+  );
+  const ax = Math.abs(local.x);
+  const ay = Math.abs(local.y);
+
+  if (ax > halfW || ay > halfH) return false;
+  if (corner <= 0 || ax <= halfW - corner || ay <= halfH - corner) return true;
+
+  const dx = ax - (halfW - corner);
+  const dy = ay - (halfH - corner);
+  return dx * dx + dy * dy <= corner * corner;
+}
+
 function selectionStyleForBounds(originX, originY, scale, rotation, bounds) {
   const safeScale = Math.max(0.0001, Number(scale || 1));
   const angle = Number(rotation || 0);
@@ -3800,17 +3831,40 @@ export default function Page() {
       const layerY = Number(layer.y ?? 0.5) * OUT_H;
       const layerScale = clamp(Number(layer.scale ?? 1), 0.1, 6);
 
-      if (layer.type === 'shape' && layer.shape === 'ellipse') {
+      if (layer.type === 'shape') {
+        const shapeWidth = clamp(Number(layer.width ?? 280), 20, 1200);
+        const shapeHeight = clamp(Number(layer.height ?? 120), 20, 800);
+
+        if (layer.shape === 'ellipse') {
+          if (
+            pointInRotatedEllipse(
+              px,
+              py,
+              layerX,
+              layerY,
+              layer.rotation,
+              layerScale,
+              shapeWidth,
+              shapeHeight,
+              14
+            )
+          ) {
+            return layer.id;
+          }
+          continue;
+        }
+
         if (
-          pointInRotatedEllipse(
+          pointInRotatedRoundedRect(
             px,
             py,
             layerX,
             layerY,
             layer.rotation,
             layerScale,
-            clamp(Number(layer.width ?? 280), 20, 1200),
-            clamp(Number(layer.height ?? 120), 20, 800),
+            shapeWidth,
+            shapeHeight,
+            clamp(Number(layer.radius ?? 26), 0, Math.min(shapeWidth, shapeHeight) / 2),
             14
           )
         ) {
