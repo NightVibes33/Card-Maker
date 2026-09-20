@@ -98,7 +98,7 @@ features:
       - "toggleFavorite"
       - "favoriteIds"
       - "dbPut('favorites'"
-      - "cacheArtwork(proxyImageWidth(item.image, 3072))"
+      - "cacheArtwork(stored.image)"
   recent_twenty:
     file: app/page.jsx
     contains:
