@@ -5666,9 +5666,20 @@ export default function Page() {
     ? Boolean(selectedImageLayer.src)
     : Boolean(design.background);
   const activeImageRenderable = selectedImageLayer
-    ? Boolean(selectedImageLayer.src && !selectedImageLayer.hidden)
-    : Boolean(design.background);
-  const activeImageEditable = activeImageAvailable && !Boolean(selectedImageLayer?.locked);
+    ? Boolean(
+        selectedImageLayer.src &&
+        !selectedImageLayer.hidden &&
+        loadedImageLayerSourceKey === imageLayerSourceKey &&
+        layerImages[selectedImageLayer.id]
+      )
+    : Boolean(
+        design.background &&
+        image &&
+        loadedBackgroundKey === design.background
+      );
+  const activeImageEditable =
+    activeImageRenderable &&
+    !Boolean(selectedImageLayer?.locked);
   const activeImageLabel = selectedImageLayer
     ? (selectedImageLayer.name || 'Image Layer')
     : 'Artwork';
