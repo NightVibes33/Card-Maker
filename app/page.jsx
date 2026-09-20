@@ -2590,11 +2590,20 @@ export default function Page() {
     };
   }, []);
 
-  useEffect(() => {
-    if (tab === 'studio' && previewMode === 'flat') return;
-
+  const finishActiveGesture = useCallback(() => {
     if (gestureHistoryRecorded.current) {
       replaceDesign(designRef.current);
+    }
+
+    const canvas = canvasRef.current;
+    if (canvas && typeof canvas.releasePointerCapture === 'function') {
+      for (const pointerId of pointers.current.keys()) {
+        try {
+          if (!canvas.hasPointerCapture || canvas.hasPointerCapture(pointerId)) {
+            canvas.releasePointerCapture(pointerId);
+          }
+        } catch {}
+      }
     }
 
     pointers.current.clear();
@@ -2610,9 +2619,15 @@ export default function Page() {
       window.cancelAnimationFrame(gesturePreviewFrameRef.current);
       gesturePreviewFrameRef.current = 0;
     }
-  }, [previewMode, replaceDesign, tab]);
+  }, [replaceDesign]);
+
+  useEffect(() => {
+    if (tab === 'studio' && previewMode === 'flat') return;
+    finishActiveGesture();
+  }, [finishActiveGesture, previewMode, tab]);
 
   const undo = useCallback(() => {
+    finishActiveGesture();
     if (cleanupInFlightRef.current) {
       setMessage('Finish cleaning imported images before using Undo.');
       return;
@@ -2628,9 +2643,10 @@ export default function Page() {
     replaceDesign(previous);
     setHistoryVersion((value) => value + 1);
     setMessage('Undid change');
-  }, [replaceDesign]);
+  }, [finishActiveGesture, replaceDesign]);
 
   const redo = useCallback(() => {
+    finishActiveGesture();
     if (cleanupInFlightRef.current) {
       setMessage('Finish cleaning imported images before using Redo.');
       return;
@@ -2646,7 +2662,7 @@ export default function Page() {
     replaceDesign(next);
     setHistoryVersion((value) => value + 1);
     setMessage('Redid change');
-  }, [replaceDesign]);
+  }, [finishActiveGesture, replaceDesign]);
 
   const persistDraftSnapshot = useCallback((snapshot) => {
     const version = ++draftSaveVersionRef.current;
@@ -4079,6 +4095,7 @@ export default function Page() {
   }
 
   function useArtwork(item) {
+    finishActiveGesture();
     if (cleanupInFlightRef.current) {
       setMessage('Finish cleaning imported images before changing artwork.');
       return;
@@ -4802,6 +4819,7 @@ export default function Page() {
   }
 
   function openProject(project) {
+    finishActiveGesture();
     if (!project?.design) return;
     if (cleanupInFlightRef.current) {
       setMessage('Finish cleaning imported images before opening a design.');
@@ -5394,6 +5412,7 @@ export default function Page() {
   }
 
   function reset() {
+    finishActiveGesture();
     if (cleanupInFlightRef.current) {
       setMessage('Finish cleaning imported images before starting a new card.');
       return;
