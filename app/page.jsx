@@ -15,6 +15,8 @@ import {
 
 const OUT_W = 1536;
 const OUT_H = 969;
+const EDITOR_PREVIEW_W = 1024;
+const EDITOR_PREVIEW_H = 646;
 const CARD_RATIO = OUT_W / OUT_H;
 const MAX_IMAGE_IMPORT_BYTES = 30 * 1024 * 1024;
 const MAX_PRESET_IMPORT_BYTES = 48 * 1024 * 1024;
@@ -3202,7 +3204,7 @@ export default function Page() {
             : 'artwork')
         : null;
 
-      renderCard(canvas.getContext('2d'), OUT_W, OUT_H, { originalTarget });
+      renderCard(canvas.getContext('2d'), EDITOR_PREVIEW_W, EDITOR_PREVIEW_H, { originalTarget });
 
       if (showExportPreview && fullPreviewCanvasRef.current) {
         renderCard(fullPreviewCanvasRef.current.getContext('2d'), OUT_W, OUT_H);
@@ -5274,8 +5276,8 @@ export default function Page() {
       <div className={'cardFrame ' + (previewMode === 'physical' ? 'physicalCard' : '')}>
         <canvas
           ref={canvasRef}
-          width={OUT_W}
-          height={OUT_H}
+          width={EDITOR_PREVIEW_W}
+          height={EDITOR_PREVIEW_H}
           onPointerDown={previewMode === 'flat' ? pointerDown : undefined}
           onPointerMove={previewMode === 'flat' ? pointerMove : undefined}
           onPointerUp={previewMode === 'flat' ? pointerUp : undefined}
