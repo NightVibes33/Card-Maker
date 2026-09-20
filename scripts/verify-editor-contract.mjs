@@ -227,7 +227,7 @@ requireMatch(page, /const MAX_SVG_IMPORT_BYTES = 2 \* 1024 \* 1024;/, 'SVG impor
 requireMatch(page, /const MAX_IMAGE_PIXELS = 52_000_000;/, 'source image pixels are bounded for iPhone decode safety');
 requireMatch(page, /const MAX_IMAGE_DIMENSION = 10_000;/, 'source image dimensions are bounded for iPhone decode safety');
 requireMatch(page, /async function probeLocalImageDimensions\(/, 'common image dimensions are probed before full decode');
-requireMatch(page, /assertSafeSourceDimensions\(await probeLocalImageDimensions\(blob\)\)/, 'dimension preflight runs before image decoding');
+requireMatch(page, /const probedDimensions = await probeLocalImageDimensions\(blob\);[\s\S]{0,100}assertSafeSourceDimensions\(probedDimensions\);[\s\S]{0,220}decodeLocalImageBlob\(blob\)/, 'dimension preflight runs before image decoding');
 requireMatch(page, /async function validateSafeSvgBlob\(/, 'SVG imports are inspected before rasterization');
 requireMatch(page, /<\\s\*script\\b/, 'SVG active script content is rejected');
 requireMatch(page, /<\\s\*foreignObject\\b/, 'SVG foreignObject content is rejected');
