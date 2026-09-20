@@ -46,6 +46,12 @@ self.addEventListener('activate', (event) => {
           .filter((key) => ![SHELL_CACHE, ART_CACHE, CATALOG_CACHE, STATIC_CACHE].includes(key))
           .map((key) => caches.delete(key))
       ))
+      .then(() => Promise.all([
+        trimCache(SHELL_CACHE),
+        trimCache(ART_CACHE),
+        trimCache(CATALOG_CACHE),
+        trimCache(STATIC_CACHE)
+      ]))
       .then(() => self.clients.claim())
   );
 });
