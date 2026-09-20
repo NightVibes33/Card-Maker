@@ -123,6 +123,85 @@ try {
   const initialCanvasBox = await editorCanvas.boundingBox();
   assert.ok(initialCanvasBox, 'editor canvas must have a layout box');
 
+  // Prove the main Discover/Card Library action is exactly a New-project boundary:
+  // dirty multiple project fields first, then use a library skin and require the
+  // original defaults to return before any unrelated editor smoke can fail.
+  await page.getByRole('button', { name: 'Black Metal', exact: true }).click();
+  await page.getByLabel('Text color').evaluate((node) => {
+    node.value = '#123456';
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+    node.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.getByRole('button', { name: '+ Text', exact: true }).click();
+  await page.getByLabel('Layer text').fill('MUST BE CLEARED');
+
+  await page.getByRole('button', { name: /^EMV Chip Built-in hardware /i }).click();
+  await page.getByRole('tab', { name: 'Position', exact: true }).click();
+  for (const [label, value] of [
+    ['Chip horizontal position', '0.42'],
+    ['Chip vertical position', '0.18'],
+    ['Chip size', '1.6'],
+    ['Chip rotation', '23']
+  ]) {
+    await page.getByLabel(label).evaluate((node, nextValue) => {
+      node.value = nextValue;
+      node.dispatchEvent(new Event('input', { bubbles: true }));
+      node.dispatchEvent(new Event('change', { bubbles: true }));
+    }, value);
+  }
+
+  await page.getByRole('tab', { name: 'Discover', exact: true }).click();
+  const earlyLibrarySkin = page.getByRole('button', { name: 'Use WebKit Library Skin', exact: true }).first();
+  await earlyLibrarySkin.waitFor({ state: 'visible', timeout: 15000 });
+  await earlyLibrarySkin.click();
+  await page.getByText('New project created from WebKit Library Skin', { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 10000
+  });
+
+  assert.equal(
+    await page.getByRole('button', { name: 'Undo', exact: true }).isDisabled(),
+    true,
+    'main Card Library import must forget all prior working-project history'
+  );
+
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  assert.equal(
+    await page.getByRole('button', { name: /^Text text /i }).count(),
+    0,
+    'main Card Library import must clear prior custom layers'
+  );
+  assert.equal(
+    await page.getByRole('radiogroup', { name: 'Chip finish' })
+      .getByRole('radio', { name: 'Gold', exact: true })
+      .getAttribute('aria-checked'),
+    'true',
+    'main Card Library import must restore the original gold chip finish'
+  );
+  assert.equal(
+    await page.getByLabel('Text color').inputValue(),
+    '#ffffff',
+    'main Card Library import must restore the original card text color'
+  );
+
+  await page.getByRole('button', { name: /^EMV Chip Built-in hardware /i }).click();
+  await page.getByRole('tab', { name: 'Position', exact: true }).click();
+  for (const [label, expected] of [
+    ['Chip horizontal position', 0.105],
+    ['Chip vertical position', 0.35],
+    ['Chip size', 1],
+    ['Chip rotation', 0]
+  ]) {
+    const actual = Number(await page.getByLabel(label).inputValue());
+    assert.ok(
+      Math.abs(actual - expected) < 0.002,
+      `main Card Library import must reset ${label}; got ${actual}`
+    );
+  }
+  console.log('PASS main Card Library hard reset => chip, color, layers, history restored to defaults');
+
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+
   // Built-in card text should be directly selectable from its rendered badge.
   const topBadge = page.getByRole('switch', { name: 'Top Badge' });
   await topBadge.click();
