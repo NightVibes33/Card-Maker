@@ -4757,9 +4757,9 @@ export default function Page() {
                 ) : (
                   <>
                     <div className="groupRow segmentedRow">
-                      <div className="segmentedControl compact" role="tablist" aria-label="Artwork fit">
-                        <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
-                        <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
+                      <div className="segmentedControl compact" role="group" aria-label="Artwork fit">
+                        <button type="button" disabled={!design.background} aria-pressed={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
+                        <button type="button" disabled={!design.background} aria-pressed={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
                       </div>
                       <button type="button" className="iconTextButton" disabled={!design.background} aria-pressed={Boolean(design.flipX)} onClick={() => patch({ flipX: !design.flipX })}>
                         <span>{design.flipX ? 'Unflip' : 'Flip'}</span>
@@ -4806,9 +4806,9 @@ export default function Page() {
                   {selectedElement === 'artwork' ? (
                     <>
                       <div className="groupRow segmentedRow">
-                        <div className="segmentedControl compact" role="tablist" aria-label="Artwork fit in Position">
-                          <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
-                          <button type="button" role="tab" disabled={!design.background} aria-selected={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
+                        <div className="segmentedControl compact" role="group" aria-label="Artwork fit in Position">
+                          <button type="button" disabled={!design.background} aria-pressed={design.fit === 'cover'} className={design.fit === 'cover' ? 'selected' : ''} onClick={() => patch({ fit: 'cover' })}>Fill</button>
+                          <button type="button" disabled={!design.background} aria-pressed={design.fit === 'contain'} className={design.fit === 'contain' ? 'selected' : ''} onClick={() => patch({ fit: 'contain' })}>Fit</button>
                         </div>
                         <button type="button" className="iconTextButton" disabled={!design.background} aria-pressed={Boolean(design.flipX)} onClick={() => patch({ flipX: !design.flipX })}>
                           <span>{design.flipX ? 'Unflip' : 'Flip Horizontal'}</span>
