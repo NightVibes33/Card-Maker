@@ -16,13 +16,12 @@ const sw = read('public/sw.js');
 const storage = read('app/lib/storage.js');
 const imageRoute = read('app/api/image/route.js');
 const inspectRoute = read('app/api/cucu/inspect/route.js');
+const imagePolicy = read('app/lib/imagePolicy.js');
 
 const pageChecks = [
   [/function normalizeDesignState\(/, 'restored designs are normalized'],
   [/function normalizeImportArtworkSource\(/, 'persisted import artwork IDs are validated canonically'],
   [/rawUrl\.length > 2200/, 'persisted proxy targets are length bounded'],
-  [/remote\.protocol !== 'https:'/, 'persisted proxy targets require HTTPS'],
-  [/remote\.username \|\|[\s\S]{0,80}remote\.password/, 'persisted proxy targets reject embedded credentials'],
   [/const normalized = new URLSearchParams\(\)/, 'persisted proxy URLs are rebuilt from supported parameters only'],
   [/if \(!source\.startsWith\('\/api\/image\?'\)\) return '';/, 'unknown artwork schemes and paths fail closed'],
   [/This artwork source is unavailable or unsupported\./, 'invalid catalog artwork never enters editor state'],
@@ -134,6 +133,13 @@ const pageChecks = [
 ];
 
 for (const [pattern, label] of pageChecks) requireMatch(page, pattern, label);
+
+requireMatch(imagePolicy, /url\.protocol !== 'https:'/, 'persisted proxy targets require HTTPS');
+requireMatch(
+  imagePolicy,
+  /url\.username \|\|[\s\S]{0,80}url\.password/,
+  'persisted proxy targets reject embedded credentials'
+);
 
 requireMatch(page, /onChange=\{emit\}/, 'range sliders use React controlled onChange');
 requireMatch(page, /type=\{Number\(min\) < 0 \? 'text' : 'number'\}/, 'signed Expert Mode fields remain typeable on iPhone');
