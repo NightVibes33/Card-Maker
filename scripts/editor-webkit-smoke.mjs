@@ -185,6 +185,68 @@ try {
     'Redo must restore the dragged shape position'
   );
 
+  const layerScale = page.getByLabel('Layer Scale');
+  const layerRotation = page.getByLabel('Layer Rotation');
+  const gestureCenterX = Number(await layerX.inputValue());
+
+  await editorCanvas.evaluate((node, normalizedX) => {
+    const rect = node.getBoundingClientRect();
+    const cx = rect.left + rect.width * normalizedX;
+    const cy = rect.top + rect.height * 0.5;
+    const originalSetPointerCapture = node.setPointerCapture;
+    node.setPointerCapture = () => {};
+
+    const fire = (type, pointerId, x, y, isPrimary = false) => {
+      node.dispatchEvent(new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        pointerId,
+        pointerType: 'touch',
+        isPrimary,
+        clientX: x,
+        clientY: y,
+        button: 0,
+        buttons: type === 'pointerup' ? 0 : 1
+      }));
+    };
+
+    try {
+      fire('pointerdown', 41, cx - 20, cy, true);
+      fire('pointerdown', 42, cx + 20, cy, false);
+      fire('pointermove', 41, cx - 38, cy - 18, true);
+      fire('pointermove', 42, cx + 38, cy + 18, false);
+      fire('pointerup', 42, cx + 38, cy + 18, false);
+      fire('pointerup', 41, cx - 38, cy - 18, true);
+    } finally {
+      node.setPointerCapture = originalSetPointerCapture;
+    }
+  }, gestureCenterX);
+
+  await page.waitForFunction(() => {
+    const scale = document.querySelector('input[aria-label="Layer Scale"]');
+    const rotation = document.querySelector('input[aria-label="Layer Rotation"]');
+    return scale && rotation && Number(scale.value) > 1.2 && Math.abs(Number(rotation.value)) > 5;
+  });
+  assert.ok(Number(await layerScale.inputValue()) > 1.2, 'two-finger gesture must scale the selected shape');
+  assert.ok(Math.abs(Number(await layerRotation.inputValue())) > 5, 'two-finger gesture must rotate the selected shape');
+
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.waitForFunction(() => {
+    const scale = document.querySelector('input[aria-label="Layer Scale"]');
+    const rotation = document.querySelector('input[aria-label="Layer Rotation"]');
+    return scale && rotation &&
+      Math.abs(Number(scale.value) - 1) < 0.001 &&
+      Math.abs(Number(rotation.value)) < 0.001;
+  });
+  assert.ok(
+    Math.abs(Number(await layerScale.inputValue()) - 1) < 0.001,
+    'Undo must restore pre-gesture scale'
+  );
+  assert.ok(
+    Math.abs(Number(await layerRotation.inputValue())) < 0.001,
+    'Undo must restore pre-gesture rotation'
+  );
+
   // Zero is a valid normalized coordinate. Older editor code used x || 0.5
   // and silently snapped an exact zero back to center.
   await layerX.evaluate((node) => {
