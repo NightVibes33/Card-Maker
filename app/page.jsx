@@ -1593,8 +1593,8 @@ async function prepareLocalImageBlob(blob, limits = {}) {
     /\.(?:gif|apng|svg)$/i.test(sourceName);
   const needsFormatNormalization =
     animatedOrVectorSource ||
-    /^image\/(?:heic|heif)$/.test(sourceType) ||
-    /\.(?:heic|heif)$/i.test(sourceName);
+    /^image\/(?:webp|avif|heic|heif)$/.test(sourceType) ||
+    /\.(?:webp|avif|heic|heif)$/i.test(sourceName);
 
   if (scale >= 0.999 && !needsFormatNormalization) {
     image.src = '';
