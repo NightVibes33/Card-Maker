@@ -1648,7 +1648,8 @@ async function probeLocalImageDimensions(blob) {
   if (probe.length < 10) return null;
   const view = new DataView(probe.buffer, probe.byteOffset, probe.byteLength);
 
-  // PNG: signature + IHDR width/height.
+  // PNG/APNG: signature + IHDR width/height. APNG normally uses the
+  // standard image/png MIME type, so detect its acTL animation chunk here.
   if (
     probe.length >= 24 &&
     probe[0] === 0x89 &&
@@ -1657,7 +1658,26 @@ async function probeLocalImageDimensions(blob) {
   ) {
     const width = view.getUint32(16, false);
     const height = view.getUint32(20, false);
-    return plausibleImageDimensions(width, height) ? { width, height } : null;
+    let animated = false;
+    let chunkOffset = 8;
+
+    while (chunkOffset + 12 <= probe.length) {
+      const chunkLength = view.getUint32(chunkOffset, false);
+      const chunkType = readAscii(probe, chunkOffset + 4, 4);
+      if (chunkType === 'acTL') {
+        animated = true;
+        break;
+      }
+      if (chunkType === 'IDAT' || chunkType === 'IEND') break;
+
+      const nextOffset = chunkOffset + 12 + chunkLength;
+      if (nextOffset <= chunkOffset || nextOffset > probe.length) break;
+      chunkOffset = nextOffset;
+    }
+
+    return plausibleImageDimensions(width, height)
+      ? { width, height, animated }
+      : null;
   }
 
   // GIF logical screen dimensions.
@@ -1878,6 +1898,7 @@ async function prepareLocalImageBlob(blob, limits = {}) {
   const sourceType = String(blob.type || '').toLowerCase();
   const sourceName = String(blob.name || '');
   const animatedOrVectorSource =
+    Boolean(probedDimensions?.animated) ||
     /^image\/(?:gif|apng|svg\+xml)$/.test(sourceType) ||
     /\.(?:gif|apng|svg)$/i.test(sourceName);
   const needsFormatNormalization =
