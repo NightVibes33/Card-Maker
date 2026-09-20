@@ -3509,13 +3509,15 @@ export default function Page() {
     return new File([blob], name, { type: 'image/png' });
   }
 
-  async function download(width, height, name) {
-    let file;
-    try {
-      file = makePngFile(width, height, name);
-    } catch {
-      setMessage('PNG export failed. Re-open the artwork or image layer and try again.');
-      return;
+  async function download(width, height, name, existingFile = null) {
+    let file = existingFile;
+    if (!file) {
+      try {
+        file = makePngFile(width, height, name);
+      } catch {
+        setMessage('PNG export failed. Re-open the artwork or image layer and try again.');
+        return;
+      }
     }
     const url = URL.createObjectURL(file);
     const anchor = document.createElement('a');
@@ -3555,7 +3557,7 @@ export default function Page() {
     );
 
     if (!canShareFile) {
-      await download(width, height, name);
+      await download(width, height, name, file);
       setMessage('Native image sharing is unavailable, so the PNG was downloaded instead.');
       return;
     }
