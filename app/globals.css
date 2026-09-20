@@ -1614,7 +1614,7 @@ button:disabled{opacity:.38}
 
 .catalogArtworkFrame{
   position:absolute;
-  inset:-2.25%;
+  inset:calc(-1 * var(--catalog-artwork-overscan, 2.25%));
   display:block;
   overflow:hidden;
   background:#000;
