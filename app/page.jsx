@@ -2539,6 +2539,9 @@ export default function Page() {
       ctx.translate(x + iw / 2, y + ih / 2);
       ctx.rotate((renderDesign.rotate * Math.PI) / 180);
       ctx.scale(renderDesign.flipX ? -1 : 1, 1);
+      ctx.beginPath();
+      ctx.rect(-iw / 2, -ih / 2, iw, ih);
+      ctx.clip();
       ctx.filter =
         'brightness(' + brightness + ')' +
         ' saturate(' + saturation + ')' +
@@ -2546,7 +2549,6 @@ export default function Page() {
         ' blur(' + blur * 7 + 'px)';
       ctx.drawImage(image, sx, sy, sw, sh, -iw / 2, -ih / 2, iw, ih);
       ctx.restore();
-      ctx.filter = 'none';
 
       if (!artworkOriginal) {
         const shadows = Number(renderDesign.shadows || 0);
