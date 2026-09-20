@@ -2063,8 +2063,12 @@ async function prepareLocalImageBlob(blob, limits = {}) {
     /\.(?:webp|avif|heic|heif)$/i.test(sourceName);
 
   if (scale >= 0.999 && !needsFormatNormalization) {
+    // Detach File-backed imports from the picker before IndexedDB storage.
+    // WebKit can reject structured-cloning a live File object even though an
+    // equivalent plain Blob is fully supported.
+    const storedBlob = blob.slice(0, blob.size, blob.type || 'application/octet-stream');
     image.src = '';
-    return { blob, width, height, optimized: false };
+    return { blob: storedBlob, width, height, optimized: false };
   }
 
   const targetWidth = Math.max(1, Math.round(width * scale));
