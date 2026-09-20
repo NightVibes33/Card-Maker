@@ -4736,13 +4736,7 @@ export default function Page() {
                       className="settingsResetButton"
                       disabled={!design.background}
                       onClick={() => patch({
-                        sourceCrop: design.originalSourceCrop || null,
-                        fit: 'cover',
-                        zoom: design.originalSourceCrop ? 1 : 1.06,
-                        x: 0,
-                        y: 0,
-                        rotate: 0,
-                        flipX: false
+                        sourceCrop: design.originalSourceCrop || null
                       })}
                     >
                       Reset Crop
