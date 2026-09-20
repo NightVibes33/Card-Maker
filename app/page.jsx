@@ -996,7 +996,6 @@ export default function Page() {
   const [menuItem, setMenuItem] = useState(null);
   const [installHelp, setInstallHelp] = useState(false);
   const [online, setOnline] = useState(true);
-  const [isIOS, setIsIOS] = useState(false);
   const [query, setQuery] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [featured, setFeatured] = useState({});
@@ -1159,15 +1158,7 @@ export default function Page() {
     hydrate();
 
     const updateOnline = () => setOnline(navigator.onLine);
-    const detectIOS = () => {
-      const ua = navigator.userAgent || '';
-      const iOSDevice = /iPad|iPhone|iPod/i.test(ua) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      setIsIOS(iOSDevice);
-    };
-
     updateOnline();
-    detectIOS();
     window.addEventListener('online', updateOnline);
     window.addEventListener('offline', updateOnline);
 
@@ -2610,7 +2601,11 @@ export default function Page() {
     setMessage(name + ' saved to Files/downloads');
   }
 
-  async function sharePng(width = OUT_W, height = OUT_H, name = 'cardBackgroundCombined@3x.png', saveToPhotos = false) {
+  async function nativeExportPng(
+    width = OUT_W,
+    height = OUT_H,
+    name = 'cardBackgroundCombined@3x.png'
+  ) {
     const file = makePngFile(width, height, name);
     const canShareFile = Boolean(
       navigator.share &&
@@ -2619,34 +2614,24 @@ export default function Page() {
 
     if (!canShareFile) {
       await download(width, height, name);
-      setMessage('Native image sharing is unavailable here, so the PNG was downloaded instead.');
+      setMessage('Native image sharing is unavailable, so the PNG was downloaded instead.');
       return;
     }
 
     try {
-      if (saveToPhotos && isIOS) {
-        setMessage('Choose “Save Image” in the iOS share sheet to save it to Photos.');
-      } else {
-        setMessage('Opening share sheet…');
-      }
-
+      setMessage('Opening the native image sheet… Choose “Save Image” to save it to Photos.');
       await navigator.share({ files: [file] });
-      await recordExport(name, width, height, saveToPhotos && isIOS ? 'photos-share-sheet' : 'share');
-
-      if (saveToPhotos && isIOS) {
-        setMessage('iOS share sheet closed. If you chose “Save Image,” the PNG is now in Photos.');
-      } else {
-        setMessage('Share sheet closed');
-      }
+      await recordExport(name, width, height, 'native-image-sheet');
+      setMessage('Image sheet closed');
     } catch (error) {
       if (error?.name !== 'AbortError') {
-        setMessage('Could not open the share sheet.');
+        setMessage('Could not open the native image sheet.');
       }
     }
   }
 
   async function share() {
-    return sharePng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png', false);
+    return nativeExportPng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png');
   }
 
   function dismissInstallHelp() {
@@ -3582,10 +3567,10 @@ export default function Page() {
 
         {tab === 'export' && (
           <div className="tabScreen exportScreen">
-            <section className="exportCard" aria-label="AirCard export details">
+            <section className="exportCard" aria-label="Card export details">
               <div className="exportGlyph"><IOSIcon name="export" size={30} /></div>
-              <h2>Ready for AirCard</h2>
-              <p>Preview the finished card, then share or save exact AirCard PNG sizes.</p>
+              <h2>Ready to Export</h2>
+              <p>Preview the finished card, then open the native image sheet for either output size.</p>
               <div className="exportSpec">
                 <span>1536 × 969</span>
                 <code>cardBackgroundCombined@3x.png</code>
@@ -3599,51 +3584,41 @@ export default function Page() {
             <button
               type="button"
               className="primaryAction bigAction"
-              onClick={() => isIOS
-                ? sharePng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png', true)
-                : share()
-              }
+              onClick={() => nativeExportPng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}
             >
-              <IOSIcon name={isIOS ? 'photo' : 'export'} size={21} />
-              <span>{isIOS ? 'Save 3× to Photos' : 'Share 3× PNG'}</span>
+              <IOSIcon name="photo" size={21} />
+              <span>Save 3× Image</span>
             </button>
 
-            {isIOS ? (
-              <>
-                <Group title="SAVE TO PHOTOS" footer="The iOS share sheet opens with the PNG. Choose “Save Image” to place it in Photos.">
-                  <button type="button" className="actionRow" onClick={() => sharePng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png', true)}>
-                    <span><strong>Save 3× to Photos</strong><small>1536 × 969 · highest quality</small></span>
-                    <IOSIcon name="photo" size={19} />
-                  </button>
-                  <button type="button" className="actionRow" onClick={() => sharePng(1024, 646, 'cardBackgroundCombined@2x.png', true)}>
-                    <span><strong>Save 2× to Photos</strong><small>1024 × 646</small></span>
-                    <IOSIcon name="photo" size={19} />
-                  </button>
-                </Group>
-
-                <Group title="OTHER EXPORT OPTIONS">
-                  <button type="button" className="actionRow" onClick={() => sharePng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png', false)}>
-                    <span><strong>Share 3× PNG</strong><small>Messages, AirDrop, apps, and more</small></span>
-                    <IOSIcon name="export" size={18} />
-                  </button>
-                  <button type="button" className="actionRow" onClick={() => download(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}>
-                    <span><strong>Save 3× to Files</strong><small>Fallback file download</small></span>
-                    <IOSIcon name="chevron" size={17} />
-                  </button>
-                </Group>
-              </>
-            ) : (
-              <Group title="DOWNLOADS">
-                <button type="button" className="actionRow" onClick={() => download(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}>
-                  <span><strong>Save 3× PNG</strong><small>1536 × 969</small></span>
-                  <IOSIcon name="chevron" size={17} />
-                </button>
-                <button type="button" className="actionRow" onClick={() => download(1024, 646, 'cardBackgroundCombined@2x.png')}>
-                  <span><strong>Save 2× PNG</strong><small>1024 × 646</small></span>
-                  <IOSIcon name="chevron" size={17} />
-                </button>
-              </Group>
-            )}
+            <Group
+              title="IMAGE EXPORTS"
+              footer="On iPhone/iPad, each button opens the native image sheet. Choose “Save Image” to place the PNG in Photos."
+            >
+              <button
+                type="button"
+                className="actionRow"
+                onClick={() => nativeExportPng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}
+              >
+                <span><strong>Save 3× Image</strong><small>1536 × 969 · highest quality</small></span>
+                <IOSIcon name="photo" size={19} />
+              </button>
+              <button
+                type="button"
+                className="actionRow"
+                onClick={() => nativeExportPng(1024, 646, 'cardBackgroundCombined@2x.png')}
+              >
+                <span><strong>Save 2× Image</strong><small>1024 × 646</small></span>
+                <IOSIcon name="photo" size={19} />
+              </button>
+              <button
+                type="button"
+                className="actionRow"
+                onClick={() => nativeExportPng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}
+              >
+                <span><strong>Share 3× PNG</strong><small>Photos, AirDrop, Messages, apps, and more</small></span>
+                <IOSIcon name="export" size={18} />
+              </button>
+            </Group>
 
             <button type="button" className="secondaryAction bigAction" onClick={() => saveProject()}>Save Design to Library</button>
 
