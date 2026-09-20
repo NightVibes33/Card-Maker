@@ -2011,6 +2011,7 @@ export default function Page() {
   const favoriteOpsRef = useRef(new Set());
   const projectSaveInFlightRef = useRef(false);
   const presetTransferInFlightRef = useRef(false);
+  const cleanupInFlightRef = useRef(false);
   const exportInFlightRef = useRef(false);
 
   const gradient = useMemo(
@@ -4037,7 +4038,13 @@ export default function Page() {
   }
 
   async function cleanupUnusedImports() {
-    if (cleanupInProgress) return;
+    if (cleanupInFlightRef.current || cleanupInProgress) return;
+    if (presetTransferInFlightRef.current) {
+      setMessage('Finish the preset operation before cleaning imported images.');
+      return;
+    }
+
+    cleanupInFlightRef.current = true;
     setCleanupInProgress(true);
 
     try {
@@ -4104,6 +4111,7 @@ export default function Page() {
           : 'Removed ' + removed.size + ' unused imported image' + (removed.size === 1 ? '' : 's')
       );
     } finally {
+      cleanupInFlightRef.current = false;
       setCleanupInProgress(false);
     }
   }
@@ -4163,6 +4171,10 @@ export default function Page() {
       setMessage('Another preset operation is already in progress');
       return;
     }
+    if (cleanupInFlightRef.current) {
+      setMessage('Finish cleaning imported images before exporting a preset.');
+      return;
+    }
 
     presetTransferInFlightRef.current = true;
     setMessage('Preparing design preset…');
@@ -4201,6 +4213,10 @@ export default function Page() {
     if (!file) return;
     if (presetTransferInFlightRef.current) {
       setMessage('Another preset operation is already in progress');
+      return;
+    }
+    if (cleanupInFlightRef.current) {
+      setMessage('Finish cleaning imported images before importing a preset.');
       return;
     }
     if (file.size > MAX_PRESET_IMPORT_BYTES) {
