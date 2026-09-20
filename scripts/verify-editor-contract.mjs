@@ -39,6 +39,8 @@ const pageChecks = [
   [/label="Line Height"/, 'multiline text has line-height controls'],
   [/<textarea[\s\S]*aria-label="Layer text"/, 'text layers use a multiline editor'],
   [/designRef\.current === startupDesign/, 'startup hydration does not overwrite newer edits'],
+  [/for \(let attempt = 0; attempt < 3; attempt \+= 1\)/, 'service-worker reload retries until the latest draft is stable'],
+  [/if \(designRef\.current !== snapshot\)/, 'service-worker reload refuses to discard edits made during persistence'],
   [/Layer limit reached\. Delete a layer before adding another\./, 'custom layer adds enforce the layer cap'],
   [/visibleImageCount <= MAX_VISIBLE_IMAGE_LAYERS/, 'older designs hide overflow image layers instead of failing hydration'],
   [/setSelectedElement\('artwork'\);[\s\S]{0,220}setStudioTool\('crop'\)/, 'Library artwork selection targets the background before crop editing'],
