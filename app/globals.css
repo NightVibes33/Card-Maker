@@ -144,28 +144,6 @@ button:disabled{opacity:.38}
 .screenContent{padding:0 16px}
 .tabScreen{padding:6px 0 26px}
 .searchSection{display:flex;flex-direction:column;gap:10px}
-.sourceSegmented{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:2px;
-  min-height:40px;
-  padding:2px;
-  border-radius:11px;
-  background:var(--tertiary-bg);
-}
-.sourceSegmented button{
-  min-height:36px;
-  border:0;
-  border-radius:9px;
-  background:transparent;
-  color:var(--label);
-  font-size:14px;
-  font-weight:700;
-}
-.sourceSegmented button.selected{
-  background:var(--secondary-bg);
-  box-shadow:0 1px 4px rgba(0,0,0,.14),0 0 0 .5px rgba(0,0,0,.06);
-}
 .segmentedControl{
   display:grid;
   grid-template-columns:repeat(5,1fr);
