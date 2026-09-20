@@ -1722,7 +1722,10 @@ export default function Page() {
             : '';
           replaceDesign({ ...designRef.current, ...parsed });
         } else {
-          const legacy = localStorage.getItem('aircard-sticker-fvp-v3');
+          let legacy = null;
+          try {
+            legacy = localStorage.getItem('aircard-sticker-fvp-v3');
+          } catch {}
           if (legacy) {
             try {
               const parsed = JSON.parse(legacy);
@@ -1733,7 +1736,9 @@ export default function Page() {
                 replaceDesign({ ...designRef.current, ...parsed });
               }
             } catch {
-              localStorage.removeItem('aircard-sticker-fvp-v3');
+              try {
+                localStorage.removeItem('aircard-sticker-fvp-v3');
+              } catch {}
             }
           }
         }
@@ -1753,10 +1758,16 @@ export default function Page() {
             setRecent(storedRecent.filter((item) => item?.id).slice(0, 20));
           }
         } catch {
-          localStorage.removeItem('aircard-recent-artwork-v1');
+          try {
+            localStorage.removeItem('aircard-recent-artwork-v1');
+          } catch {}
         }
 
-        setExpertMode(localStorage.getItem('aircard-expert-v2') === '1');
+        try {
+          setExpertMode(localStorage.getItem('aircard-expert-v2') === '1');
+        } catch {
+          setExpertMode(false);
+        }
 
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.register('/sw.js').then((registration) => {
@@ -1815,7 +1826,10 @@ export default function Page() {
         const standalone =
           window.matchMedia('(display-mode: standalone)').matches ||
           Boolean(navigator.standalone);
-        const dismissed = localStorage.getItem('aircard-install-dismissed-v2') === '1';
+        let dismissed = false;
+        try {
+          dismissed = localStorage.getItem('aircard-install-dismissed-v2') === '1';
+        } catch {}
         if (!standalone && !dismissed) setInstallHelp(true);
       } catch {
         setMessage('Local library could not fully load');
