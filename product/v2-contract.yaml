@@ -138,7 +138,8 @@ features:
     contains:
       - "Before / After"
       - "setShowOriginal(true)"
-      - "original: showOriginal"
+      - "originalTarget"
+      - "showOriginal"
   crop_ui:
     file: app/page.jsx
     contains:
