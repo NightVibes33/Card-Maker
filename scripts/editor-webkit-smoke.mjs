@@ -151,8 +151,8 @@ try {
   }
 
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
-  const earlyChipSwitch = page.getByRole('switch', { name: 'EMV Chip', exact: true });
-  const earlyContactlessSwitch = page.getByRole('switch', { name: 'Contactless', exact: true });
+  const earlyChipSwitch = page.getByRole('switch', { name: /^EMV Chip/ });
+  const earlyContactlessSwitch = page.getByRole('switch', { name: /^Contactless/ });
   const earlyMaskedNumberSwitch = page.getByRole('switch', { name: 'Masked Number', exact: true });
   if ((await earlyChipSwitch.getAttribute('aria-checked')) === 'true') await earlyChipSwitch.click();
   if ((await earlyContactlessSwitch.getAttribute('aria-checked')) === 'true') await earlyContactlessSwitch.click();
@@ -260,12 +260,12 @@ try {
     'main Card Library import must restore the original card text color'
   );
   assert.equal(
-    await page.getByRole('switch', { name: 'EMV Chip', exact: true }).getAttribute('aria-checked'),
+    await page.getByRole('switch', { name: /^EMV Chip/ }).getAttribute('aria-checked'),
     'true',
     'main Card Library import must restore EMV Chip to enabled'
   );
   assert.equal(
-    await page.getByRole('switch', { name: 'Contactless', exact: true }).getAttribute('aria-checked'),
+    await page.getByRole('switch', { name: /^Contactless/ }).getAttribute('aria-checked'),
     'true',
     'main Card Library import must restore Contactless to enabled'
   );
@@ -1138,7 +1138,7 @@ try {
     node.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
-  const dirtyContactless = page.getByRole('switch', { name: 'Contactless', exact: true });
+  const dirtyContactless = page.getByRole('switch', { name: /^Contactless/ });
   if ((await dirtyContactless.getAttribute('aria-checked')) === 'true') await dirtyContactless.click();
   const dirtyMaskedNumber = page.getByRole('switch', { name: 'Masked Number', exact: true });
   if ((await dirtyMaskedNumber.getAttribute('aria-checked')) === 'false') await dirtyMaskedNumber.click();
@@ -1239,7 +1239,7 @@ try {
     'main Card Library selection must restore the default card text color'
   );
   assert.equal(
-    await page.getByRole('switch', { name: 'Contactless', exact: true }).getAttribute('aria-checked'),
+    await page.getByRole('switch', { name: /^Contactless/ }).getAttribute('aria-checked'),
     'true',
     'main Card Library selection must restore Contactless to enabled'
   );
