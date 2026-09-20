@@ -78,7 +78,7 @@ features:
     file: app/globals.css
     contains:
       - ".catalogArtworkFrame{"
-      - "inset:-2.25%"
+      - "inset:calc(-1 * var(--catalog-artwork-overscan, 2.25%))"
       - "background:#000"
   real_cucu_search:
     file: app/api/cucu/route.js
