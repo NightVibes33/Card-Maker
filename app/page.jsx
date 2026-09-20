@@ -1496,7 +1496,8 @@ export default function Page() {
 
   const renderCard = useCallback((ctx, width, height, options = {}) => {
     if (!ctx) return;
-    const original = Boolean(options.original);
+    const originalTarget = options.originalTarget || (options.original ? 'all' : null);
+    const artworkOriginal = originalTarget === 'all' || originalTarget === 'artwork';
     ctx.save();
     ctx.clearRect(0, 0, width, height);
     ctx.scale(width / OUT_W, height / OUT_H);
@@ -1531,14 +1532,14 @@ export default function Page() {
 
       const x = (OUT_W - iw) / 2 + design.x * OUT_W;
       const y = (OUT_H - ih) / 2 + design.y * OUT_H;
-      const exposureFactor = original ? 1 : Math.pow(2, Number(design.exposure || 0));
-      const brightness = original ? 1 : clamp(design.brightness * exposureFactor, 0.2, 3);
-      const saturation = original ? 1 : clamp(design.saturation, 0, 3);
-      const sharpBoost = original ? 0 : Math.max(0, Number(design.sharpness || 0));
-      const contrast = original
+      const exposureFactor = artworkOriginal ? 1 : Math.pow(2, Number(design.exposure || 0));
+      const brightness = artworkOriginal ? 1 : clamp(design.brightness * exposureFactor, 0.2, 3);
+      const saturation = artworkOriginal ? 1 : clamp(design.saturation, 0, 3);
+      const sharpBoost = artworkOriginal ? 0 : Math.max(0, Number(design.sharpness || 0));
+      const contrast = artworkOriginal
         ? 1
         : clamp(design.contrast + sharpBoost * 0.22, 0.3, 2.5);
-      const blur = original
+      const blur = artworkOriginal
         ? 0
         : Math.max(0, design.blur + Math.max(0, -Number(design.sharpness || 0)) * 0.09);
 
@@ -1555,7 +1556,7 @@ export default function Page() {
       ctx.restore();
       ctx.filter = 'none';
 
-      if (!original) {
+      if (!artworkOriginal) {
         const shadows = Number(design.shadows || 0);
         if (shadows !== 0) {
           ctx.save();
@@ -1598,7 +1599,7 @@ export default function Page() {
       }
     }
 
-    if (!original && design.overlay > 0) {
+    if (!artworkOriginal && design.overlay > 0) {
       const overlay = ctx.createLinearGradient(0, 0, OUT_W, OUT_H);
       overlay.addColorStop(0, 'rgba(0,0,0,' + design.overlay * 0.55 + ')');
       overlay.addColorStop(0.55, 'rgba(0,0,0,0)');
@@ -1607,7 +1608,7 @@ export default function Page() {
       ctx.fillRect(0, 0, OUT_W, OUT_H);
     }
 
-    if (!original && design.vignette > 0) {
+    if (!artworkOriginal && design.vignette > 0) {
       const vignette = ctx.createRadialGradient(
         OUT_W / 2,
         OUT_H / 2,
@@ -1622,7 +1623,7 @@ export default function Page() {
       ctx.fillRect(0, 0, OUT_W, OUT_H);
     }
 
-    if (!original && design.gloss > 0) {
+    if (!artworkOriginal && design.gloss > 0) {
       const gloss = ctx.createLinearGradient(0, 0, OUT_W, OUT_H);
       gloss.addColorStop(0, 'rgba(255,255,255,' + design.gloss * 0.42 + ')');
       gloss.addColorStop(0.22, 'rgba(255,255,255,' + design.gloss * 0.08 + ')');
@@ -1631,7 +1632,7 @@ export default function Page() {
       ctx.fillRect(0, 0, OUT_W, OUT_H);
     }
 
-    if (!original && design.grain > 0) {
+    if (!artworkOriginal && design.grain > 0) {
       ctx.globalAlpha = design.grain;
       for (let i = 0; i < 3600; i += 1) {
         ctx.fillStyle = i % 3 ? '#000' : '#fff';
@@ -1640,7 +1641,7 @@ export default function Page() {
       ctx.globalAlpha = 1;
     }
 
-    if (!original && design.fade > 0) {
+    if (!artworkOriginal && design.fade > 0) {
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
       ctx.globalAlpha = clamp(design.fade, 0, 1) * 0.34;
@@ -1649,7 +1650,7 @@ export default function Page() {
       ctx.restore();
     }
 
-    if (!original && design.effectTintStrength > 0) {
+    if (!artworkOriginal && design.effectTintStrength > 0) {
       const [r, g, b] = hexToRgb(design.effectTint);
       ctx.save();
       ctx.globalCompositeOperation = 'soft-light';
@@ -1750,6 +1751,7 @@ export default function Page() {
       } else if (layer.type === 'image') {
         const layerImage = layerImages[layer.id];
         if (layerImage) {
+          const layerOriginal = originalTarget === 'all' || originalTarget === layer.id;
           const settings = { ...IMAGE_LAYER_DEFAULTS, ...(layer.adjustments || {}) };
           const crop = layer.crop;
           const sx = crop ? clamp(crop.x, 0, 1) * layerImage.width : 0;
@@ -1759,14 +1761,14 @@ export default function Page() {
           const ratio = sw / Math.max(1, sh);
           const w = clamp(Number(layer.width || 640), 20, 1800);
           const h = w / Math.max(0.1, ratio);
-          const exposureFactor = original ? 1 : Math.pow(2, Number(settings.exposure || 0));
-          const brightness = original ? 1 : clamp(Number(settings.brightness || 1) * exposureFactor, 0.2, 3);
-          const saturation = original ? 1 : clamp(Number(settings.saturation ?? 1), 0, 3);
-          const sharpBoost = original ? 0 : Math.max(0, Number(settings.sharpness || 0));
-          const contrast = original
+          const exposureFactor = layerOriginal ? 1 : Math.pow(2, Number(settings.exposure || 0));
+          const brightness = layerOriginal ? 1 : clamp(Number(settings.brightness || 1) * exposureFactor, 0.2, 3);
+          const saturation = layerOriginal ? 1 : clamp(Number(settings.saturation ?? 1), 0, 3);
+          const sharpBoost = layerOriginal ? 0 : Math.max(0, Number(settings.sharpness || 0));
+          const contrast = layerOriginal
             ? 1
             : clamp(Number(settings.contrast || 1) + sharpBoost * 0.22, 0.3, 2.5);
-          const blur = original
+          const blur = layerOriginal
             ? 0
             : Math.max(0, Number(settings.blur || 0) + Math.max(0, -Number(settings.sharpness || 0)) * 0.09);
 
@@ -1778,7 +1780,7 @@ export default function Page() {
           ctx.drawImage(layerImage, sx, sy, sw, sh, -w / 2, -h / 2, w, h);
           ctx.filter = 'none';
 
-          if (!original) {
+          if (!layerOriginal) {
             ctx.save();
             ctx.beginPath();
             ctx.rect(-w / 2, -h / 2, w, h);
@@ -1899,11 +1901,16 @@ export default function Page() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    renderCard(canvas.getContext('2d'), OUT_W, OUT_H, { original: showOriginal });
+    const originalTarget = showOriginal
+      ? ((design.customLayers || []).some((layer) => layer.id === selectedElement && layer.type === 'image')
+          ? selectedElement
+          : 'artwork')
+      : null;
+    renderCard(canvas.getContext('2d'), OUT_W, OUT_H, { originalTarget });
     if (showExportPreview && fullPreviewCanvasRef.current) {
       renderCard(fullPreviewCanvasRef.current.getContext('2d'), OUT_W, OUT_H);
     }
-  }, [renderCard, showOriginal, showExportPreview]);
+  }, [design.customLayers, renderCard, selectedElement, showOriginal, showExportPreview]);
 
   const loadCucu = useCallback(async (
     nextPage = 1,
