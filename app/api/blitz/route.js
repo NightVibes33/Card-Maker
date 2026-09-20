@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 
 const ORIGIN = 'https://blitzcovers.com';
-const COLLECTION = 'credit-card-cover';
+const COLLECTION = 'all';
 const SHOPIFY_PAGE_SIZE = 250;
 const MAX_SOURCE_PAGES = 6;
-const MAX_READER_PAGES = 12;
-const READER_ORIGIN = 'https://r.jina.ai/http://blitzcovers.com';
+const MAX_HTML_PAGES = 20;
 
 let catalogCache = null;
 const productCache = new Map();
@@ -151,6 +150,177 @@ function buildItem({ handle, title, assets }) {
   };
 }
 
+function decodeXml(value = '') {
+  return cleanText(
+    String(value)
+      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&apos;/g, "'")
+  );
+}
+
+function absoluteBlitzUrl(raw = '') {
+  try {
+    return new URL(decodeXml(raw), ORIGIN).toString();
+  } catch {
+    return '';
+  }
+}
+
+function parseProductSitemap(xml) {
+  const items = [];
+  const urlBlocks = String(xml).match(/<url>[\s\S]*?<\/url>/gi) || [];
+
+  for (const block of urlBlocks) {
+    const loc = decodeXml(block.match(/<loc>([\s\S]*?)<\/loc>/i)?.[1] || '');
+    const handle = loc.match(/\/products\/([a-z0-9][a-z0-9-]*)/i)?.[1] || '';
+    if (!handle) continue;
+
+    const title = decodeXml(
+      block.match(/<image:title>([\s\S]*?)<\/image:title>/i)?.[1] ||
+      block.match(/<image:caption>([\s\S]*?)<\/image:caption>/i)?.[1] ||
+      handle.replace(/[-_]+/g, ' ')
+    );
+
+    if (isExcluded(title, handle)) continue;
+
+    const assets = [];
+    const imageMatches = block.matchAll(/<image:loc>([\s\S]*?)<\/image:loc>/gi);
+    for (const match of imageMatches) {
+      const src = normalizeImageUrl(decodeXml(match[1]));
+      if (src && !assets.includes(src)) assets.push(src);
+    }
+
+    if (!assets.length) continue;
+    const item = buildItem({ handle, title, assets });
+    if (item) items.push(item);
+  }
+
+  return items;
+}
+
+async function getSitemapCatalog() {
+  const rootResponse = await fetchWithTimeout(
+    ORIGIN + '/sitemap.xml',
+    { headers: { Accept: 'application/xml,text/xml;q=0.9,*/*;q=0.5' } },
+    15000
+  );
+
+  if (!rootResponse.ok) {
+    throw new Error('Blitz sitemap index returned ' + rootResponse.status);
+  }
+
+  const rootXml = await rootResponse.text();
+  const sitemapUrls = [...rootXml.matchAll(/<loc>([\s\S]*?)<\/loc>/gi)]
+    .map((match) => absoluteBlitzUrl(match[1]))
+    .filter((url) => /sitemap_products/i.test(url));
+
+  if (!sitemapUrls.length) {
+    throw new Error('Blitz sitemap index exposed no product sitemap');
+  }
+
+  const all = [];
+  for (const url of sitemapUrls) {
+    const response = await fetchWithTimeout(
+      url,
+      { headers: { Accept: 'application/xml,text/xml;q=0.9,*/*;q=0.5' } },
+      18000
+    );
+    if (!response.ok) {
+      throw new Error('Blitz product sitemap returned ' + response.status);
+    }
+    all.push(...parseProductSitemap(await response.text()));
+  }
+
+  const seen = new Set();
+  return all.filter((item) => {
+    if (!item?.id || seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+}
+
+function parseHtmlCatalogPage(html) {
+  const byHandle = new Map();
+  const source = String(html)
+    .replace(/\\\//g, '/')
+    .replace(/\\u0026/g, '&')
+    .replace(/&amp;/g, '&');
+
+  const productMatches = [...source.matchAll(/(?:href|url)=["']?(?:https?:\/\/(?:www\.)?blitzcovers\.com)?\/products\/([a-z0-9][a-z0-9-]*)/gi)];
+
+  for (const match of productMatches) {
+    const handle = match[1];
+    if (!handle || isExcluded('', handle)) continue;
+
+    const start = Math.max(0, match.index - 2200);
+    const end = Math.min(source.length, match.index + 4200);
+    const block = source.slice(start, end);
+
+    const title =
+      cleanText(block.match(/(?:title|alt)=["']([^"']{2,180})["']/i)?.[1] || '') ||
+      handle.replace(/[-_]+/g, ' ');
+
+    if (isExcluded(title, handle)) continue;
+
+    const assets = [];
+    const urls = block.match(
+      /https?:\/\/(?:www\.)?blitzcovers\.com\/cdn\/shop\/(?:files|products)\/[^\s"'<>]+|https?:\/\/cdn\.shopify\.com\/s\/files\/[^\s"'<>]+|\/cdn\/shop\/(?:files|products)\/[^\s"'<>]+/gi
+    ) || [];
+
+    for (const raw of urls) {
+      const src = normalizeImageUrl(raw);
+      if (src && !assets.includes(src)) assets.push(src);
+    }
+
+    if (!assets.length) continue;
+
+    const existing = byHandle.get(handle);
+    if (existing) {
+      existing.assets = [...new Set([...existing.assets, ...assets])].slice(0, 8);
+    } else {
+      byHandle.set(handle, { handle, title, assets: assets.slice(0, 8) });
+    }
+  }
+
+  return [...byHandle.values()].map(buildItem).filter(Boolean);
+}
+
+async function getHtmlCatalog() {
+  const all = [];
+  const seen = new Set();
+
+  for (let page = 1; page <= MAX_HTML_PAGES; page += 1) {
+    const url = ORIGIN + '/collections/' + COLLECTION + (page > 1 ? '?page=' + page : '');
+    const response = await fetchWithTimeout(
+      url,
+      { headers: { Accept: 'text/html,application/xhtml+xml' } },
+      15000
+    );
+
+    if (!response.ok) {
+      throw new Error('Blitz HTML collection page ' + page + ' returned ' + response.status);
+    }
+
+    const html = await response.text();
+    const found = parseHtmlCatalogPage(html);
+    let added = 0;
+
+    for (const item of found) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      all.push(item);
+      added += 1;
+    }
+
+    if (page > 1 && added === 0) break;
+    if (!/page=\d+/i.test(html) && page > 1) break;
+  }
+
+  return all;
+}
+
 async function fetchShopifyPage(page) {
   const url =
     ORIGIN +
@@ -208,132 +378,6 @@ async function getDirectShopifyCatalog() {
     });
 }
 
-function readerUrl(path) {
-  return READER_ORIGIN + path;
-}
-
-async function fetchReader(path, timeout = 18000) {
-  const response = await fetchWithTimeout(
-    readerUrl(path),
-    {
-      headers: {
-        'User-Agent': 'AirCard-Card-Studio/4.2',
-        Accept: 'text/plain,text/markdown;q=0.9,*/*;q=0.5'
-      }
-    },
-    timeout
-  );
-
-  if (!response.ok) {
-    throw new Error('Blitz reader returned ' + response.status + ' for ' + path);
-  }
-
-  return response.text();
-}
-
-function parseReaderCollection(markdown) {
-  const products = [];
-  const seen = new Set();
-
-  const markdownLink =
-    /\[([^\]]{1,160})\]\(https?:\/\/(?:www\.)?blitzcovers\.com\/products\/([a-z0-9][a-z0-9-]*)(?:[^)]*)\)/gi;
-  let match;
-
-  while ((match = markdownLink.exec(markdown))) {
-    const title = cleanText(match[1]);
-    const handle = match[2];
-    if (!handle || seen.has(handle) || isExcluded(title, handle)) continue;
-    seen.add(handle);
-    products.push({ handle, title });
-  }
-
-  if (!products.length) {
-    const plain = /https?:\/\/(?:www\.)?blitzcovers\.com\/products\/([a-z0-9][a-z0-9-]*)/gi;
-    while ((match = plain.exec(markdown))) {
-      const handle = match[1];
-      if (!handle || seen.has(handle) || isExcluded('', handle)) continue;
-      seen.add(handle);
-      products.push({ handle, title: handle.replace(/[-_]+/g, ' ') });
-    }
-  }
-
-  return products;
-}
-
-function parseReaderAssets(markdown) {
-  const matches = String(markdown).match(
-    /https?:\/\/(?:www\.)?blitzcovers\.com\/cdn\/shop\/(?:files|products)\/[^\s)"'<>]+|https?:\/\/cdn\.shopify\.com\/s\/files\/[^\s)"'<>]+/gi
-  ) || [];
-
-  const seen = new Set();
-  return matches
-    .map(normalizeImageUrl)
-    .filter((url) => {
-      if (!url || seen.has(url)) return false;
-      seen.add(url);
-      return true;
-    });
-}
-
-async function hydrateReaderProduct(product) {
-  const now = Date.now();
-  const cached = productCache.get(product.handle);
-  if (cached && cached.expires > now) return cached.promise;
-
-  const promise = (async () => {
-    const markdown = await fetchReader('/products/' + product.handle);
-    const assets = parseReaderAssets(markdown);
-    return buildItem({
-      handle: product.handle,
-      title: product.title,
-      assets
-    });
-  })();
-
-  productCache.set(product.handle, {
-    promise,
-    expires: now + 6 * 60 * 60 * 1000
-  });
-
-  try {
-    return await promise;
-  } catch (error) {
-    productCache.delete(product.handle);
-    return null;
-  }
-}
-
-async function getReaderIndex() {
-  const all = [];
-  const seen = new Set();
-
-  for (let page = 1; page <= MAX_READER_PAGES; page += 1) {
-    const suffix =
-      '/collections/' +
-      COLLECTION +
-      (page > 1 ? '?page=' + page : '');
-
-    const markdown = await fetchReader(suffix);
-    const found = parseReaderCollection(markdown);
-    let added = 0;
-
-    for (const product of found) {
-      if (seen.has(product.handle)) continue;
-      seen.add(product.handle);
-      all.push(product);
-      added += 1;
-    }
-
-    if (!found.length || (page > 1 && added === 0)) break;
-    if (/Page\s+\d+\s+of\s+\d+/i.test(markdown)) {
-      const pageMatch = markdown.match(/Page\s+(\d+)\s+of\s+(\d+)/i);
-      if (pageMatch && Number(pageMatch[1]) >= Number(pageMatch[2])) break;
-    }
-  }
-
-  return all;
-}
-
 async function getCatalog() {
   const now = Date.now();
   if (catalogCache && catalogCache.expires > now) return catalogCache.promise;
@@ -345,15 +389,24 @@ async function getCatalog() {
         return { mode: 'shopify-json', items: direct };
       }
     } catch (error) {
-      console.warn('Blitz direct Shopify blocked; using reader fallback:', error?.message || error);
+      console.warn('Blitz Shopify JSON blocked:', error?.message || error);
     }
 
-    const index = await getReaderIndex();
-    if (!index.length) {
-      throw new Error('Blitz reader returned no product index');
+    try {
+      const sitemap = await getSitemapCatalog();
+      if (sitemap.length >= 100) {
+        return { mode: 'shopify-sitemap', items: sitemap };
+      }
+    } catch (error) {
+      console.warn('Blitz sitemap fallback failed:', error?.message || error);
     }
 
-    return { mode: 'reader', index };
+    const html = await getHtmlCatalog();
+    if (!html.length) {
+      throw new Error('Blitz public collection exposed no usable card products');
+    }
+
+    return { mode: 'collection-html', items: html };
   })();
 
   catalogCache = {
@@ -379,21 +432,10 @@ export async function GET(request) {
   try {
     const catalog = await getCatalog();
 
-    let total;
-    let results;
-    let mode = catalog.mode;
-
-    if (catalog.mode === 'shopify-json') {
-      total = catalog.items.length;
-      const start = (page - 1) * limit;
-      results = catalog.items.slice(start, start + limit);
-    } else {
-      total = catalog.index.length;
-      const start = (page - 1) * limit;
-      const pageIndex = catalog.index.slice(start, start + limit);
-      results = (await Promise.all(pageIndex.map(hydrateReaderProduct))).filter(Boolean);
-    }
-
+    const mode = catalog.mode;
+    const total = catalog.items.length;
+    const start = (page - 1) * limit;
+    const results = catalog.items.slice(start, start + limit);
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
     return NextResponse.json(
@@ -409,7 +451,7 @@ export async function GET(request) {
         upstream: {
           collection: COLLECTION,
           mode,
-          directShopifyBlocked: mode === 'reader'
+          directShopifyBlocked: mode !== 'shopify-json'
         }
       },
       {
