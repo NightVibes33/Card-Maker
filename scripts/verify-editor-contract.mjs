@@ -70,6 +70,7 @@ const pageChecks = [
   [/let hasServiceWorkerController = Boolean\(navigator\.serviceWorker\.controller\)/, 'service-worker distinguishes first claim from an update'],
   [/if \(!hasServiceWorkerController\)/, 'first service-worker claim does not force an app reload'],
   [/Layer limit reached\. Delete a layer before adding another\./, 'custom layer adds enforce the layer cap'],
+  [/order\.unshift\(id\);/, 'new custom layers start at the bottom of the unified stack'],
   [/visibleImageIdsTopDown\.length > MAX_VISIBLE_IMAGE_LAYERS/, 'older designs normalize overflow image layers instead of failing hydration'],
   [/visibleImageIdsTopDown\.slice\(0, MAX_VISIBLE_IMAGE_LAYERS\)/, 'overflow normalization preserves topmost visible image layers'],
   [/setSelectedElement\('artwork'\);[\s\S]{0,220}setStudioTool\('crop'\)/, 'Library artwork selection targets the background before crop editing'],
