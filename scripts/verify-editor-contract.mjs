@@ -130,7 +130,11 @@ requireMatch(page, /const MAX_STORED_LAYER_IMAGE_DIMENSION = 2560;/, 'custom ima
 requireMatch(page, /const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS \+ 1;/, 'preset asset capacity covers every custom layer plus the imported background');
 requireMatch(page, /async function prepareLocalImageBlob\(/, 'oversized local images are downsampled before persistence');
 requireMatch(page, /maxPixels: MAX_STORED_LAYER_IMAGE_PIXELS/, 'custom image-layer imports use the smaller working set');
-requireMatch(page, /source\.startsWith\('\/api\/image\?'\) \|\| \^https:/, 'restored proxied artwork is normalized back to working resolution');
+requireMatch(
+  page,
+  /source\.startsWith\('\/api\/image\?'\)[\s\S]{0,100}test\(source\)[\s\S]{0,120}return proxyImageWidth\(source, width\)/,
+  'restored proxied artwork is normalized back to working resolution'
+);
 requireMatch(page, /parsed\.background = normalizePersistedArtworkSource\(parsed\.background, 3072\)/, 'legacy draft artwork is upgraded instead of cleared');
 requireMatch(page, /imported\.background = normalizePersistedArtworkSource\(imported\.background, 3072\)/, 'legacy preset background artwork is upgraded instead of cleared');
 requireMatch(page, /src: normalizePersistedArtworkSource\(src, MAX_STORED_LAYER_IMAGE_DIMENSION\)/, 'legacy preset image layers are upgraded instead of cleared');
