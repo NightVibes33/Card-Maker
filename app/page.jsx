@@ -6601,6 +6601,15 @@ export default function Page() {
             </Group>
 
             <Group title="ADVANCED">
+              <button
+                type="button"
+                className="actionRow"
+                disabled={cleanupInProgress || presetTransferInProgress || imageImportInProgress}
+                onClick={reset}
+              >
+                <span><strong>New Card</strong><small>Start with a clean card. Undo can restore your current design.</small></span>
+                <IOSIcon name="reset" size={18} />
+              </button>
               <SwitchRow label="Expert Mode" detail="Show precise numeric editing controls" value={expertMode} onChange={setExpertMode} />
               <button type="button" className="actionRow" onClick={() => setInstallHelp(true)}>
                 <span><strong>Install Card Studio</strong><small>Add the PWA to your iPhone Home Screen</small></span>
