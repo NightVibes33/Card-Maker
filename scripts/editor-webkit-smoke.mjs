@@ -417,35 +417,6 @@ try {
     mimeType: 'image/png',
     buffer: imageLayerUpload
   });
-  await discoverUploadInput.dispatchEvent('change');
-
-  await page.waitForTimeout(1800);
-  const syntheticImportProbe = await page.evaluate(() => {
-    let draft = {};
-    try {
-      draft = JSON.parse(localStorage.getItem('aircard-sticker-fvp-v3') || '{}');
-    } catch {}
-    const input = document.querySelector('#panel-discover input[type="file"][accept="image/*"]');
-    return {
-      label: draft.backgroundLabel || '',
-      files: Number(input?.files?.length || 0),
-      importButtonDisabled: Boolean(
-        [...document.querySelectorAll('button')]
-          .find((node) => node.textContent?.includes('Import Photo or File'))
-          ?.disabled
-      )
-    };
-  });
-  if (syntheticImportProbe.label !== 'fresh-main-menu-import.png') {
-    await page.getByRole('tab', { name: 'Studio', exact: true }).click();
-    const caption = await page.locator('.previewCaption').innerText().catch(() => '');
-    console.log('DEBUG synthetic local import => ' + JSON.stringify({
-      ...syntheticImportProbe,
-      caption,
-      pageErrors
-    }));
-    await page.getByRole('tab', { name: 'Discover', exact: true }).click();
-  }
 
   await page.waitForFunction(
     () => {
@@ -500,7 +471,6 @@ try {
     mimeType: 'image/png',
     buffer: catalogSkinPng
   });
-  await replaceUploadInput.dispatchEvent('change');
   await page.waitForFunction(
     () => {
       try {
