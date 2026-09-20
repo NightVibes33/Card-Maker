@@ -32,6 +32,7 @@ const pageChecks = [
   [/label="Lock Layer"/, 'layer locking control exists'],
   [/Clean Unused Imports/, 'unused import cleanup exists'],
   [/renderAssetsReady/, 'exports are gated on decoded assets'],
+  [/if \(!ctx\) \{[\s\S]{0,120}throw new Error\('Canvas rendering is unavailable'\)/, 'export canvas allocation fails closed'],
   [/historyGroupRef/, 'continuous edits use grouped undo history'],
   [/gestureStartDesign\.current = designRef\.current/, 'gestures snapshot authoritative state'],
   [/if \(pointers\.current\.size >= 2\) return;/, 'gesture tracking ignores accidental third touches'],
