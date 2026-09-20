@@ -2062,6 +2062,8 @@ export default function Page() {
         }
 
         if ('serviceWorker' in navigator) {
+          let hasServiceWorkerController = Boolean(navigator.serviceWorker.controller);
+
           navigator.serviceWorker.register('/sw.js').then((registration) => {
             registration.update().catch(() => {});
           }).catch(() => {});
@@ -2076,6 +2078,11 @@ export default function Page() {
 
           controllerChangeHandler = async () => {
             if (controllerReloadInFlight || cancelled) return;
+
+            if (!hasServiceWorkerController) {
+              hasServiceWorkerController = true;
+              return;
+            }
 
             try {
               if (sessionStorage.getItem(reloadKey) === '1') return;
