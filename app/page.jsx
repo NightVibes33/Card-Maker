@@ -1292,7 +1292,7 @@ function ArtworkRail({ title, items, onPick, favoriteIds = new Set(), onFavorite
               </button>
               <SkinActions
                 item={item}
-                isFavorite={favoriteIds.has(item.id)}
+                isFavorite={favoriteIds.has(String(item.id))}
                 onPick={onPick}
                 onFavorite={onFavorite}
                 onMenu={onMenu}
@@ -1373,7 +1373,7 @@ function StoreCatalog({
                 </button>
                 <SkinActions
                   item={item}
-                  isFavorite={favoriteIds.has(item.id)}
+                  isFavorite={favoriteIds.has(String(item.id))}
                   onPick={onPick}
                   onFavorite={onFavorite}
                   onMenu={onMenu}
@@ -6054,7 +6054,7 @@ export default function Page() {
           </button>
           <button type="button" className="primaryAction" onClick={() => useArtwork(menuItem)}>Use Skin</button>
           <button type="button" className="secondaryAction" onClick={() => toggleFavorite(menuItem)}>
-            {favoriteIds.has(menuItem.id) ? 'Remove Favorite' : 'Add to Favorites'}
+            {favoriteIds.has(String(menuItem.id)) ? 'Remove Favorite' : 'Add to Favorites'}
           </button>
         </Modal>
       ) : null}
