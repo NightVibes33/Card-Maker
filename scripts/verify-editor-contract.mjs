@@ -122,6 +122,7 @@ requireMatch(storage, /const DB_VERSION = 2;/, 'IndexedDB schema includes import
 requireMatch(storage, /'importMeta'/, 'import metadata store exists');
 requireMatch(storage, /export async function dbGetImportMetadata\(/, 'metadata-only import listing exists');
 requireMatch(storage, /if \(!db\) throw new Error\('IndexedDB unavailable'\);/, 'durable IndexedDB writes fail instead of reporting fake success');
+requireMatch(storage, /if \(settled\) \{[\s\S]{0,80}db\.close\(\);/, 'late IndexedDB upgrade success closes orphaned connections');
 requireMatch(storage, /const CACHE_ARTWORK_TIMEOUT_MS = 12000;/, 'offline artwork caching has a mobile-network timeout');
 requireMatch(storage, /signal: controller\.signal/, 'offline artwork cache fetches are abortable');
 requireMatch(page, /dbGetImportMetadata\(\)/, 'Library hydrates import metadata instead of blobs');
