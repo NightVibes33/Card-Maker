@@ -427,13 +427,13 @@ function normalizeDesignState(value) {
 
   const seen = new Set();
   next.customLayers = (Array.isArray(raw.customLayers) ? raw.customLayers : [])
-    .slice(0, MAX_CUSTOM_LAYERS)
     .map(normalizeCustomLayer)
     .filter((layer) => {
       if (!layer || seen.has(layer.id)) return false;
       seen.add(layer.id);
       return true;
-    });
+    })
+    .slice(0, MAX_CUSTOM_LAYERS);
   next.layerOrder = normalizeLayerOrder({
     ...next,
     layerOrder: Array.isArray(raw.layerOrder) ? raw.layerOrder : DEFAULTS.layerOrder
