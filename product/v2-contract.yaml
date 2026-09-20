@@ -39,6 +39,7 @@ forbidden:
       - "isIOS ?"
       - "<span className=\"kicker\">AirCard</span>"
       - "Design Studio"
+      - "<button type=\"button\" className=\"navTextButton\" onClick={reset}>New</button>"
       - "CUCU Covers"
       - "Searching CUCU"
       - "Loading CUCU"
@@ -69,6 +70,16 @@ features:
       - "Preview"
       - "Use Skin"
       - "Add to Favorites"
+  preview_crop_cleanup:
+    file: app/page.jsx
+    contains:
+      - "catalogArtworkFrame"
+  preview_crop_css:
+    file: app/globals.css
+    contains:
+      - ".catalogArtworkFrame{"
+      - "inset:-2.25%"
+      - "background:#000"
   real_cucu_search:
     file: app/api/cucu/route.js
     contains:
