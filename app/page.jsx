@@ -1868,6 +1868,7 @@ export default function Page() {
   const [projectName, setProjectName] = useState('');
   const [imports, setImports] = useState([]);
   const [cleanupInProgress, setCleanupInProgress] = useState(false);
+  const [exportInProgress, setExportInProgress] = useState(false);
   const [exportHistory, setExportHistory] = useState([]);
   const [expertMode, setExpertMode] = useState(false);
   const [guidesEnabled, setGuidesEnabled] = useState(true);
@@ -1917,6 +1918,7 @@ export default function Page() {
   const gestureHistoryRecorded = useRef(false);
   const draftSaveQueueRef = useRef(Promise.resolve());
   const draftSaveVersionRef = useRef(0);
+  const exportInFlightRef = useRef(false);
 
   const gradient = useMemo(
     () => GRADIENTS.find((item) => item.id === design.gradient) || GRADIENTS[0],
@@ -4527,50 +4529,63 @@ export default function Page() {
     height = OUT_H,
     name = 'cardBackgroundCombined@3x.png'
   ) {
-    if (!assetsReadyForDesign(designRef.current)) {
-      setMessage(
-        backgroundLoadError ||
-        layerLoadError ||
-        'Artwork is still loading. Export is available when every image is ready.'
-      );
+    if (exportInFlightRef.current) {
+      setMessage('An export is already in progress');
       return;
     }
 
-    let file;
-    try {
-      file = makePngFile(width, height, name);
-    } catch {
-      setMessage('PNG export failed. Re-open the artwork or image layer and try again.');
-      return;
-    }
-
-    let canShareFile = false;
-    try {
-      canShareFile = Boolean(
-        navigator.share &&
-        (!navigator.canShare || navigator.canShare({ files: [file] }))
-      );
-    } catch {
-      canShareFile = false;
-    }
-
-    if (!canShareFile) {
-      await download(width, height, name, file);
-      setMessage('Native image sharing is unavailable, so the PNG was downloaded instead.');
-      return;
-    }
+    exportInFlightRef.current = true;
+    setExportInProgress(true);
 
     try {
-      setMessage('Opening the native image sheet… Choose “Save Image” to save it to Photos.');
-      await navigator.share({ files: [file] });
-      await recordExport(name, width, height, 'native-image-sheet');
-      setMessage('Image sheet closed');
-    } catch (error) {
-      if (error?.name === 'AbortError') {
-        setMessage('Image sharing canceled');
-      } else {
-        setMessage('Could not open the native image sheet.');
+      if (!assetsReadyForDesign(designRef.current)) {
+        setMessage(
+          backgroundLoadError ||
+          layerLoadError ||
+          'Artwork is still loading. Export is available when every image is ready.'
+        );
+        return;
       }
+
+      let file;
+      try {
+        file = makePngFile(width, height, name);
+      } catch {
+        setMessage('PNG export failed. Re-open the artwork or image layer and try again.');
+        return;
+      }
+
+      let canShareFile = false;
+      try {
+        canShareFile = Boolean(
+          navigator.share &&
+          (!navigator.canShare || navigator.canShare({ files: [file] }))
+        );
+      } catch {
+        canShareFile = false;
+      }
+
+      if (!canShareFile) {
+        await download(width, height, name, file);
+        setMessage('Native image sharing is unavailable, so the PNG download was started instead.');
+        return;
+      }
+
+      try {
+        setMessage('Opening the native image sheet… Choose “Save Image” to save it to Photos.');
+        await navigator.share({ files: [file] });
+        await recordExport(name, width, height, 'native-image-sheet');
+        setMessage('Image sheet closed');
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          setMessage('Image sharing canceled');
+        } else {
+          setMessage('Could not open the native image sheet.');
+        }
+      }
+    } finally {
+      exportInFlightRef.current = false;
+      setExportInProgress(false);
     }
   }
 
@@ -5646,14 +5661,14 @@ export default function Page() {
               </div>
             </section>
 
-            <button type="button" className="secondaryAction bigAction" disabled={!renderAssetsReady} onClick={() => setShowExportPreview(true)}>
+            <button type="button" className="secondaryAction bigAction" disabled={!renderAssetsReady || exportInProgress} onClick={() => setShowExportPreview(true)}>
               <span>Full-Screen Preview</span>
             </button>
 
             <button
               type="button"
               className="primaryAction bigAction"
-              disabled={!renderAssetsReady}
+              disabled={!renderAssetsReady || exportInProgress}
               onClick={() => nativeExportPng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}
             >
               <IOSIcon name="photo" size={21} />
@@ -5667,7 +5682,7 @@ export default function Page() {
               <button
                 type="button"
                 className="actionRow"
-                disabled={!renderAssetsReady}
+                disabled={!renderAssetsReady || exportInProgress}
                 onClick={() => nativeExportPng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}
               >
                 <span><strong>Save 3× Image</strong><small>1536 × 969 · highest quality</small></span>
@@ -5676,7 +5691,7 @@ export default function Page() {
               <button
                 type="button"
                 className="actionRow"
-                disabled={!renderAssetsReady}
+                disabled={!renderAssetsReady || exportInProgress}
                 onClick={() => nativeExportPng(1024, 646, 'cardBackgroundCombined@2x.png')}
               >
                 <span><strong>Save 2× Image</strong><small>1024 × 646</small></span>
@@ -5685,7 +5700,7 @@ export default function Page() {
               <button
                 type="button"
                 className="actionRow"
-                disabled={!renderAssetsReady}
+                disabled={!renderAssetsReady || exportInProgress}
                 onClick={() => nativeExportPng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}
               >
                 <span><strong>Share 3× PNG</strong><small>Photos, AirDrop, Messages, apps, and more</small></span>
@@ -5753,9 +5768,10 @@ export default function Page() {
           <button
             type="button"
             className="primaryAction"
+            disabled={!renderAssetsReady || exportInProgress}
             onClick={() => nativeExportPng(OUT_W, OUT_H, 'cardBackgroundCombined@3x.png')}
           >
-            Save / Share 3× Image
+            {exportInProgress ? 'Exporting…' : 'Save / Share 3× Image'}
           </button>
         </Modal>
       ) : null}
