@@ -1056,14 +1056,73 @@ function StoreCatalog({
 }
 
 function Modal({ title, children, onClose, className = '' }) {
+  const sheetRef = useRef(null);
+  const closeRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    const frame = requestAnimationFrame(() => closeRef.current?.focus());
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current?.();
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(
+        sheetRef.current?.querySelectorAll(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+        ) || []
+      ).filter((element) => !element.hasAttribute('hidden'));
+
+      if (!focusable.length) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      if (previousFocus instanceof HTMLElement) previousFocus.focus();
+    };
+  }, []);
+
   return (
-    <div className="modalBackdrop" role="presentation" onMouseDown={(event) => {
+    <div className="modalBackdrop" role="presentation" onPointerDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <section className={'modalSheet ' + className} role="dialog" aria-modal="true" aria-label={title}>
+      <section ref={sheetRef} className={'modalSheet ' + className} role="dialog" aria-modal="true" aria-label={title}>
         <div className="modalHeader">
           <h2>{title}</h2>
-          <button type="button" className="modalClose" onClick={onClose} aria-label={'Close ' + title}>×</button>
+          <button ref={closeRef} type="button" className="modalClose" onClick={onClose} aria-label={'Close ' + title}>×</button>
         </div>
         {children}
       </section>
