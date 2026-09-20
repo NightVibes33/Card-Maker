@@ -1173,6 +1173,8 @@ export default function Page() {
   const redoRef = useRef([]);
   const designRef = useRef(DEFAULTS);
   const historyGroupRef = useRef({ key: '', at: 0 });
+  const catalogLoadingRef = useRef(false);
+  const catalogIntentRef = useRef('all\u0000');
   const gestureTarget = useRef('artwork');
   const gestureStartDesign = useRef(null);
   const gestureHistoryRecorded = useRef(false);
@@ -1918,11 +1920,15 @@ export default function Page() {
     category = cucuCategory,
     search = query
   ) => {
-    if (cucuLoading) return;
+    if (catalogLoadingRef.current) return;
 
+    const requestIntent = category + '\u0000' + search.trim();
+    catalogLoadingRef.current = true;
     setCucuLoading(true);
     setCatalogError('');
     setMessage(search ? 'Searching card library…' : 'Loading card skins…');
+
+    const isCurrentIntent = () => catalogIntentRef.current === requestIntent;
 
     try {
       const params = new URLSearchParams({
@@ -1935,8 +1941,12 @@ export default function Page() {
       const response = await fetch('/api/cucu?' + params.toString());
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Card library failed');
+      if (!isCurrentIntent()) return;
 
       const rawList = Array.isArray(json.results) ? json.results : [];
+      const cleanList = await prepareCleanResults(rawList);
+      if (!isCurrentIntent()) return;
+
       setCucuTotal(Number(json.total) || 0);
       setCucuHasMore(Boolean(json.hasMore));
       setCucuCategoryLabel(
@@ -1944,8 +1954,6 @@ export default function Page() {
           ? 'Search Results'
           : json.categoryLabel || CUCU_CATEGORIES.find(([key]) => key === category)?.[1] || 'Card Skins'
       );
-
-      const cleanList = await prepareCleanResults(rawList);
 
       setCucuItems((current) => {
         const base = replace ? [] : current;
@@ -1965,18 +1973,22 @@ export default function Page() {
           : 'No usable card skins on this page'
       );
     } catch (error) {
-      const text = error?.message || 'Card library failed';
-      setCatalogError(text);
-      setMessage(text);
+      if (isCurrentIntent()) {
+        const text = error?.message || 'Card library failed';
+        setCatalogError(text);
+        setMessage(text);
+      }
     } finally {
+      catalogLoadingRef.current = false;
       setCucuLoading(false);
     }
-  }, [cucuCategory, cucuLoading, query]);
+  }, [cucuCategory, query]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       const next = searchInput.trim();
       if (next === query) return;
+      catalogIntentRef.current = cucuCategory + '\u0000' + next;
       setQuery(next);
       setCucuItems([]);
       setCucuPage(0);
@@ -3135,6 +3147,7 @@ export default function Page() {
                     setSearchInput('');
                     setQuery('');
                     if (value === cucuCategory && cucuPage > 0) return;
+                    catalogIntentRef.current = value + '\u0000';
                     setCucuCategory(value);
                     setCucuCategoryLabel(label);
                     setCucuItems([]);
