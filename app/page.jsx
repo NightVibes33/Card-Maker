@@ -2062,9 +2062,22 @@ export default function Page() {
           .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
         setFavorites(validFavorites.map((entry) => entry.item));
         setFavoriteIds(new Set(validFavorites.map((entry) => entry.item.id)));
-        setProjects(storedProjects.sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0)));
-        setImports(storedImports.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)));
-        setExportHistory(storedExports.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)).slice(0, 40));
+        setProjects(
+          storedProjects
+            .filter((entry) => entry?.id && entry?.design && typeof entry.design === 'object')
+            .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))
+        );
+        setImports(
+          storedImports
+            .filter((entry) => entry?.id)
+            .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
+        );
+        setExportHistory(
+          storedExports
+            .filter((entry) => entry?.id)
+            .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
+            .slice(0, 40)
+        );
 
         try {
           const storedRecent = JSON.parse(localStorage.getItem('aircard-recent-artwork-v1') || '[]');
@@ -3715,6 +3728,7 @@ export default function Page() {
       ...project,
       id: makeId('project'),
       name: (project.name || 'Design') + ' Copy',
+      design: JSON.parse(JSON.stringify(project.design || DEFAULTS)),
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
