@@ -46,7 +46,8 @@ export async function GET(request) {
         'User-Agent': 'AirCard-Card-Studio/3.0 (+https://github.com/NightVibes33/Card-Maker)',
         Accept: 'image/avif,image/webp,image/apng,image/jpeg,image/png,*/*'
       },
-      cache: 'force-cache'
+      cache: 'force-cache',
+      next: { revalidate: 31536000 }
     });
 
     if (!upstream.ok) {
@@ -76,7 +77,9 @@ export async function GET(request) {
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'CDN-Cache-Control': 'public, max-age=31536000, stale-while-revalidate=31536000',
+        'Vercel-CDN-Cache-Control': 'public, max-age=31536000, stale-while-revalidate=31536000',
         'X-Content-Type-Options': 'nosniff'
       }
     });
