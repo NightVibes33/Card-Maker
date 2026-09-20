@@ -1216,16 +1216,26 @@ function CatalogArtwork({ item, alt, useThumbnail = true }) {
   const src = useThumbnail
     ? proxyImageWidth(item.thumbnail || item.image, 560)
     : proxyImageWidth(item.image, 1600);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
 
   return (
     <span className="catalogArtworkFrame">
-      {crop && crop.w > 0 && crop.h > 0 ? (
+      {failed || !src ? (
+        <span className="catalogArtworkFallback" role="img" aria-label={alt || 'Artwork unavailable'}>
+          <IOSIcon name="photo" size={24} />
+        </span>
+      ) : crop && crop.w > 0 && crop.h > 0 ? (
         <img
           className="croppedCatalogImage"
           src={src}
           alt={alt}
           loading="lazy"
           decoding="async"
+          onError={() => setFailed(true)}
           style={{
             width: (100 / crop.w) + '%',
             height: (100 / crop.h) + '%',
@@ -1234,7 +1244,13 @@ function CatalogArtwork({ item, alt, useThumbnail = true }) {
           }}
         />
       ) : (
-        <img src={src} alt={alt} loading="lazy" decoding="async" />
+        <img
+          src={src}
+          alt={alt}
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+        />
       )}
     </span>
   );
