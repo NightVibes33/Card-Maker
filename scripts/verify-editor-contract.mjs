@@ -196,6 +196,8 @@ requireMatch(page, /const MAX_STORED_IMAGE_PIXELS = 12_000_000;/, 'local image w
 requireMatch(page, /const MAX_STORED_IMAGE_DIMENSION = 4096;/, 'local image working-set dimensions are bounded');
 requireMatch(page, /const MAX_STORED_LAYER_IMAGE_PIXELS = 4_000_000;/, 'custom image-layer working-set pixels are bounded separately');
 requireMatch(page, /const MAX_STORED_LAYER_IMAGE_DIMENSION = 2560;/, 'custom image-layer dimensions are bounded separately');
+requireMatch(page, /const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS \+ 1;/, 'preset asset cap includes the background plus every custom layer');
+requireMatch(page, /refs\.size > MAX_PRESET_ASSETS/, 'preset export guards asset-count round-trip compatibility');
 requireMatch(page, /const EDITOR_PREVIEW_W = 1024;/, 'interactive editor canvas uses a reduced backing width');
 requireMatch(page, /const EDITOR_PREVIEW_H = 646;/, 'interactive editor canvas preserves the exact card ratio');
 requireMatch(page, /width=\{EDITOR_PREVIEW_W\}/, 'interactive canvas uses the reduced backing width');
