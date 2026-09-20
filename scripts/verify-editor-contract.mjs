@@ -101,6 +101,9 @@ requireMatch(page, /const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS \+ 1;/, 'preset 
 requireMatch(page, /async function prepareLocalImageBlob\(/, 'oversized local images are downsampled before persistence');
 requireMatch(page, /maxPixels: MAX_STORED_LAYER_IMAGE_PIXELS/, 'custom image-layer imports use the smaller working set');
 requireMatch(page, /const decodedBySource = new Map\(\);/, 'duplicate image layers share decoded sources');
+requireMatch(page, /const animatedOrVectorSource =/, 'animated and vector imports are normalized');
+requireMatch(page, /gif\|apng\|svg\\\+xml/, 'APNG, GIF, and SVG imports use deterministic rasterization');
+requireMatch(page, /const encodeCanvas = \(type, quality\)/, 'image optimization has an encoder fallback path');
 if (/dbGetAll\('imports'\)/.test(page)) {
   throw new Error('Editor contract failed: Library must not hydrate full import blobs into React state');
 }
