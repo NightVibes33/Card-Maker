@@ -37,7 +37,7 @@ const pageChecks = [
   [/try \{[\s\S]{0,100}setPointerCapture\(event\.pointerId\);[\s\S]{0,50}\} catch \{\}/, 'mobile pointer capture failures are non-fatal'],
   [/function normalizeFreeRotation\(/, 'free rotations wrap smoothly through the ±180° boundary'],
   [/const nextRotation = normalizeFreeRotation\([\s\S]{0,420}contactlessRotation: nextRotation/, 'contactless gesture rotation wraps instead of sticking at 180°'],
-  [/rotation: normalizeFreeRotation\(/, 'custom layer gesture rotation wraps instead of sticking at 180°'],
+  [/const nextRotation = normalizeFreeRotation\(currentRotation \+ angleDelta\)[\s\S]{0,700}rotation: nextRotation/, 'custom layer gesture rotation wraps instead of sticking at 180°'],
   [/rotate: normalizeFreeRotation\(/, 'artwork gesture rotation wraps instead of sticking at 180°'],
   [/const localPadding = Number\(padding \|\| 0\) \/ safeScale;/, 'transformed hit padding remains scale-independent'],
   [/const hitPadding = Math\.max\(14, \(22 \* OUT_W\) \/ Math\.max\(1, rect\.width\)\);/, 'canvas hit padding tracks a true iPhone-sized touch target'],
