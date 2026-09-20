@@ -89,7 +89,7 @@ const pageChecks = [
   [/designRef\.current === startupDesign/, 'startup hydration does not overwrite newer edits'],
   [/async function saveProject\([\s\S]*?if \(!hydrated\)/, 'named project saves wait for Library hydration before enforcing project limits'],
   [/setFavorites\(\(current\) => \{[\s\S]*?mergedById/, 'startup favorite hydration merges early user actions'],
-  [/setProjects\(\(current\) => \{[\s\S]*?projectCountRef\.current = merged\.length/, 'startup project hydration merges early user actions'],
+  [/setProjects\(\(current\) => \{[\s\S]{0,700}const merged = \[\.\.\.mergedById\.values\(\)\][\s\S]{0,240}return merged;/, 'startup project hydration merges early user actions'],
   [/setImports\(\(current\) => \{[\s\S]*?mergedById/, 'startup import hydration merges early user actions'],
   [/setExportHistory\(\(current\) => \{[\s\S]*?mergedById/, 'startup export hydration merges early user actions'],
   [/for \(let attempt = 0; attempt < 3; attempt \+= 1\)/, 'service-worker reload retries until the latest draft is stable'],
