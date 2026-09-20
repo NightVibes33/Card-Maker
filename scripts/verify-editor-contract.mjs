@@ -110,7 +110,7 @@ const pageChecks = [
   [/className="studioNewCardButton"/, 'Studio exposes a New Card action'],
   [/dbPutIfBelowLimit\('projects', project, MAX_SAVED_PROJECTS\)/, 'named project saves enforce capacity inside IndexedDB'],
   [/dbPutIfBelowLimit\('projects', copy, MAX_SAVED_PROJECTS\)/, 'project duplicates share the atomic IndexedDB capacity limit'],
-  [/const pendingNamedSave = projectSaveInFlightRef\.current \? 1 : 0;/, 'project duplication counts an in-flight named save against the project cap'],
+  [/copyInserted = await dbPutIfBelowLimit\('projects', copy, MAX_SAVED_PROJECTS\)/, 'project duplication enforces the project cap atomically'],
   [/if \(projectOpsRef\.current\.size\) \{[\s\S]{0,180}before cleaning imported images/, 'import cleanup waits for active project transactions'],
   [/const imageImportGenerationRef = useRef\(0\)/, 'image imports use a generation token'],
   [/function invalidatePendingImageImport\(\)/, 'newer card actions can invalidate stale image imports'],
