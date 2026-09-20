@@ -398,12 +398,12 @@ try {
   await page.getByRole('button', { name: /^EMV Chip Built-in hardware /i }).click();
   await page.getByRole('tab', { name: 'Position', exact: true }).click();
 
-  const chipX = page.getByLabel('Chip horizontal position');
-  const chipY = page.getByLabel('Chip vertical position');
-  const chipScale = page.getByLabel('Chip size');
-  const chipXBefore = Number(await chipX.inputValue());
-  const chipYBefore = Number(await chipY.inputValue());
-  const chipScaleBefore = Number(await chipScale.inputValue());
+  const builtinChipX = page.getByLabel('Chip horizontal position');
+  const builtinChipY = page.getByLabel('Chip vertical position');
+  const builtinChipScale = page.getByLabel('Chip size');
+  const chipXBefore = Number(await builtinChipX.inputValue());
+  const chipYBefore = Number(await builtinChipY.inputValue());
+  const chipScaleBefore = Number(await builtinChipScale.inputValue());
 
   const chipCanvasBox = await editorCanvas.boundingBox();
   assert.ok(chipCanvasBox, 'built-in chip test requires a visible editor canvas');
@@ -425,7 +425,7 @@ try {
     return input && Number(input.value) > before;
   }, chipXBefore);
   assert.ok(
-    Number(await chipX.inputValue()) > chipXBefore,
+    Number(await builtinChipX.inputValue()) > chipXBefore,
     'direct canvas drag must move the built-in EMV chip'
   );
 
