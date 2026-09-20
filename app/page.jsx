@@ -2166,8 +2166,15 @@ export default function Page() {
   }, []);
 
   const rememberArtwork = useCallback((item) => {
+    const normalized = normalizeStoredArtworkItem(item);
+    if (!normalized) return;
+
     setRecent((current) => {
-      const next = [item, ...current.filter((entry) => entry.id !== item.id)].slice(0, 20);
+      const itemId = String(normalized.id);
+      const next = [
+        normalized,
+        ...current.filter((entry) => String(entry.id) !== itemId)
+      ].slice(0, 20);
       try {
         localStorage.setItem('aircard-recent-artwork-v1', JSON.stringify(next));
       } catch {}
