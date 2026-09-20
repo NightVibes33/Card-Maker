@@ -1377,7 +1377,7 @@ export default function Page() {
   const imageLayerSourceKey = useMemo(
     () => JSON.stringify(
       (design.customLayers || [])
-        .filter((layer) => layer.type === 'image' && layer.src)
+        .filter((layer) => layer.type === 'image' && layer.src && !layer.hidden)
         .map((layer) => ({ id: layer.id, src: layer.src }))
     ),
     [design.customLayers]
@@ -1387,7 +1387,11 @@ export default function Page() {
     if (design.background && (!image || loadedBackgroundKey !== design.background)) return false;
     if (loadedImageLayerSourceKey !== imageLayerSourceKey) return false;
     return (design.customLayers || []).every(
-      (layer) => layer.type !== 'image' || !layer.src || Boolean(layerImages[layer.id])
+      (layer) =>
+        layer.hidden ||
+        layer.type !== 'image' ||
+        !layer.src ||
+        Boolean(layerImages[layer.id])
     );
   }, [
     design.background,
@@ -2619,7 +2623,7 @@ export default function Page() {
       while (
         target >= 0 &&
         target < order.length &&
-        !isLayerStackEntryVisible(current, order[target])
+        !isLayerStackEntryListed(current, order[target])
       ) {
         target += direction;
       }
