@@ -31,11 +31,59 @@ await page.addInitScript(() => {
   } catch {}
 });
 
+const catalogSkinPng = await sharp({
+  create: {
+    width: 640,
+    height: 404,
+    channels: 4,
+    background: { r: 58, g: 92, b: 220, alpha: 1 }
+  }
+}).png().toBuffer();
+
 await page.route('**/api/cucu**', async (route) => {
+  const url = new URL(route.request().url());
+  if (url.pathname === '/api/cucu/inspect') {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        usable: true,
+        full: '/api/image?url=' + encodeURIComponent('https://example.test/webkit-library.png'),
+        thumbnail: '/api/image?url=' + encodeURIComponent('https://example.test/webkit-library.png') + '&w=560',
+        crop: null,
+        ratio: 640 / 404,
+        quality: { variance: 1200 }
+      })
+    });
+    return;
+  }
+
   await route.fulfill({
     status: 200,
     contentType: 'application/json',
-    body: JSON.stringify({ results: [], total: 0, hasMore: false })
+    body: JSON.stringify({
+      results: [{
+        id: 'cucu-webkit-library',
+        title: 'WebKit Library Skin',
+        image: '/api/image?url=' + encodeURIComponent('https://example.test/webkit-library.png'),
+        thumbnail: '/api/image?url=' + encodeURIComponent('https://example.test/webkit-library.png') + '&w=560',
+        inspectUrls: ['/api/cucu/inspect?url=' + encodeURIComponent('https://example.test/webkit-library.png')],
+        candidateImages: ['/api/image?url=' + encodeURIComponent('https://example.test/webkit-library.png')],
+        assetMode: 'direct-card-art',
+        mediaAlt: 'WebKit Library Skin'
+      }],
+      total: 1,
+      hasMore: false,
+      categoryLabel: 'All Card Skins'
+    })
+  });
+});
+
+await page.route('**/api/image**', async (route) => {
+  await route.fulfill({
+    status: 200,
+    contentType: 'image/png',
+    body: catalogSkinPng
   });
 });
 
@@ -865,6 +913,29 @@ try {
     await page.getByLabel('Layer text').inputValue(),
     'AVATAR\nWA',
     'preset import must restore the exported text-layer state'
+  );
+
+  // Main Card Library / Discover selection is a project boundary. It must
+  // import the selected skin into a clean project and forget unsaved editor
+  // work from the previously open project.
+  await page.getByRole('tab', { name: 'Discover', exact: true }).click();
+  const mainLibrarySkin = page.getByRole('button', { name: 'Use WebKit Library Skin', exact: true }).first();
+  await mainLibrarySkin.waitFor({ state: 'visible', timeout: 15000 });
+  await mainLibrarySkin.click();
+  await page.getByText('New project created from WebKit Library Skin', { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 10000
+  });
+  assert.equal(
+    await page.getByRole('button', { name: 'Undo', exact: true }).isDisabled(),
+    true,
+    'main Card Library selection must clear undo history from the previous project'
+  );
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  assert.equal(
+    await page.getByRole('button', { name: /^Text text /i }).count(),
+    0,
+    'main Card Library selection must not inherit custom layers from the previous project'
   );
 
   // Simulate another Safari/PWA instance filling the project store without
