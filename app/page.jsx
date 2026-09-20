@@ -273,24 +273,31 @@ function ArtworkRail({ title, items, onPick }) {
     <section className="browseSection">
       <div className="browseHeading">
         <h2>{title}</h2>
-        <span>{items.length}</span>
+        <span>{items.length} card skins</span>
       </div>
-      <div className="artRail" role="list">
+      <div className="artRail cardSkinRail" role="list">
         {items.map((item) => (
-          <button
-            type="button"
-            className="artPoster"
-            role="listitem"
-            key={item.id}
-            onClick={() => onPick(item)}
-            aria-label={'Use ' + item.title}
-          >
-            <img src={item.image} alt={item.title} loading="lazy" />
-            <span>
-              <strong>{item.title}</strong>
-              <small>{item.subtitle || item.source}</small>
-            </span>
-          </button>
+          <article className="artSkinItem" role="listitem" key={item.id}>
+            <button
+              type="button"
+              className="artSkinPreview"
+              onClick={() => onPick(item)}
+              aria-label={'Use premade card skin ' + item.title}
+            >
+              <img src={item.image} alt={item.mediaAlt || item.title} loading="lazy" />
+            </button>
+            <div className="artSkinMeta">
+              <div>
+                <strong>{item.title}</strong>
+                <small>{item.source || item.subtitle}</small>
+              </div>
+              {item.sourceUrl ? (
+                <a href={item.sourceUrl} target="_blank" rel="noreferrer" aria-label={'Open original listing for ' + item.title}>
+                  Original ↗
+                </a>
+              ) : null}
+            </div>
+          </article>
         ))}
       </div>
     </section>
@@ -727,7 +734,7 @@ export default function Page() {
                   enterKeyHint="search"
                   autoCapitalize="none"
                   autoCorrect="off"
-                  placeholder={kind === 'anime' ? 'Search anime' : kind === 'cartoon' ? 'Search cartoons' : 'Search TV shows'}
+                  placeholder={kind === 'anime' ? 'Search anime card skins' : kind === 'cartoon' ? 'Search cartoon card skins' : 'Search TV card skins'}
                   onChange={(event) => setQuery(event.target.value)}
                   onKeyDown={(event) => event.key === 'Enter' && runSearch()}
                 />
@@ -743,7 +750,7 @@ export default function Page() {
                 <span>{searching ? 'Searching' : 'Search'}</span>
               </button>
 
-              {source ? <p className="sourceNote">Artwork source: {source}</p> : null}
+              {source ? <p className="sourceNote">Catalog: {source} · posters blocked</p> : null}
             </section>
 
             <ArtworkRail title="Results" items={results} onPick={useArtwork} />

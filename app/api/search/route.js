@@ -1,183 +1,399 @@
 import { NextResponse } from 'next/server';
 
-const proxy = (url) => '/api/image?url=' + encodeURIComponent(url);
+const STORES = [
+  {
+    name: 'Anime Town Creations',
+    origin: 'https://www.animetowncreations.com',
+    priority: 4
+  },
+  {
+    name: 'Stickyink Designs',
+    origin: 'https://stickyinkdesigns.com',
+    priority: 3
+  },
+  {
+    name: 'CUCU Covers',
+    origin: 'https://cucucovers.com',
+    priority: 2
+  },
+  {
+    name: 'Styled Cards',
+    origin: 'https://styledcards.com',
+    priority: 1
+  }
+];
 
-async function fetchWithTimeout(url, options = {}, timeout = 8000) {
+const QUERY_ALIASES = new Map([
+  ['spongebob', ['SpongeBob', 'Bikini Bottom']],
+  ['spongebob squarepants', ['SpongeBob SquarePants', 'Bikini Bottom']],
+  ['breaking bad', ['Breaking Bad', 'Walter White']],
+  ['hunter x hunter', ['Hunter x Hunter', 'HxH']],
+  ['dragon ball z', ['Dragon Ball Z', 'Dragon Ball', 'Vegeta', 'Goku']],
+  ['dragon ball', ['Dragon Ball', 'Vegeta', 'Goku']],
+  ['pokemon', ['Pokemon', 'Pikachu', 'Charizard']],
+  ['one piece', ['One Piece', 'Luffy']],
+  ['jujutsu kaisen', ['Jujutsu Kaisen', 'Gojo']],
+  ['demon slayer', ['Demon Slayer']],
+  ['naruto', ['Naruto']],
+  ['tokyo ghoul', ['Tokyo Ghoul']],
+  ['rick and morty', ['Rick and Morty', 'Rick & Morty']]
+]);
+
+const REJECT_MEDIA = [
+  'size guide',
+  'chip guide',
+  'chip size',
+  'materials',
+  'material showcase',
+  'showcase of materials',
+  'application',
+  'how to apply',
+  'instructions',
+  'customer photo',
+  'customer image',
+  'packaging',
+  'package',
+  'back skin',
+  'back side',
+  'half skin',
+  'half cover',
+  'window skin',
+  'window cover',
+  'video',
+  'logo',
+  'watermark'
+];
+
+const GOOD_MEDIA = [
+  'full skins',
+  'full skin',
+  'full cover',
+  'credit card skin',
+  'debit card skin',
+  'card skin',
+  'card cover'
+];
+
+function cleanText(value = '') {
+  return String(value)
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isCardSkinTitle(title = '') {
+  const text = title.toLowerCase();
+  if (/(poster|mouse ?pad|phone case|shirt|hoodie|metal print|sticker sheet)/i.test(text)) return false;
+  return (
+    /(credit|debit|bank|card).{0,24}(skin|cover|sticker)/i.test(text) ||
+    /(skin|cover|sticker).{0,24}(credit|debit|bank|card)/i.test(text) ||
+    /card skin/i.test(text)
+  );
+}
+
+function normalizeImageUrl(raw, origin) {
+  if (!raw) return '';
+  try {
+    if (raw.startsWith('//')) return 'https:' + raw;
+    return new URL(raw, origin).toString();
+  } catch {
+    return '';
+  }
+}
+
+function imageProxy(url) {
+  return '/api/image?url=' + encodeURIComponent(url);
+}
+
+async function fetchWithTimeout(url, options = {}, timeout = 7000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   try {
-    return await fetch(url, { ...options, signal: controller.signal, cache: 'no-store' });
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      cache: 'no-store',
+      headers: {
+        'User-Agent': 'AirCard-Card-Studio/3.0 (+https://github.com/NightVibes33/Card-Maker)',
+        Accept: options.headers?.Accept || '*/*',
+        ...options.headers
+      }
+    });
   } finally {
     clearTimeout(timer);
   }
 }
 
-function normalizeJikan(item) {
-  const remote =
-    item.images?.webp?.large_image_url ||
-    item.images?.jpg?.large_image_url ||
-    item.images?.webp?.image_url ||
-    item.images?.jpg?.image_url ||
-    '';
-
-  if (!remote) return null;
-  return {
-    id: 'jikan-' + item.mal_id,
-    title: item.title_english || item.title || 'Untitled',
-    subtitle: [item.year, item.type, ...(item.genres || []).slice(0, 2).map((g) => g.name)].filter(Boolean).join(' · '),
-    image: proxy(remote),
-    source: 'Jikan',
-    sourceUrl: item.url || 'https://myanimelist.net/'
-  };
+function extractHandle(url = '') {
+  const match = String(url).match(/\/products\/([^/?#]+)/i);
+  return match?.[1] || '';
 }
 
-async function searchJikan(q) {
-  const url = 'https://api.jikan.moe/v4/anime?q=' + encodeURIComponent(q) + '&limit=18&sfw=true&order_by=popularity';
-  let response = await fetchWithTimeout(url, {
-    headers: { 'User-Agent': 'AirCard-Sticker-Studio/2.0' }
+async function predictiveSearch(store, term) {
+  const endpoint =
+    store.origin +
+    '/search/suggest.json?q=' +
+    encodeURIComponent(term) +
+    '&resources[type]=product&resources[limit]=10';
+
+  const response = await fetchWithTimeout(endpoint, {
+    headers: { Accept: 'application/json' }
   });
 
-  if (response.status === 429) {
-    await new Promise((resolve) => setTimeout(resolve, 650));
-    response = await fetchWithTimeout(url, {
-      headers: { 'User-Agent': 'AirCard-Sticker-Studio/2.0' }
-    });
-  }
-
-  if (!response.ok) throw new Error('Jikan ' + response.status);
+  if (!response.ok) throw new Error('predictive ' + response.status);
   const json = await response.json();
-  return (json.data || []).map(normalizeJikan).filter(Boolean);
+
+  return (json?.resources?.results?.products || [])
+    .map((product) => ({
+      title: cleanText(product.title),
+      url: new URL(product.url || '', store.origin).toString(),
+      image: normalizeImageUrl(product.image || product.featured_image || '', store.origin)
+    }))
+    .filter((product) => product.url.includes('/products/'));
 }
 
-async function searchAniList(q) {
-  const query = [
-    'query ($search: String) {',
-    '  Page(page: 1, perPage: 18) {',
-    '    media(search: $search, type: ANIME, isAdult: false, sort: SEARCH_MATCH) {',
-    '      id',
-    '      title { romaji english }',
-    '      coverImage { extraLarge large }',
-    '      seasonYear',
-    '      format',
-    '      genres',
-    '      siteUrl',
-    '    }',
-    '  }',
-    '}'
-  ].join('\n');
-
-  const response = await fetchWithTimeout('https://graphql.anilist.co', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'User-Agent': 'AirCard-Sticker-Studio/2.0'
-    },
-    body: JSON.stringify({ query, variables: { search: q } })
+async function htmlSearch(store, term) {
+  const endpoint = store.origin + '/search?q=' + encodeURIComponent(term) + '&type=product';
+  const response = await fetchWithTimeout(endpoint, {
+    headers: { Accept: 'text/html,application/xhtml+xml' }
   });
+  if (!response.ok) throw new Error('html search ' + response.status);
 
-  if (!response.ok) throw new Error('AniList ' + response.status);
-  const json = await response.json();
-  const rows = json?.data?.Page?.media || [];
-
-  return rows.map((item) => {
-    const remote = item.coverImage?.extraLarge || item.coverImage?.large || '';
-    if (!remote) return null;
-    return {
-      id: 'anilist-' + item.id,
-      title: item.title?.english || item.title?.romaji || 'Untitled',
-      subtitle: [item.seasonYear, item.format, ...(item.genres || []).slice(0, 2)].filter(Boolean).join(' · '),
-      image: proxy(remote),
-      source: 'AniList',
-      sourceUrl: item.siteUrl || 'https://anilist.co/'
-    };
-  }).filter(Boolean);
-}
-
-function mergeAnime(groups) {
+  const html = await response.text();
+  const handles = [];
   const seen = new Set();
-  const out = [];
-  for (const group of groups) {
-    for (const item of group) {
-      const key = item.title.toLowerCase().replace(/[^a-z0-9]+/g, '');
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      out.push(item);
-      if (out.length >= 24) return out;
-    }
+  const re = /href=["'](?:https?:\/\/[^"']+)?\/products\/([^"'?#/]+)[^"']*["']/gi;
+  let match;
+  while ((match = re.exec(html)) && handles.length < 12) {
+    const handle = match[1];
+    if (seen.has(handle)) continue;
+    seen.add(handle);
+    handles.push(handle);
   }
-  return out;
+
+  return handles.map((handle) => ({
+    title: handle.replace(/[-_]+/g, ' '),
+    url: store.origin + '/products/' + handle,
+    image: ''
+  }));
 }
 
-async function searchAnime(q) {
-  const settled = await Promise.allSettled([searchJikan(q), searchAniList(q)]);
-  const successful = settled.filter((r) => r.status === 'fulfilled').map((r) => r.value);
-  if (!successful.length) {
-    const reasons = settled.map((r) => r.status === 'rejected' ? r.reason?.message : '').filter(Boolean).join(', ');
-    throw new Error(reasons || 'Anime providers unavailable');
+async function searchStore(store, term) {
+  try {
+    const predictive = await predictiveSearch(store, term);
+    if (predictive.length) return predictive;
+  } catch {}
+
+  try {
+    return await htmlSearch(store, term);
+  } catch {
+    return [];
   }
-  return {
-    results: mergeAnime(successful),
-    source: successful.length > 1 ? 'Jikan + AniList' : (settled[0].status === 'fulfilled' ? 'Jikan' : 'AniList')
-  };
 }
 
-async function searchTV(q, cartoonOnly) {
-  const response = await fetchWithTimeout(
-    'https://api.tvmaze.com/search/shows?q=' + encodeURIComponent(q),
-    { headers: { 'User-Agent': 'AirCard-Sticker-Studio/2.0' } }
+function mediaScore(media, fallbackUrl = '') {
+  const alt = cleanText(media?.alt || media?.preview_image?.alt || '');
+  const src = normalizeImageUrl(
+    media?.src ||
+      media?.preview_image?.src ||
+      media?.preview_image?.url ||
+      fallbackUrl,
+    'https://cdn.shopify.com'
   );
 
-  if (!response.ok) throw new Error('TVmaze ' + response.status);
-  let rows = (await response.json()).map((row) => row.show).filter(Boolean);
+  if (!src) return { score: -999, src: '', alt };
 
-  if (cartoonOnly) {
-    const animation = rows.filter((show) =>
-      (show.genres || []).some((genre) => /animation|children|family/i.test(genre))
-    );
-    if (animation.length) rows = animation;
+  const descriptor = (alt + ' ' + src).toLowerCase();
+  if (REJECT_MEDIA.some((term) => descriptor.includes(term))) {
+    return { score: -999, src, alt };
   }
 
-  const results = rows.slice(0, 24).map((show) => {
-    const remote = show.image?.original || show.image?.medium || '';
-    if (!remote) return null;
-    return {
-      id: 'tvmaze-' + show.id,
-      title: show.name || 'Untitled',
-      subtitle: [show.premiered?.slice(0, 4), ...(show.genres || []).slice(0, 3)].filter(Boolean).join(' · '),
-      image: proxy(remote),
-      source: 'TVmaze',
-      sourceUrl: show.url || 'https://www.tvmaze.com/'
-    };
-  }).filter(Boolean);
+  let score = 0;
+  for (const term of GOOD_MEDIA) {
+    if (descriptor.includes(term)) score += 7;
+  }
 
-  return { results, source: 'TVmaze' };
+  const ratio =
+    Number(media?.aspect_ratio) ||
+    (Number(media?.width) && Number(media?.height) ? Number(media.width) / Number(media.height) : 0);
+
+  if (ratio >= 1.35 && ratio <= 1.9) score += 8;
+  else if (ratio >= 1.15 && ratio <= 2.1) score += 3;
+  else if (ratio > 0 && ratio < 0.9) score -= 6;
+
+  const width = Number(media?.width || media?.preview_image?.width || 0);
+  if (width >= 1200) score += 4;
+  else if (width >= 800) score += 2;
+
+  if (/\bfull\b/i.test(alt)) score += 5;
+  if (/mockup/i.test(descriptor)) score -= 8;
+
+  return { score, src, alt, ratio, width };
+}
+
+async function fetchProduct(store, hit) {
+  const handle = extractHandle(hit.url);
+  if (!handle) return null;
+
+  const productUrl = store.origin + '/products/' + handle;
+  let details = null;
+
+  try {
+    const response = await fetchWithTimeout(productUrl + '.js', {
+      headers: { Accept: 'application/json' }
+    });
+    if (response.ok) details = await response.json();
+  } catch {}
+
+  const title = cleanText(details?.title || hit.title || handle.replace(/[-_]+/g, ' '));
+  if (!isCardSkinTitle(title)) return null;
+
+  const candidates = [];
+
+  for (const media of details?.media || []) {
+    if (media?.media_type && media.media_type !== 'image') continue;
+    candidates.push(mediaScore(media));
+  }
+
+  const detailImages = details?.images || [];
+  for (const image of detailImages) {
+    if (typeof image === 'string') {
+      candidates.push(mediaScore({ src: image }));
+    } else {
+      candidates.push(mediaScore(image));
+    }
+  }
+
+  if (details?.featured_image) {
+    const featured =
+      typeof details.featured_image === 'string'
+        ? { src: details.featured_image }
+        : details.featured_image;
+    candidates.push(mediaScore(featured));
+  }
+
+  if (hit.image) candidates.push(mediaScore({ src: hit.image }));
+
+  const usable = candidates
+    .filter((candidate) => candidate.src && candidate.score > -100)
+    .sort((a, b) => b.score - a.score);
+
+  const best = usable[0];
+  if (!best) return null;
+
+  // Require positive evidence that this is useful card-skin media.
+  // Unknown gallery/media entries are intentionally dropped rather than
+  // silently substituted with a poster or unrelated product photo.
+  if (best.score < 3) return null;
+
+  return {
+    id: store.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + handle,
+    title,
+    subtitle: store.name,
+    image: imageProxy(best.src),
+    source: store.name,
+    sourceUrl: productUrl,
+    mediaType: 'premade-card-skin',
+    cleanFilter: 'source-and-media-filtered',
+    originalImage: best.src,
+    mediaAlt: best.alt || '',
+    mediaAspectRatio: best.ratio || null,
+    priority: store.priority
+  };
+}
+
+function searchTerms(q) {
+  const key = q.toLowerCase().trim();
+  const aliases = QUERY_ALIASES.get(key) || [];
+  return [...new Set([q, ...aliases])].slice(0, 3);
 }
 
 export async function GET(request) {
   const q = (request.nextUrl.searchParams.get('q') || '').trim().slice(0, 100);
-  const kind = request.nextUrl.searchParams.get('kind') || 'anime';
-
   if (q.length < 2) {
-    return NextResponse.json({ results: [], source: '' });
+    return NextResponse.json({ results: [], source: 'Premade card-skin stores' });
   }
 
   try {
-    const payload = kind === 'anime'
-      ? await searchAnime(q)
-      : await searchTV(q, kind === 'cartoon');
+    const terms = searchTerms(q);
+    const discoveryJobs = [];
 
-    return NextResponse.json(payload, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=900, stale-while-revalidate=86400'
+    for (const store of STORES) {
+      for (const term of terms) {
+        discoveryJobs.push(
+          searchStore(store, term).then((hits) => ({ store, hits }))
+        );
       }
+    }
+
+    const discovered = await Promise.all(discoveryJobs);
+    const productJobs = [];
+    const seenProduct = new Set();
+
+    for (const group of discovered) {
+      for (const hit of group.hits.slice(0, 8)) {
+        const handle = extractHandle(hit.url);
+        const key = group.store.origin + '|' + handle;
+        if (!handle || seenProduct.has(key)) continue;
+        seenProduct.add(key);
+        productJobs.push(fetchProduct(group.store, hit));
+        if (productJobs.length >= 32) break;
+      }
+      if (productJobs.length >= 32) break;
+    }
+
+    const products = (await Promise.all(productJobs)).filter(Boolean);
+
+    const queryTokens = q.toLowerCase().split(/\s+/).filter(Boolean);
+    products.sort((a, b) => {
+      const aText = a.title.toLowerCase();
+      const bText = b.title.toLowerCase();
+      const aMatch = queryTokens.reduce((score, token) => score + (aText.includes(token) ? 1 : 0), 0);
+      const bMatch = queryTokens.reduce((score, token) => score + (bText.includes(token) ? 1 : 0), 0);
+      return bMatch - aMatch || b.priority - a.priority;
     });
+
+    const deduped = [];
+    const seen = new Set();
+
+    for (const item of products) {
+      const key = item.title.toLowerCase().replace(/[^a-z0-9]+/g, '');
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      const { priority, originalImage, ...publicItem } = item;
+      deduped.push(publicItem);
+      if (deduped.length >= 20) break;
+    }
+
+    return NextResponse.json(
+      {
+        results: deduped,
+        source: 'Premade card-skin stores',
+        policy: {
+          postersAllowed: false,
+          genericEntertainmentArtworkAllowed: false,
+          obviousWatermarkLogoMediaAllowed: false,
+          uncertainMedia: 'excluded'
+        }
+      },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=3600'
+        }
+      }
+    );
   } catch (error) {
-    console.error('search failed', error);
-    return NextResponse.json({
-      error: error?.message || 'Artwork search failed',
-      results: [],
-      source: ''
-    }, { status: 502 });
+    console.error('card skin search failed', error);
+    return NextResponse.json(
+      {
+        error: error?.message || 'Card-skin search failed',
+        results: [],
+        source: 'Premade card-skin stores'
+      },
+      { status: 502 }
+    );
   }
 }
