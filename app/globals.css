@@ -560,7 +560,35 @@ button:disabled{opacity:.38}
 .sliderRow input{
   display:block;
   width:100%;
+  min-height:32px;
   accent-color:var(--blue);
+}
+.sliderRow.isDisabled{
+  opacity:.42;
+}
+.sliderRow input:disabled{
+  cursor:not-allowed;
+}
+.editStatus{
+  margin:0 0 8px;
+  padding:0 4px;
+  color:var(--secondary-label);
+  font-size:12px;
+  line-height:1.35;
+}
+.settingsResetButton{
+  width:100%;
+  min-height:46px;
+  border:0;
+  border-top:.5px solid var(--separator);
+  padding:0 16px;
+  background:transparent;
+  color:var(--blue);
+  font-size:15px;
+  font-weight:600;
+}
+.settingsResetButton:active:not(:disabled){
+  background:color-mix(in srgb,var(--tertiary-bg) 72%,transparent);
 }
 .switchRow{
   position:relative;
