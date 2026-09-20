@@ -88,6 +88,7 @@ const pageChecks = [
   [/setSelectedElement\('artwork'\);[\s\S]{0,220}setStudioTool\('crop'\)/, 'Library artwork selection targets the background before crop editing'],
   [/for \(const snapshot of undoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves undo history assets'],
   [/for \(const snapshot of redoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves redo history assets'],
+  [/const pendingNamedSave = projectSaveInFlightRef\.current \? 1 : 0;/, 'project duplication counts an in-flight named save against the project cap'],
   [/const imageImportGenerationRef = useRef\(0\)/, 'image imports use a generation token'],
   [/function invalidatePendingImageImport\(\)/, 'newer card actions can invalidate stale image imports'],
   [/await dbDelete\('imports', id\)\.catch/, 'stale background imports remove orphaned blobs'],
