@@ -849,7 +849,7 @@ function SliderRow({ label, value, min, max, step, onChange, suffix = '', disabl
         max={max}
         step={step}
         disabled={disabled}
-        onInput={emit}
+        onChange={emit}
       />
     </label>
   );
