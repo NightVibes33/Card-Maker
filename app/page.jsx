@@ -197,6 +197,14 @@ function insertCustomLayerBelowHardware(design, id) {
   return order;
 }
 
+function isLayerStackEntryVisible(design, id) {
+  if (id === 'builtin-chip') return Boolean(design.chip);
+  if (id === 'builtin-contactless') return Boolean(design.contactless);
+  if (id === 'builtin-text') return Boolean(design.badge || design.number || design.holder || design.expiry);
+  const layer = (design.customLayers || []).find((entry) => entry.id === id);
+  return Boolean(layer && !layer.hidden);
+}
+
 function hexToRgb(hex = '#000000') {
   const clean = String(hex).replace('#', '').trim();
   const normalized = clean.length === 3
@@ -1957,8 +1965,18 @@ export default function Page() {
       const order = normalizeLayerOrder(current);
       const index = order.indexOf(id);
       if (index < 0) return {};
-      const target = clamp(index + direction, 0, order.length - 1);
-      if (target === index) return {};
+
+      let target = index + direction;
+      while (
+        target >= 0 &&
+        target < order.length &&
+        !isLayerStackEntryVisible(current, order[target])
+      ) {
+        target += direction;
+      }
+
+      if (target < 0 || target >= order.length || target === index) return {};
+
       const next = [...order];
       const [entry] = next.splice(index, 1);
       next.splice(target, 0, entry);
@@ -2409,6 +2427,30 @@ export default function Page() {
     [design.customLayers, selectedElement]
   );
 
+  const visualLayerStack = useMemo(() => {
+    const custom = new Map((design.customLayers || []).map((layer) => [layer.id, layer]));
+    return normalizeLayerOrder(design)
+      .filter((id) => isLayerStackEntryVisible(design, id))
+      .slice()
+      .reverse()
+      .map((id) => {
+        if (id === 'builtin-chip') {
+          return { id, name: 'EMV Chip', type: 'Built-in hardware', selection: 'chip', builtin: true };
+        }
+        if (id === 'builtin-contactless') {
+          return { id, name: 'Contactless', type: 'Built-in hardware', selection: 'contactless', builtin: true };
+        }
+        if (id === 'builtin-text') {
+          return { id, name: 'Card Text', type: 'Built-in text', selection: 'artwork', builtin: true };
+        }
+        const layer = custom.get(id);
+        return layer
+          ? { id, name: layer.name || layer.type, type: layer.type, selection: layer.id, builtin: false, locked: layer.locked }
+          : null;
+      })
+      .filter(Boolean);
+  }, [design]);
+
   const preview = (
     <section className={'previewShell editingPreview ' + (previewMode === 'physical' ? 'physicalPreview' : '')}>
       <div className="studioFloatingBar" aria-label="Studio history and comparison controls">
@@ -2417,6 +2459,18 @@ export default function Page() {
           <button type="button" onClick={redo} disabled={!redoRef.current.length} aria-label="Redo">↷</button>
         </div>
         <span className={'savePill ' + (saveStatus === 'Saved' ? 'isSaved' : '')}>{saveStatus}</span>
+        {selectedElement !== 'artwork' ? (
+          <button
+            type="button"
+            className="doneSelectionButton"
+            onClick={() => {
+              setSelectedElement('artwork');
+              setMessage('Artwork selected');
+            }}
+          >
+            Done
+          </button>
+        ) : null}
         <button
           type="button"
           className="beforeAfterButton"
@@ -2909,7 +2963,7 @@ export default function Page() {
                   </label>
                 </Group>
 
-                <Group title="CUSTOM LAYERS" footer="Image, text, and shape layers are embedded into the final AirCard PNG.">
+<Group title="CUSTOM LAYERS" footer="Image, text, and shape layers are embedded into the final AirCard PNG.">
                   <div className="layerAddRow">
                     <button type="button" onClick={addTextLayer}>+ Text</button>
                     <button type="button" onClick={() => layerUploadRef.current?.click()}>+ Image / Logo</button>
@@ -2919,21 +2973,61 @@ export default function Page() {
                   </div>
                   <input ref={layerUploadRef} type="file" accept="image/*" hidden onChange={uploadLayerImage} />
 
-                  {(design.customLayers || []).map((layer) => (
+                  <button
+                    type="button"
+                    className={'layerRow artworkLayerRow ' + (selectedElement === 'artwork' ? 'selected' : '')}
+                    onClick={() => {
+                      setSelectedElement('artwork');
+                      setMessage('Artwork selected');
+                    }}
+                  >
+                    <span><strong>Artwork</strong><small>background · bottom</small></span>
+                    <span>{selectedElement === 'artwork' ? 'Selected' : 'Edit'}</span>
+                  </button>
+
+                  <div className="layerStackHeader">
+                    <span>Layer Stack</span>
+                    <small>Top → Bottom</small>
+                  </div>
+
+                  {visualLayerStack.map((entry, index) => (
                     <button
                       type="button"
-                      key={layer.id}
-                      className={'layerRow ' + (selectedElement === layer.id ? 'selected' : '')}
-                      onClick={() => setSelectedElement(layer.id)}
+                      key={entry.id}
+                      className={'layerRow ' + (selectedElement === entry.selection ? 'selected' : '')}
+                      onClick={() => {
+                        if (!entry.builtin && selectedElement === entry.selection) {
+                          setSelectedElement('artwork');
+                          setMessage('Artwork selected');
+                          return;
+                        }
+                        setSelectedElement(entry.selection);
+                        setMessage(entry.name + ' selected');
+                      }}
                     >
-                      <span><strong>{layer.name || layer.type}</strong><small>{layer.type}</small></span>
-                      <span>{layer.locked ? 'Locked' : 'Edit'}</span>
+                      <span>
+                        <strong>{entry.name}</strong>
+                        <small>{entry.type}{index === 0 ? ' · top' : ''}</small>
+                      </span>
+                      <span>
+                        {entry.locked ? 'Locked' : selectedElement === entry.selection ? 'Selected' : entry.builtin ? 'Built-in' : 'Edit'}
+                      </span>
                     </button>
                   ))}
                 </Group>
 
                 {selectedLayer ? (
                   <Group title="SELECTED LAYER">
+                    <button
+                      type="button"
+                      className="doneLayerButton"
+                      onClick={() => {
+                        setSelectedElement('artwork');
+                        setMessage('Artwork selected');
+                      }}
+                    >
+                      Done Editing Layer
+                    </button>
                     {selectedLayer.type === 'text' ? (
                       <>
                         <input className="iosTextField" aria-label="Layer text" value={selectedLayer.text || ''} onChange={(event) => updateLayer(selectedLayer.id, { text: event.target.value })} />
