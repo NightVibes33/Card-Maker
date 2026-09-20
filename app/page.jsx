@@ -27,6 +27,7 @@ const MAX_PRESET_IMPORT_BYTES = 48 * 1024 * 1024;
 const MAX_PRESET_EMBEDDED_BYTES = 30 * 1024 * 1024;
 const MAX_CUSTOM_LAYERS = 200;
 const MAX_VISIBLE_IMAGE_LAYERS = 12;
+const MAX_VISIBLE_IMAGE_DECODE_PIXELS = 24_000_000;
 const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS + 1;
 const MAX_IMAGE_PIXELS = 52_000_000;
 const MAX_IMAGE_DIMENSION = 10_000;
@@ -3011,7 +3012,10 @@ export default function Page() {
       }
 
       let cursor = 0;
+      let decodedPixels = 0;
+      let memoryLimited = false;
       const decodedBySource = new Map();
+      const countedSources = new Set();
 
       async function decodeLayerSource(source) {
         if (decodedBySource.has(source)) {
@@ -3046,6 +3050,22 @@ export default function Page() {
         try {
           const decoded = await decodeLayerSource(layer.src);
           if (cancelled) return;
+
+          if (!countedSources.has(layer.src)) {
+            const width = Number(decoded.naturalWidth || decoded.width || 0);
+            const height = Number(decoded.naturalHeight || decoded.height || 0);
+            const pixels = Math.max(0, width * height);
+
+            if (decodedPixels + pixels > MAX_VISIBLE_IMAGE_DECODE_PIXELS) {
+              memoryLimited = true;
+              failed = true;
+              return;
+            }
+
+            countedSources.add(layer.src);
+            decodedPixels += pixels;
+          }
+
           next[layer.id] = decoded;
         } catch {
           if (!cancelled) failed = true;
@@ -3067,10 +3087,15 @@ export default function Page() {
       );
 
       if (!cancelled) {
+        const errorText = memoryLimited
+          ? 'Visible image layers exceed the safe iPhone memory budget. Hide or delete some image layers.'
+          : failed
+            ? 'One or more image layers could not load.'
+            : '';
         setLayerImages(next);
         setLoadedImageLayerSourceKey(imageLayerSourceKey);
-        setLayerLoadError(failed ? 'One or more image layers could not load.' : '');
-        if (failed) setMessage('Some image layers could not load');
+        setLayerLoadError(errorText);
+        if (errorText) setMessage(errorText);
       }
     }
 
