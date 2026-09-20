@@ -5587,6 +5587,9 @@ export default function Page() {
   const activeImageAvailable = selectedImageLayer
     ? Boolean(selectedImageLayer.src)
     : Boolean(design.background);
+  const activeImageRenderable = selectedImageLayer
+    ? Boolean(selectedImageLayer.src && !selectedImageLayer.hidden)
+    : Boolean(design.background);
   const activeImageEditable = activeImageAvailable && !Boolean(selectedImageLayer?.locked);
   const activeImageLabel = selectedImageLayer
     ? (selectedImageLayer.name || 'Image Layer')
@@ -5654,7 +5657,7 @@ export default function Page() {
         <button
           type="button"
           className="beforeAfterButton"
-          disabled={!activeImageAvailable || !renderAssetsReady}
+          disabled={!activeImageRenderable || !renderAssetsReady}
           onPointerDown={() => setShowOriginal(true)}
           onPointerUp={() => setShowOriginal(false)}
           onPointerCancel={() => setShowOriginal(false)}
