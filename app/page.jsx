@@ -3643,11 +3643,8 @@ export default function Page() {
   }
 
   function reset() {
-    undoRef.current = [];
-    redoRef.current = [];
     historyGroupRef.current = { key: '', at: 0 };
-    setHistoryVersion((value) => value + 1);
-    replaceDesign(DEFAULTS);
+    patch({ ...DEFAULTS }, true, 'new-card');
     setImage(null);
     setLoadedBackgroundKey('');
     setBackgroundLoadError('');
@@ -3655,7 +3652,9 @@ export default function Page() {
     setLoadedImageLayerSourceKey('[]');
     setLayerLoadError('');
     setSelectedElement('artwork');
-    setMessage('New card');
+    setShowOriginal(false);
+    setActiveGuides({ x: null, y: null });
+    setMessage('New card · Undo is available');
   }
 
   function hitTestElement(event) {
