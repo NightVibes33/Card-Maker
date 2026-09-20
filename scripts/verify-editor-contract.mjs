@@ -147,7 +147,7 @@ requireMatch(
 );
 requireMatch(
   css,
-  /\.cleanupShield\{[^}]*position:fixed;[^}]*z-index:120;[^}]*inset:0;/s,
+  /\.cleanupShield\{[^}]*position:fixed;[^}]*z-index:260;[^}]*inset:0;/s,
   'cleanup shield covers and blocks the editor during destructive maintenance'
 );
 
