@@ -16,7 +16,6 @@ export default function Icon() {
           alignItems: 'center',
           justifyContent: 'center',
           background: 'linear-gradient(145deg, #111827 0%, #000000 58%, #1f2937 100%)',
-          borderRadius: '40px',
           position: 'relative',
           overflow: 'hidden'
         }
