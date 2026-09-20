@@ -2128,9 +2128,7 @@ export default function Page() {
 
           if (preferredDraft) {
             const parsed = { ...preferredDraft };
-            parsed.background = parsed.background && isPersistableBackground(parsed.background)
-              ? parsed.background
-              : '';
+            parsed.background = normalizePersistedArtworkSource(parsed.background, 3072);
             replaceDesign({ ...startupDesign, ...parsed });
           }
         }
