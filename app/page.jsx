@@ -2683,6 +2683,17 @@ export default function Page() {
               return;
             }
 
+            if (
+              imageImportInFlightRef.current ||
+              presetTransferInFlightRef.current ||
+              cleanupInFlightRef.current ||
+              projectSaveInFlightRef.current ||
+              exportInFlightRef.current
+            ) {
+              setMessage('Update ready. Finish the current save/import/export operation, then reload when it is safe.');
+              return;
+            }
+
             try {
               if (sessionStorage.getItem(reloadKey) === '1') return;
             } catch {}
