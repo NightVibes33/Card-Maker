@@ -1953,6 +1953,7 @@ export default function Page() {
   const [favorites, setFavorites] = useState([]);
   const [projects, setProjects] = useState([]);
   const [projectName, setProjectName] = useState('');
+  const [projectBusyIds, setProjectBusyIds] = useState(new Set());
   const [projectSaveInProgress, setProjectSaveInProgress] = useState(false);
   const [imports, setImports] = useState([]);
   const [cleanupInProgress, setCleanupInProgress] = useState(false);
@@ -4031,8 +4032,36 @@ export default function Page() {
     }
   }
 
+  async function withProjectOperation(projectId, task) {
+    const id = String(projectId || '');
+    if (!id || projectBusyIds.has(id)) return false;
+
+    setProjectBusyIds((current) => {
+      if (current.has(id)) return current;
+      const next = new Set(current);
+      next.add(id);
+      return next;
+    });
+
+    try {
+      await task();
+      return true;
+    } finally {
+      setProjectBusyIds((current) => {
+        if (!current.has(id)) return current;
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
+
   function openProject(project) {
     if (!project?.design) return;
+    if (projectBusyIds.has(String(project.id || ''))) {
+      setMessage('That design is still being updated');
+      return;
+    }
 
     historyGroupRef.current = { key: '', at: 0 };
     const current = designRef.current;
@@ -4058,6 +4087,7 @@ export default function Page() {
   }
 
   async function duplicateProject(project) {
+    await withProjectOperation(project?.id, async () => {
     const copy = {
       ...project,
       id: makeId('project'),
@@ -4074,11 +4104,14 @@ export default function Page() {
     }
     setProjects((current) => [copy, ...current]);
     setMessage('Design duplicated');
+    });
   }
 
   async function removeProject(project) {
     const projectName = project?.name || 'this design';
     if (!window.confirm('Delete "' + projectName + '" permanently?')) return;
+
+    await withProjectOperation(project?.id, async () => {
 
     try {
       await dbDelete('projects', project.id);
@@ -4088,6 +4121,7 @@ export default function Page() {
     }
     setProjects((current) => current.filter((entry) => entry.id !== project.id));
     setMessage('Design deleted');
+    });
   }
 
   async function cleanupUnusedImports() {
@@ -5904,9 +5938,9 @@ export default function Page() {
                       <strong>{project.name}</strong>
                       <small>{new Date(project.updatedAt || project.createdAt).toLocaleDateString()}</small>
                       <div className="projectActions">
-                        <button type="button" onClick={() => openProject(project)}>Open</button>
-                        <button type="button" onClick={() => duplicateProject(project)}>Duplicate</button>
-                        <button type="button" className="destructive" onClick={() => removeProject(project)}>Delete</button>
+                        <button type="button" disabled={projectBusyIds.has(project.id)} onClick={() => openProject(project)}>Open</button>
+                        <button type="button" disabled={projectBusyIds.has(project.id)} onClick={() => duplicateProject(project)}>Duplicate</button>
+                        <button type="button" disabled={projectBusyIds.has(project.id)} className="destructive" onClick={() => removeProject(project)}>Delete</button>
                       </div>
                     </article>
                   ))}
