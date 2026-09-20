@@ -59,6 +59,7 @@ const pageChecks = [
   [/Preset is missing a referenced image asset/, 'preset import rejects missing referenced image blobs'],
   [/Undo returns to your previous card/, 'opening a saved project remains reversible'],
   [/const MAX_VISIBLE_IMAGE_LAYERS = 12;/, 'visible image layers have an iPhone memory cap'],
+  [/function fillGrain\(/, 'grain rendering uses a cached pattern instead of per-frame dot loops'],
   [/imageLayers\.length > MAX_VISIBLE_IMAGE_LAYERS/, 'image hydration refuses unsafe visible-image counts'],
   [/visibleImageLayers\(designRef\.current\)\.length >= MAX_VISIBLE_IMAGE_LAYERS/, 'image-layer creation enforces the visible-image cap'],
   [/draftSaveQueueRef\.current/, 'draft writes are serialized through one persistence queue'],
@@ -73,6 +74,9 @@ for (const [pattern, label] of pageChecks) requireMatch(page, pattern, label);
 requireMatch(page, /onChange=\{emit\}/, 'range sliders use React controlled onChange');
 if (/onInput=\{emit\}/.test(page)) {
   throw new Error('Editor contract failed: range sliders must not use raw onInput');
+}
+if (/for \(let i = 0; i < (?:3600|900); i \+= 1\)/.test(page)) {
+  throw new Error('Editor contract failed: grain must not use per-frame thousands-of-rectangles loops');
 }
 
 const touchChecks = [
