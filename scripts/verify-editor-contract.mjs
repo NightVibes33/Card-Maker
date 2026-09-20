@@ -173,6 +173,8 @@ const pageChecks = [
   [/localUpdatedAt >= indexedUpdatedAt/, 'startup prefers the synchronous fallback when draft timestamps tie'],
   [/startFreshWorkingProject\(createDefaultProjectDesign\(\),[\s\S]{0,180}New card ready · unsaved work cleared/, 'New Card starts a clean working project'],
   [/undoRef\.current = \[\];[\s\S]{0,80}redoRef\.current = \[\];/, 'fresh project transitions clear undo and redo history'],
+  [/setGuidesEnabled\(true\)/, 'fresh project transitions restore default alignment guides'],
+  [/localStorage\.setItem\('aircard-sticker-fvp-v3', JSON\.stringify\(next\)\)/, 'fresh project transitions synchronously replace the recovery draft'],
   [/function createDefaultProjectDesign\([\s\S]{0,500}customLayers: \[\],[\s\S]{0,120}layerOrder: \[\.\.\.DEFAULTS\.layerOrder\]/, 'new projects clone pristine default layer state'],
   [/function useArtwork\([\s\S]{0,1000}startFreshWorkingProject\(createDefaultProjectDesign\(\{[\s\S]{0,260}background: workingImage/, 'main Card Library artwork selection starts from a pristine default project'],
   [/function openProject\([\s\S]{0,700}startFreshWorkingProject\(/, 'opening a saved project starts a new working session rather than preserving unsaved undo history']
