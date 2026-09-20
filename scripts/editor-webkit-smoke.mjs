@@ -155,9 +155,45 @@ try {
   await previewStyle.getByRole('button', { name: 'Flat', exact: true }).click();
   assert.equal(await editorCanvas.evaluate((node) => node.style.touchAction), 'none');
 
+  await page.getByRole('tab', { name: 'Crop', exact: true }).click();
+  const [fileChooser] = await Promise.all([
+    page.waitForEvent('filechooser', { timeout: 10000 }),
+    page.getByRole('button', { name: /Replace Artwork/ }).click()
+  ]);
+  await fileChooser.setFiles({
+    name: 'webkit-smoke.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4e0AAAAASUVORK5CYII=',
+      'base64'
+    )
+  });
+  await page.getByText('Imported image ready to crop', { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 15000
+  });
+
+  // Let the 420ms autosave commit both the imported-image reference and
+  // custom layer state, then verify hydration restores them after a reload.
+  await page.waitForTimeout(900);
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.locator('main.studio').waitFor({ state: 'visible', timeout: 15000 });
+  await page.getByRole('tab', { name: 'Studio', exact: true }).click();
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+
+  const restoredTextRow = page.getByRole('button', { name: /^Text text /i }).first();
+  await restoredTextRow.waitFor({ state: 'visible', timeout: 10000 });
+  await restoredTextRow.click();
+  assert.equal(await page.getByLabel('Layer text').inputValue(), 'AVATAR\nWA');
+
   await page.getByRole('tab', { name: 'Export', exact: true }).click();
   const save2x = page.getByRole('button', { name: /Save 2× Image/ }).first();
   await save2x.waitFor({ state: 'visible' });
+  await page.waitForFunction(() => {
+    const button = [...document.querySelectorAll('button')]
+      .find((node) => node.textContent?.includes('Save 2× Image'));
+    return button && !button.disabled;
+  }, null, { timeout: 15000 });
   assert.equal(await save2x.isDisabled(), false);
 
   const [download] = await Promise.all([
