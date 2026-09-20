@@ -1361,7 +1361,7 @@ button:disabled{opacity:.38}
 }
 @supports (font: -apple-system-body){
   body{font:-apple-system-body}
-  button,input,select{font:inherit}
+  button,input,select,textarea{font:inherit}
 }
 @media (prefers-reduced-motion:reduce){
   .physicalCard,.physicalCard:after,.physicalChipReflection{animation:none!important}
