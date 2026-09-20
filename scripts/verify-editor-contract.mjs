@@ -58,6 +58,7 @@ const pageChecks = [
   [/if \(!ctx\) \{[\s\S]{0,120}throw new Error\('Canvas rendering is unavailable'\)/, 'export canvas allocation fails closed'],
   [/historyGroupRef/, 'continuous edits use grouped undo history'],
   [/gestureStartDesign\.current = designRef\.current/, 'gestures snapshot authoritative state'],
+  [/inert=\{blockingAssetOperation \|\| undefined\}/, 'blocking editor operations use a boolean inert attribute'],
   [/setSelectedElement\('card-text'\)/, 'built-in card text keeps an independent selection state'],
   [/selection: 'card-text'/, 'layer stack identifies built-in card text independently'],
   [/if \(pointers\.current\.size >= 2\) return;/, 'gesture tracking ignores accidental third touches'],
