@@ -2769,6 +2769,7 @@ export default function Page() {
     let controllerChangeHandler = null;
     let controllerReloadInFlight = false;
     let reloadGuardTimer = 0;
+    let serviceWorkerResumeHandler = null;
 
     async function hydrate() {
       let autosaveSafe = false;
@@ -2954,10 +2955,18 @@ export default function Page() {
           let hasServiceWorkerController = Boolean(navigator.serviceWorker.controller);
 
           navigator.serviceWorker.register('/sw.js').then((registration) => {
+            const refreshServiceWorker = () => {
+              if (document.visibilityState === 'visible') {
+                registration.update().catch(() => {});
+              }
+            };
+            serviceWorkerResumeHandler = refreshServiceWorker;
             registration.update().catch(() => {});
+            document.addEventListener('visibilitychange', refreshServiceWorker);
+            window.addEventListener('pageshow', refreshServiceWorker);
           }).catch(() => {});
 
-          const reloadKey = 'card-studio-sw-v3-reloaded';
+          const reloadKey = 'card-studio-sw-v4-reloaded';
           const clearReloadGuard = () => {
             try {
               sessionStorage.removeItem(reloadKey);
@@ -3069,6 +3078,10 @@ export default function Page() {
       if (reloadGuardTimer) window.clearTimeout(reloadGuardTimer);
       if (controllerChangeHandler && 'serviceWorker' in navigator) {
         navigator.serviceWorker.removeEventListener('controllerchange', controllerChangeHandler);
+      }
+      if (serviceWorkerResumeHandler) {
+        document.removeEventListener('visibilitychange', serviceWorkerResumeHandler);
+        window.removeEventListener('pageshow', serviceWorkerResumeHandler);
       }
       window.removeEventListener('online', updateOnline);
       window.removeEventListener('offline', updateOnline);
