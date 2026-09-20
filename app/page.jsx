@@ -294,7 +294,7 @@ function normalizeCustomLayer(layer) {
   };
 
   if (type === 'text') {
-    normalized.text = String(layer.text ?? 'Text').slice(0, 500);
+    normalized.text = splitGraphemes(layer.text ?? 'Text').slice(0, 500).join('');
     normalized.color = normalizeHexColor(layer.color, '#ffffff');
     normalized.fontSize = finiteClamp(layer.fontSize, 58, 10, 240);
     normalized.fontFamily = ['system', 'rounded', 'serif', 'mono'].includes(layer.fontFamily)
@@ -4384,7 +4384,9 @@ export default function Page() {
                           aria-label="Layer text"
                           rows={3}
                           value={selectedLayer.text ?? ''}
-                          onChange={(event) => updateLayer(selectedLayer.id, { text: event.target.value.slice(0, 500) })}
+                          onChange={(event) => updateLayer(selectedLayer.id, {
+                            text: splitGraphemes(event.target.value).slice(0, 500).join('')
+                          })}
                         />
                         <label className="selectRow">
                           <span>Font</span>
