@@ -292,6 +292,9 @@ function normalizeImageAdjustments(value) {
 
 function normalizeCustomLayer(layer) {
   if (!layer || typeof layer !== 'object' || !layer.id) return null;
+  const id = String(layer.id).slice(0, 120);
+  if (!id || BUILTIN_LAYER_IDS.includes(id)) return null;
+
   const type = ['text', 'shape', 'image', 'chip', 'contactless'].includes(layer.type)
     ? layer.type
     : null;
@@ -299,7 +302,7 @@ function normalizeCustomLayer(layer) {
 
   const normalized = {
     ...layer,
-    id: String(layer.id),
+    id,
     type,
     name: String(layer.name || type).slice(0, 80),
     x: finiteClamp(layer.x, 0.5, 0, 1),
