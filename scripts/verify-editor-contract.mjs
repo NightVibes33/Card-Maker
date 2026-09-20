@@ -238,6 +238,7 @@ console.log('PASS editor regression contract');
 requireMatch(imageRoute, /Math\.min\(3072, Math\.floor\(requestedWidth\)\)/, 'image proxy bounds working artwork width');
 
 const proxySecurityChecks = [
+  [imageRoute, /parseAllowedRemoteImageUrl/, 'image proxy shares the canonical remote-host policy'],
   [imageRoute, /redirect:\s*'manual'/, 'image proxy validates redirects before following them'],
   [imageRoute, /SAFE_IMAGE_TYPES/, 'image proxy rejects unsafe image formats'],
   [imageRoute, /readLimitedBody\(/, 'image proxy stream-limits response bodies'],
