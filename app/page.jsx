@@ -931,6 +931,12 @@ export default function Page() {
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.register('/sw.js').catch(() => {});
         }
+
+        const standalone =
+          window.matchMedia('(display-mode: standalone)').matches ||
+          Boolean(navigator.standalone);
+        const dismissed = localStorage.getItem('aircard-install-dismissed-v2') === '1';
+        if (!standalone && !dismissed) setInstallHelp(true);
       } catch {
         setMessage('Local library could not fully load');
       }
@@ -2025,21 +2031,38 @@ export default function Page() {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
-    renderCard(canvas.getContext('2d'), width, height);
+    renderCard(canvas.getContext('2d'), width, height, { original: false });
     return canvas;
   }
 
-  function download(width, height, name) {
-    makeCanvas(width, height).toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = name;
-      anchor.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1200);
-      setMessage(name + ' saved');
-    }, 'image/png');
+  async function recordExport(name, width, height, action) {
+    const record = {
+      id: makeId('export'),
+      name,
+      width,
+      height,
+      action,
+      designName: design.backgroundLabel || 'Untitled Card',
+      createdAt: Date.now()
+    };
+    await dbPut('exports', record).catch(() => {});
+    setExportHistory((current) => [record, ...current].slice(0, 40));
+  }
+
+  async function download(width, height, name) {
+    const blob = await new Promise((resolve) => {
+      makeCanvas(width, height).toBlob(resolve, 'image/png');
+    });
+    if (!blob) return;
+
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = name;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1200);
+    await recordExport(name, width, height, 'download');
+    setMessage(name + ' saved');
   }
 
   async function share() {
@@ -2050,16 +2073,26 @@ export default function Page() {
     try {
       if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
         await navigator.share({ files: [file], title: 'AirCard skin' });
+        await recordExport(file.name, OUT_W, OUT_H, 'share');
         setMessage('Share sheet opened');
       } else {
-        download(OUT_W, OUT_H, file.name);
+        await download(OUT_W, OUT_H, file.name);
       }
     } catch {}
   }
 
+  function dismissInstallHelp() {
+    localStorage.setItem('aircard-install-dismissed-v2', '1');
+    setInstallHelp(false);
+  }
+
   function reset() {
+    undoRef.current = [];
+    redoRef.current = [];
+    setHistoryVersion((value) => value + 1);
     setDesign(DEFAULTS);
     setImage(null);
+    setSelectedElement('artwork');
     setMessage('New card');
   }
 
