@@ -1360,6 +1360,28 @@ export default function Page() {
           const h = w / Math.max(0.1, layerImage.width / layerImage.height);
           ctx.drawImage(layerImage, -w / 2, -h / 2, w, h);
         }
+      } else if (layer.type === 'chip') {
+        const temp = {
+          chipTone: layer.tone || 'gold',
+          chipScale: clamp(Number(layer.scale || 1), 0.1, 6),
+          chipX: -((255 * clamp(Number(layer.scale || 1), 0.1, 6)) / OUT_W) / 2,
+          chipY: -((188 * clamp(Number(layer.scale || 1), 0.1, 6)) / OUT_H) / 2,
+          chipRotation: Number(layer.rotation || 0)
+        };
+        ctx.save();
+        ctx.scale(OUT_W / 1536, OUT_H / 969);
+        drawChip(ctx, temp);
+        ctx.restore();
+      } else if (layer.type === 'contactless') {
+        const temp = {
+          contactlessScale: clamp(Number(layer.scale || 1), 0.1, 6),
+          contactlessX: 0,
+          contactlessY: 0
+        };
+        ctx.save();
+        ctx.fillStyle = layer.color || '#ffffff';
+        drawContactless(ctx, temp);
+        ctx.restore();
       }
 
       ctx.restore();
@@ -1713,6 +1735,52 @@ export default function Page() {
     }));
     setSelectedElement(id);
     setMessage('Shape layer added');
+  }
+
+  function addChipLayer() {
+    const id = makeId('layer');
+    patch((current) => ({
+      customLayers: [
+        ...(current.customLayers || []),
+        {
+          id,
+          type: 'chip',
+          name: 'EMV Chip',
+          x: 0.19,
+          y: 0.44,
+          scale: 1,
+          rotation: 0,
+          opacity: 1,
+          tone: 'gold',
+          locked: false
+        }
+      ]
+    }));
+    setSelectedElement(id);
+    setMessage('Chip layer added');
+  }
+
+  function addContactlessLayer() {
+    const id = makeId('layer');
+    patch((current) => ({
+      customLayers: [
+        ...(current.customLayers || []),
+        {
+          id,
+          type: 'contactless',
+          name: 'Contactless',
+          x: 0.33,
+          y: 0.46,
+          scale: 1,
+          rotation: 0,
+          opacity: 1,
+          color: '#ffffff',
+          locked: false
+        }
+      ]
+    }));
+    setSelectedElement(id);
+    setMessage('Contactless layer added');
   }
 
   function updateLayer(id, delta) {
@@ -2704,8 +2772,8 @@ export default function Page() {
                     <button type="button" onClick={addTextLayer}>+ Text</button>
                     <button type="button" onClick={() => layerUploadRef.current?.click()}>+ Image / Logo</button>
                     <button type="button" onClick={addShapeLayer}>+ Shape</button>
-                    <button type="button" onClick={() => { patch({ chip: true }); setSelectedElement('chip'); }}>+ Chip</button>
-                    <button type="button" onClick={() => { patch({ contactless: true }); setSelectedElement('contactless'); }}>+ Contactless</button>
+                    <button type="button" onClick={addChipLayer}>+ Chip</button>
+                    <button type="button" onClick={addContactlessLayer}>+ Contactless</button>
                   </div>
                   <input ref={layerUploadRef} type="file" accept="image/*" hidden onChange={uploadLayerImage} />
 
@@ -2763,6 +2831,19 @@ export default function Page() {
                     ) : null}
                     {selectedLayer.type === 'image' ? (
                       <SliderRow label="Image Width" value={selectedLayer.width || 320} min={20} max={1300} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
+                    ) : null}
+                    {selectedLayer.type === 'chip' ? (
+                      <div className="tonePicker" role="radiogroup" aria-label="Custom chip finish">
+                        {['gold', 'silver', 'black', 'rose'].map((tone) => (
+                          <button type="button" role="radio" aria-checked={(selectedLayer.tone || 'gold') === tone} key={tone} className={(selectedLayer.tone || 'gold') === tone ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { tone })}>
+                            <i className={'chipTone ' + tone} aria-hidden="true" />
+                            <span>{tone[0].toUpperCase() + tone.slice(1)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    {selectedLayer.type === 'contactless' ? (
+                      <label className="colorRow"><span>Contactless Color</span><input type="color" value={selectedLayer.color || '#ffffff'} onChange={(event) => updateLayer(selectedLayer.id, { color: event.target.value })} /></label>
                     ) : null}
                     <SliderRow label="Layer X" value={selectedLayer.x || 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id, { x: value })} />
                     <SliderRow label="Layer Y" value={selectedLayer.y || 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id, { y: value })} />
@@ -2990,6 +3071,16 @@ export default function Page() {
       {menuItem ? (
         <Modal title={menuItem.title} onClose={() => setMenuItem(null)} className="skinMenuSheet">
           <div className="menuPreview"><CatalogArtwork item={menuItem} alt={menuItem.title} useThumbnail={false} /></div>
+          <button
+            type="button"
+            className="secondaryAction"
+            onClick={() => {
+              useArtwork(menuItem);
+              setShowExportPreview(true);
+            }}
+          >
+            Preview
+          </button>
           <button type="button" className="primaryAction" onClick={() => useArtwork(menuItem)}>Use Skin</button>
           <button type="button" className="secondaryAction" onClick={() => toggleFavorite(menuItem)}>
             {favoriteIds.has(menuItem.id) ? 'Remove Favorite' : 'Add to Favorites'}
