@@ -1587,6 +1587,9 @@ async function prepareLocalImageBlob(blob, limits = {}) {
     if (!optimizedBlob) {
       throw new Error('Image optimization failed');
     }
+    if (optimizedBlob.size > MAX_IMAGE_IMPORT_BYTES) {
+      throw new Error('Image remains too large after optimization');
+    }
   } finally {
     canvas.width = 1;
     canvas.height = 1;
@@ -3311,7 +3314,9 @@ export default function Page() {
       setMessage(
         error?.message === 'Image dimensions are too large'
           ? 'Image resolution is too large for reliable iPhone editing.'
-          : 'This image could not be decoded on this device.'
+          : error?.message === 'Image remains too large after optimization'
+            ? 'Image is still too large after optimization. Choose a smaller file.'
+            : 'This image could not be decoded on this device.'
       );
       return;
     }
@@ -3383,7 +3388,9 @@ export default function Page() {
       setMessage(
         error?.message === 'Image dimensions are too large'
           ? 'Image resolution is too large for reliable iPhone editing.'
-          : 'This image could not be decoded on this device.'
+          : error?.message === 'Image remains too large after optimization'
+            ? 'Image is still too large after optimization. Choose a smaller file.'
+            : 'This image could not be decoded on this device.'
       );
       return;
     }
