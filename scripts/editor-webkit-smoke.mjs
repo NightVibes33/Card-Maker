@@ -515,11 +515,28 @@ try {
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
   await page.getByRole('button', { name: 'Black Metal', exact: true }).click();
   await page.getByRole('button', { name: '+ Contactless', exact: true }).click();
-  await page.getByLabel('Contactless Color').evaluate((node) => {
-    node.value = '#4455ff';
+  const replacementContactlessColor = page.getByLabel('Contactless Color');
+  await replacementContactlessColor.evaluate((node) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    setter?.call(node, '#4455ff');
     node.dispatchEvent(new Event('input', { bubbles: true }));
     node.dispatchEvent(new Event('change', { bubbles: true }));
   });
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Contactless Color"]');
+    return input?.value === '#4455ff';
+  });
+  await page.waitForTimeout(500);
+  const replacePreconditionDraft = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('aircard-sticker-fvp-v3') || '{}')
+  );
+  assert.equal(
+    replacePreconditionDraft.customLayers?.some(
+      (layer) => layer.type === 'contactless' && layer.color === '#4455ff'
+    ),
+    true,
+    'precondition: custom contactless color must be committed before Replace Artwork'
+  );
   await page.getByRole('tab', { name: 'Crop', exact: true }).click();
   const replaceChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: /Replace Artwork/i }).click();
