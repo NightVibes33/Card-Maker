@@ -5,10 +5,23 @@ const DB_VERSION = 2;
 const STORES = ['kv', 'favorites', 'projects', 'imports', 'importMeta', 'exports'];
 
 function importMetadata(value = {}) {
+  const id =
+    typeof value.id === 'string' || typeof value.id === 'number'
+      ? String(value.id).slice(0, 160)
+      : '';
+  const name =
+    typeof value.name === 'string' || typeof value.name === 'number'
+      ? String(value.name).trim().slice(0, 160)
+      : '';
+  const type =
+    typeof value.type === 'string' || typeof value.type === 'number'
+      ? String(value.type).trim().slice(0, 80)
+      : '';
+
   return {
-    id: value.id,
-    name: value.name || 'Imported image',
-    type: value.type || 'image/*',
+    id,
+    name: name || 'Imported image',
+    type: type || 'image/*',
     createdAt: Number(value.createdAt || Date.now())
   };
 }
