@@ -1323,8 +1323,10 @@ async function prepareLocalImageBlob(blob, limits = {}) {
   const pixelScale = Math.sqrt(maxPixels / Math.max(1, width * height));
   const dimensionScale = maxDimension / Math.max(width, height);
   const scale = Math.min(1, pixelScale, dimensionScale);
+  const sourceType = String(blob.type || '').toLowerCase();
+  const needsFormatNormalization = /^image\/(?:gif|svg\+xml|heic|heif)$/.test(sourceType);
 
-  if (scale >= 0.999) {
+  if (scale >= 0.999 && !needsFormatNormalization) {
     image.src = '';
     return { blob, width, height, optimized: false };
   }
@@ -1345,7 +1347,6 @@ async function prepareLocalImageBlob(blob, limits = {}) {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
 
-  const sourceType = String(blob.type || '').toLowerCase();
   const outputType = /^image\/(?:jpe?g|heic|heif)$/.test(sourceType)
     ? 'image/jpeg'
     : /^image\/(?:webp|avif)$/.test(sourceType)
