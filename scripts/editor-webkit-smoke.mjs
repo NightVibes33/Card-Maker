@@ -83,6 +83,37 @@ try {
   assert.equal(await rectangle.getAttribute('aria-pressed'), 'true');
   assert.equal(await page.getByLabel('Corner Radius').count(), 1);
 
+  await page.getByRole('tab', { name: 'Position', exact: true }).click();
+  const layerX = page.getByLabel('Layer horizontal position');
+  assert.equal(Number(await layerX.inputValue()), 0.5);
+
+  const canvasBox = await editorCanvas.boundingBox();
+  assert.ok(canvasBox, 'editor canvas must have a layout box');
+  await page.mouse.move(
+    canvasBox.x + canvasBox.width / 2,
+    canvasBox.y + canvasBox.height / 2
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    canvasBox.x + canvasBox.width / 2 + 42,
+    canvasBox.y + canvasBox.height / 2,
+    { steps: 5 }
+  );
+  await page.mouse.up();
+
+  const movedLayerX = Number(await layerX.inputValue());
+  assert.ok(movedLayerX > 0.55, 'direct canvas drag must move the selected shape');
+
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="Layer horizontal position"]');
+    return input && Math.abs(Number(input.value) - 0.5) < 0.001;
+  });
+  assert.ok(
+    Math.abs(Number(await layerX.inputValue()) - 0.5) < 0.001,
+    'Undo must restore the pre-drag shape position'
+  );
+
   const previewStyle = page.getByRole('group', { name: 'Preview style' });
   await previewStyle.getByRole('button', { name: 'Physical', exact: true }).click();
   assert.equal(await editorCanvas.evaluate((node) => node.style.touchAction), 'pan-y');
@@ -108,5 +139,44 @@ try {
   console.log('PASS mobile WebKit editor smoke');
 } finally {
   await context.close();
+}
+
+const offlineContext = await browser.newContext({
+  viewport: { width: 390, height: 844 },
+  deviceScaleFactor: 3,
+  isMobile: true,
+  hasTouch: true,
+  serviceWorkers: 'allow'
+});
+const offlinePage = await offlineContext.newPage();
+
+try {
+  await offlinePage.route('**/api/cucu**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ results: [], total: 0, hasMore: false })
+    });
+  });
+
+  await offlinePage.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await offlinePage.locator('main.studio').waitFor({ state: 'visible', timeout: 15000 });
+  await offlinePage.evaluate(async () => {
+    if (!('serviceWorker' in navigator)) throw new Error('Service workers unavailable');
+    await navigator.serviceWorker.ready;
+  });
+  await offlinePage.waitForFunction(() => Boolean(navigator.serviceWorker?.controller), null, {
+    timeout: 15000
+  });
+
+  await offlineContext.setOffline(true);
+  await offlinePage.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
+  await offlinePage.locator('main.studio').waitFor({ state: 'visible', timeout: 15000 });
+  assert.match(await offlinePage.locator('h1').first().innerText(), /Card Studio/i);
+
+  console.log('PASS mobile WebKit offline shell smoke');
+} finally {
+  await offlineContext.setOffline(false).catch(() => {});
+  await offlineContext.close();
   await browser.close();
 }
