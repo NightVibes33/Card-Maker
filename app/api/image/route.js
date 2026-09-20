@@ -12,12 +12,64 @@ const ALLOWED_HOSTS = new Set([
   'www.styledcards.com'
 ]);
 
+const SAFE_IMAGE_TYPES = new Set([
+  'image/avif',
+  'image/webp',
+  'image/apng',
+  'image/jpeg',
+  'image/png',
+  'image/gif'
+]);
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+
 function isAllowed(url) {
   return url.protocol === 'https:' && ALLOWED_HOSTS.has(url.hostname.toLowerCase());
 }
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const MAX_REDIRECTS = 4;
+
+async function readLimitedBody(response, maxBytes) {
+  const declaredLength = Number(response.headers.get('content-length') || 0);
+  if (declaredLength > maxBytes) {
+    throw new Error('Image too large');
+  }
+
+  if (!response.body) {
+    const buffer = new Uint8Array(await response.arrayBuffer());
+    if (buffer.byteLength > maxBytes) throw new Error('Image too large');
+    return buffer;
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value?.byteLength) continue;
+
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel('Image too large').catch(() => {});
+        throw new Error('Image too large');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const output = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return output;
+}
 
 async function fetchAllowedImage(startUrl, options) {
   let current = new URL(startUrl);
@@ -101,19 +153,22 @@ export async function GET(request) {
       return new NextResponse('Image unavailable', { status: 502 });
     }
 
-    const contentType = upstream.headers.get('content-type') || '';
-    if (!contentType.startsWith('image/')) {
-      return new NextResponse('Not an image', { status: 415 });
+    const contentType = (upstream.headers.get('content-type') || '')
+      .split(';', 1)[0]
+      .trim()
+      .toLowerCase();
+    if (!SAFE_IMAGE_TYPES.has(contentType)) {
+      return new NextResponse('Unsupported image type', { status: 415 });
     }
 
-    const declaredLength = Number(upstream.headers.get('content-length') || 0);
-    if (declaredLength > 15 * 1024 * 1024) {
-      return new NextResponse('Image too large', { status: 413 });
-    }
-
-    const buffer = await upstream.arrayBuffer();
-    if (buffer.byteLength > 15 * 1024 * 1024) {
-      return new NextResponse('Image too large', { status: 413 });
+    let buffer;
+    try {
+      buffer = await readLimitedBody(upstream, MAX_IMAGE_BYTES);
+    } catch (error) {
+      if (error?.message === 'Image too large') {
+        return new NextResponse('Image too large', { status: 413 });
+      }
+      throw error;
     }
 
     return new NextResponse(buffer, {
