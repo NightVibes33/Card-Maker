@@ -1,17 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { chromium } from 'playwright-core';
 
 const ORIGIN = 'https://blitzcovers.com';
 const COLLECTION = '/collections/credit-card-cover';
 const PAGE_COUNT = 8;
-const READER = 'https://r.jina.ai/http://blitzcovers.com';
 
 function cleanText(value = '') {
-  return String(value)
-    .replace(/\[[^\]]*\]\([^)]*\)/g, ' ')
-    .replace(/[*_#>|]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return String(value).replace(/\s+/g, ' ').trim();
 }
 
 function normalizeProductUrl(raw) {
@@ -20,10 +16,7 @@ function normalizeProductUrl(raw) {
     const match = url.pathname.match(/\/products\/([a-z0-9][a-z0-9-]*)/i);
     if (!match) return null;
     const handle = match[1].toLowerCase();
-    return {
-      handle,
-      url: ORIGIN + '/products/' + handle
-    };
+    return { handle, url: ORIGIN + '/products/' + handle };
   } catch {
     return null;
   }
@@ -32,28 +25,16 @@ function normalizeProductUrl(raw) {
 function normalizeShopifyImage(raw) {
   if (!raw) return '';
   let url;
-
   try {
-    const cleaned = String(raw)
-      .replace(/&amp;/g, '&')
-      .replace(/[),.;]+$/g, '')
-      .trim();
-
-    url = new URL(cleaned.startsWith('//') ? 'https:' + cleaned : cleaned, ORIGIN);
+    url = new URL(String(raw).replace(/&amp;/g, '&').trim(), ORIGIN);
   } catch {
     return '';
   }
 
   const host = url.hostname.toLowerCase();
-  if (
-    host !== 'blitzcovers.com' &&
-    host !== 'www.blitzcovers.com' &&
-    host !== 'cdn.shopify.com'
-  ) {
-    return '';
-  }
+  if (!['blitzcovers.com', 'www.blitzcovers.com', 'cdn.shopify.com'].includes(host)) return '';
 
-  if (!/\/cdn\/shop\/(files|products)\//i.test(url.pathname) && !/cdn\.shopify\.com/i.test(host)) {
+  if (!/\/cdn\/shop\/(files|products)\//i.test(url.pathname) && host !== 'cdn.shopify.com') {
     return '';
   }
 
@@ -63,7 +44,6 @@ function normalizeShopifyImage(raw) {
     .replace(/_\d+x(\.[a-z0-9]+)$/i, '_1500x$1');
 
   if (url.searchParams.has('width')) url.searchParams.set('width', '1500');
-
   return url.toString();
 }
 
@@ -73,132 +53,161 @@ function excluded(title, handle) {
   );
 }
 
-async function fetchReader(page) {
-  const suffix = COLLECTION + (page > 1 ? '?page=' + page : '');
-  const target = READER + suffix;
-  let lastError = null;
+const executableCandidates = [
+  process.env.CHROME_PATH,
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser'
+].filter(Boolean);
 
-  for (let attempt = 1; attempt <= 6; attempt += 1) {
-    try {
-      const response = await fetch(target, {
-        headers: {
-          Accept: 'text/plain,text/markdown;q=0.9,*/*;q=0.5',
-          'User-Agent': 'AirCard-Blitz-Snapshot/2.0'
-        },
-        signal: AbortSignal.timeout(30000)
-      });
-
-      if (response.ok) {
-        const text = await response.text();
-        if (text.length > 1000) return text;
-        lastError = new Error('reader returned short body: ' + text.length);
-      } else {
-        lastError = new Error('reader returned ' + response.status);
-      }
-    } catch (error) {
-      lastError = error;
-    }
-
-    if (attempt < 6) {
-      await new Promise((resolve) => setTimeout(resolve, 900 * attempt));
-    }
-  }
-
-  throw lastError || new Error('reader failed');
+let executablePath = null;
+for (const candidate of executableCandidates) {
+  try {
+    await fs.access(candidate);
+    executablePath = candidate;
+    break;
+  } catch {}
 }
 
-function extractPage(markdown, pageNumber) {
-  const productLinkRe = /\[([^\]]{1,180})\]\((https?:\/\/(?:www\.)?blitzcovers\.com\/(?:collections\/credit-card-cover\/)?products\/[a-z0-9][a-z0-9-]*(?:[^)]*)?)\)/gi;
-  const imageRe = /!\[([^\]]*)\]\((https?:\/\/(?:www\.)?blitzcovers\.com\/cdn\/shop\/(?:files|products)\/[^)\s]+|https?:\/\/cdn\.shopify\.com\/s\/files\/[^)\s]+)\)/gi;
-
-  const images = [];
-  let match;
-
-  while ((match = imageRe.exec(markdown))) {
-    const image = normalizeShopifyImage(match[2]);
-    if (!image) continue;
-    images.push({
-      index: match.index,
-      alt: cleanText(match[1]),
-      image
-    });
-  }
-
-  const out = [];
-  const seen = new Set();
-
-  while ((match = productLinkRe.exec(markdown))) {
-    const title = cleanText(match[1]);
-    const product = normalizeProductUrl(match[2]);
-    if (!product || seen.has(product.handle) || excluded(title, product.handle)) continue;
-
-    const start = Math.max(0, match.index - 2200);
-    const end = Math.min(markdown.length, match.index + 1200);
-
-    const nearby = images
-      .filter((image) => image.index >= start && image.index <= end)
-      .sort((a, b) => {
-        const ad = Math.abs(a.index - match.index);
-        const bd = Math.abs(b.index - match.index);
-        return ad - bd;
-      });
-
-    if (!nearby.length) continue;
-
-    const preferred =
-      nearby.find((item) => {
-        const alt = item.alt.toLowerCase();
-        const words = title.toLowerCase().split(/\s+/).filter((word) => word.length >= 4);
-        return words.some((word) => alt.includes(word));
-      }) ||
-      nearby[0];
-
-    seen.add(product.handle);
-
-    out.push({
-      id: 'blitz-' + product.handle,
-      handle: product.handle,
-      title: title || product.handle.replace(/-/g, ' '),
-      source: 'Blitz Covers',
-      sourceUrl: product.url,
-      image: preferred.image,
-      candidateImages: [...new Set(nearby.slice(0, 4).map((item) => item.image))],
-      directAssetUrls: [...new Set(nearby.slice(0, 4).map((item) => item.image))],
-      mediaType: 'premade-card-skin',
-      cleanFilter: 'snapshot-direct-shopify-card-art',
-      assetMode: 'direct-card-art',
-      mediaAlt: preferred.alt || title,
-      collection: 'credit-card-cover',
-      sourcePage: pageNumber
-    });
-  }
-
-  return out;
+if (!executablePath) {
+  throw new Error('No system Chrome/Chromium found on runner');
 }
+
+console.log('Using browser:', executablePath);
+
+const browser = await chromium.launch({
+  headless: true,
+  executablePath,
+  args: ['--no-sandbox', '--disable-dev-shm-usage']
+});
+
+const context = await browser.newContext({
+  userAgent:
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1',
+  viewport: { width: 430, height: 932 },
+  locale: 'en-US'
+});
 
 const all = new Map();
 
-for (let page = 1; page <= PAGE_COUNT; page += 1) {
-  const markdown = await fetchReader(page);
-  const products = extractPage(markdown, page);
+try {
+  const page = await context.newPage();
 
-  console.log(
-    'PAGE',
-    page,
-    'markdown',
-    markdown.length,
-    'chars =>',
-    products.length,
-    'products'
-  );
+  for (let pageNumber = 1; pageNumber <= PAGE_COUNT; pageNumber += 1) {
+    const target = ORIGIN + COLLECTION + (pageNumber > 1 ? '?page=' + pageNumber : '');
 
-  if (page === 1 && products.length === 0) {
-    console.log('PAGE 1 DEBUG:', markdown.slice(0, 7000));
+    let response = null;
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      try {
+        response = await page.goto(target, {
+          waitUntil: 'domcontentloaded',
+          timeout: 45000
+        });
+        await page.waitForTimeout(2500);
+
+        const productCount = await page.locator('a[href*="/products/"]').count();
+        console.log(
+          'PAGE',
+          pageNumber,
+          'attempt',
+          attempt,
+          'status',
+          response?.status(),
+          'anchors',
+          productCount,
+          'title',
+          await page.title()
+        );
+
+        if (productCount >= 10) break;
+      } catch (error) {
+        console.log('PAGE', pageNumber, 'attempt', attempt, 'navigation error', error.message);
+      }
+
+      if (attempt < 4) await page.waitForTimeout(1500 * attempt);
+    }
+
+    const raw = await page.locator('a[href*="/products/"]').evaluateAll((anchors) => {
+      return anchors.map((anchor) => {
+        const img = anchor.querySelector('img');
+        if (!img) return null;
+
+        return {
+          href: anchor.href || anchor.getAttribute('href') || '',
+          title:
+            img.getAttribute('alt') ||
+            anchor.getAttribute('aria-label') ||
+            anchor.textContent ||
+            '',
+          image:
+            img.currentSrc ||
+            img.getAttribute('data-master') ||
+            img.getAttribute('data-src') ||
+            img.getAttribute('src') ||
+            '',
+          srcset:
+            img.getAttribute('data-srcset') ||
+            img.getAttribute('srcset') ||
+            ''
+        };
+      }).filter(Boolean);
+    });
+
+    const pageSeen = new Set();
+    let added = 0;
+
+    for (const candidate of raw) {
+      const product = normalizeProductUrl(candidate.href);
+      if (!product || pageSeen.has(product.handle)) continue;
+
+      const title = cleanText(candidate.title) || product.handle.replace(/-/g, ' ');
+      if (excluded(title, product.handle)) continue;
+
+      let image = normalizeShopifyImage(candidate.image);
+
+      if (!image && candidate.srcset) {
+        const options = String(candidate.srcset)
+          .split(',')
+          .map((part) => part.trim().split(/\s+/)[0])
+          .filter(Boolean)
+          .reverse();
+
+        for (const option of options) {
+          image = normalizeShopifyImage(option);
+          if (image) break;
+        }
+      }
+
+      if (!image) continue;
+
+      pageSeen.add(product.handle);
+      added += 1;
+
+      if (!all.has(product.handle)) {
+        all.set(product.handle, {
+          id: 'blitz-' + product.handle,
+          handle: product.handle,
+          title,
+          source: 'Blitz Covers',
+          sourceUrl: product.url,
+          image,
+          candidateImages: [image],
+          directAssetUrls: [image],
+          mediaType: 'premade-card-skin',
+          cleanFilter: 'snapshot-direct-shopify-card-art',
+          assetMode: 'direct-card-art',
+          mediaAlt: title,
+          collection: 'credit-card-cover',
+          sourcePage: pageNumber
+        });
+      }
+    }
+
+    console.log('PAGE', pageNumber, '=>', added, 'unique product cards extracted');
   }
-
-  for (const item of products) {
-    if (!all.has(item.handle)) all.set(item.handle, item);
-  }
+} finally {
+  await browser.close();
 }
 
 const products = [...all.values()];
