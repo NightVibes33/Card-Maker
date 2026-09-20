@@ -103,6 +103,10 @@ const pageChecks = [
   [/setSelectedElement\('artwork'\);[\s\S]{0,220}setStudioTool\('crop'\)/, 'Library artwork selection targets the background before crop editing'],
   [/for \(const snapshot of undoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves undo history assets'],
   [/for \(const snapshot of redoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves redo history assets'],
+  [/function beginArtworkReplacement\(/, 'artwork swaps clear decoded background state before loading the new source'],
+  [/function applyImportedArtwork\(/, 'Library imports use the hardened artwork replacement path'],
+  [/onClick=\{\(\) => applyImportedArtwork\(asset\)\}/, 'Library import rows cannot bypass artwork replacement safety'],
+  [/className="studioNewCardButton"/, 'Studio exposes a New Card action'],
   [/dbPutIfBelowLimit\('projects', project, MAX_SAVED_PROJECTS\)/, 'named project saves enforce capacity inside IndexedDB'],
   [/dbPutIfBelowLimit\('projects', copy, MAX_SAVED_PROJECTS\)/, 'project duplicates share the atomic IndexedDB capacity limit'],
   [/const pendingNamedSave = projectSaveInFlightRef\.current \? 1 : 0;/, 'project duplication counts an in-flight named save against the project cap'],
@@ -198,6 +202,7 @@ const touchChecks = [
   [/\.layerAddRow button,.layerActionGrid button\{[^}]*min-height:44px/s, 'Layer action buttons'],
   [/\.textAlignRow button\{[^}]*min-height:44px/s, 'Text alignment buttons'],
   [/\.doneSelectionButton\{[^}]*min-height:44px/s, 'Done selection button'],
+  [/\.studioNewCardButton\{[^}]*min-height:44px/s, 'Studio New Card button'],
   [/\.sliderRow input\{[^}]*min-height:44px/s, 'Range slider touch surface']
 ];
 
