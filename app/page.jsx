@@ -4701,6 +4701,10 @@ export default function Page() {
       }
     }
 
+    if (refs.size > MAX_PRESET_ASSETS) {
+      throw new Error('This design references too many imported image assets for a preset');
+    }
+
     const assets = [];
     let embeddedBytes = 0;
     let estimatedEncodedBytes = 0;
