@@ -204,6 +204,14 @@ function normalizeAngleDelta(degrees) {
   return value;
 }
 
+function normalizeFreeRotation(degrees) {
+  let value = Number(degrees || 0);
+  if (!Number.isFinite(value)) return 0;
+  while (value > 180) value -= 360;
+  while (value < -180) value += 360;
+  return value;
+}
+
 function snapValue(value, targets, threshold = 0.018) {
   let best = value;
   let distance = Infinity;
@@ -5300,7 +5308,7 @@ export default function Page() {
       } else if (target === 'contactless') {
         patch((current) => ({
           contactlessScale: clamp(current.contactlessScale * factor, 0.4, 2.2),
-          contactlessRotation: clamp(Number(current.contactlessRotation || 0) + angleDelta, -180, 180)
+          contactlessRotation: normalizeFreeRotation(Number(current.contactlessRotation || 0) + angleDelta)
         }), false);
       } else if (target !== 'artwork') {
         if (!transformBlocked) {
@@ -5310,7 +5318,7 @@ export default function Page() {
                 ? {
                     ...layer,
                     scale: clamp(Number(layer.scale ?? 1) * factor, 0.1, 6),
-                    rotation: clamp(Number(layer.rotation ?? 0) + angleDelta, -180, 180)
+                    rotation: normalizeFreeRotation(Number(layer.rotation ?? 0) + angleDelta)
                   }
                 : layer
             )
@@ -5319,7 +5327,7 @@ export default function Page() {
       } else if (!transformBlocked) {
         patch((current) => ({
           zoom: clamp(current.zoom * factor, 0.5, 5),
-          rotate: clamp(current.rotate + angleDelta, -180, 180)
+          rotate: normalizeFreeRotation(current.rotate + angleDelta)
         }), false);
       }
 
