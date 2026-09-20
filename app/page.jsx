@@ -4083,6 +4083,11 @@ export default function Page() {
     }
 
     presetTransferInFlightRef.current = true;
+    setMessage('Preparing design preset…');
+
+    let url = '';
+    let anchor = null;
+
     try {
       const payload = await serializePreset();
       const json = JSON.stringify(payload, null, 2);
@@ -4091,19 +4096,19 @@ export default function Page() {
       }
 
       const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
+      url = URL.createObjectURL(blob);
+      anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = (payload.design.backgroundLabel || 'aircard-design').replace(/[^a-z0-9_-]+/gi, '-') + '.aircard.json';
       anchor.style.display = 'none';
       document.body.appendChild(anchor);
       anchor.click();
-      anchor.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
       setMessage('Design preset exported');
     } catch (error) {
       setMessage(error?.message || 'Design preset could not be exported');
     } finally {
+      anchor?.remove();
+      if (url) setTimeout(() => URL.revokeObjectURL(url), 10000);
       presetTransferInFlightRef.current = false;
     }
   }
@@ -4124,6 +4129,7 @@ export default function Page() {
     const createdImportIds = [];
     let presetApplied = false;
     presetTransferInFlightRef.current = true;
+    setMessage('Importing design preset…');
 
     try {
       const payload = JSON.parse(await file.text());
