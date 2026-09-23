@@ -39,19 +39,6 @@ function imageProxy(url, width = 0) {
     '&v=' + encodeURIComponent(IMAGE_PROXY_VERSION);
 }
 
-// AnimeDeskMat's plain no-chip "full-cover" files are product-sheet PNGs:
-// a 1200x1200 white canvas with the actual card art consistently occupying
-// x=126..1074 and y=295..905. Seed the real normalized card bounds so Home and
-// Anime never render the white product-sheet border, even before/without the
-// shared CUCU pixel inspector.
-const FULL_COVER_SOURCE_CROP = Object.freeze({
-  x: 126 / 1200,
-  y: 295 / 1200,
-  w: 948 / 1200,
-  h: 610 / 1200
-});
-const FULL_COVER_MEDIA_RATIO = 948 / 610;
-
 function plainFullCoverAsset(raw) {
   const src = normalizeImageUrl(raw);
   if (!src) return '';
@@ -272,7 +259,6 @@ function flattenProduct(product) {
 
   if (!candidates.length) return null;
 
-  const asset = candidates[0];
   const title = cleanText(product?.title || handle.replace(/[-_]+/g, ' '));
   const tags = Array.isArray(product?.tags) ? product.tags : [];
 
@@ -280,21 +266,19 @@ function flattenProduct(product) {
     id: 'animedeskmat-' + handle,
     title,
     subtitle: 'AnimeDeskMat',
-    image: imageProxy(asset.src),
-    thumbnail: imageProxy(asset.src, 560),
-    inspectUrls: [
-      '/api/cucu/inspect?url=' + encodeURIComponent(asset.src)
-    ],
-    candidateImages: [imageProxy(asset.src)],
-    directAssetUrls: [asset.src],
+    image: imageProxy(candidates[0].src),
+    thumbnail: imageProxy(candidates[0].src, 560),
+    inspectUrls: candidates
+      .slice(0, 3)
+      .map((asset) => '/api/cucu/inspect?url=' + encodeURIComponent(asset.src)),
+    candidateImages: candidates.map((asset) => imageProxy(asset.src)),
+    directAssetUrls: candidates.map((asset) => asset.src),
     source: 'AnimeDeskMat',
     sourceUrl: ORIGIN + '/products/' + handle,
     mediaType: 'premade-card-skin',
     cleanFilter: 'strict-full-cover-no-chip',
     assetMode: 'direct-card-art',
-    mediaAlt: asset.alt || title,
-    sourceCrop: FULL_COVER_SOURCE_CROP,
-    mediaAspectRatio: FULL_COVER_MEDIA_RATIO,
+    mediaAlt: candidates[0].alt || title,
     collection: COLLECTION,
     tags
   };
