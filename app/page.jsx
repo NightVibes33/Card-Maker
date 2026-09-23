@@ -154,6 +154,15 @@ const DEFAULTS = {
   contactlessY: 0.43,
   contactlessScale: 1,
   contactlessRotation: 0,
+  visa: false,
+  visaX: 0.84,
+  visaY: 0.84,
+  visaScale: 1,
+  visaRotation: 0,
+  visaOpacity: 1,
+  visaFinish: 'silver',
+  visaGloss: 0.48,
+  visaReflection: 0.42,
   number: false,
   numberText: '••••  ••••  ••••  4242',
   holder: false,
@@ -165,7 +174,7 @@ const DEFAULTS = {
   textColor: '#ffffff',
   shadow: true,
   customLayers: [],
-  layerOrder: ['builtin-chip', 'builtin-contactless', 'builtin-text']
+  layerOrder: ['builtin-chip', 'builtin-contactless', 'builtin-visa', 'builtin-text']
 };
 
 function createDefaultProjectDesign({
@@ -414,7 +423,7 @@ function snapValue(value, targets, threshold = 0.018) {
   return distance <= threshold ? { value: best, snapped: true } : { value, snapped: false };
 }
 
-const BUILTIN_LAYER_IDS = ['builtin-chip', 'builtin-contactless', 'builtin-text'];
+const BUILTIN_LAYER_IDS = ['builtin-chip', 'builtin-contactless', 'builtin-visa', 'builtin-text'];
 
 function normalizeLayerOrder(design) {
   const customIds = (design.customLayers || []).map((layer) => layer.id).filter(Boolean);
@@ -631,6 +640,16 @@ function normalizeDesignState(value) {
   next.contactlessScale = finiteClamp(raw.contactlessScale, DEFAULTS.contactlessScale, 0.4, 2.2);
   next.contactlessRotation = finiteClamp(raw.contactlessRotation, DEFAULTS.contactlessRotation, -180, 180);
 
+  next.visa = raw.visa == null ? DEFAULTS.visa : Boolean(raw.visa);
+  next.visaX = finiteClamp(raw.visaX, DEFAULTS.visaX, 0.1, 0.9);
+  next.visaY = finiteClamp(raw.visaY, DEFAULTS.visaY, 0.08, 0.92);
+  next.visaScale = finiteClamp(raw.visaScale, DEFAULTS.visaScale, 0.45, 2.2);
+  next.visaRotation = finiteClamp(raw.visaRotation, DEFAULTS.visaRotation, -180, 180);
+  next.visaOpacity = finiteClamp(raw.visaOpacity, DEFAULTS.visaOpacity, 0.1, 1);
+  next.visaFinish = ['silver', 'white', 'black'].includes(raw.visaFinish) ? raw.visaFinish : DEFAULTS.visaFinish;
+  next.visaGloss = finiteClamp(raw.visaGloss, DEFAULTS.visaGloss, 0, 1);
+  next.visaReflection = finiteClamp(raw.visaReflection, DEFAULTS.visaReflection, 0, 1);
+
   next.number = Boolean(raw.number);
   next.numberText = singleLineCardText(raw.numberText ?? DEFAULTS.numberText, 32);
   next.holder = Boolean(raw.holder);
@@ -690,6 +709,7 @@ function insertCustomLayerBelowHardware(design, id) {
 function isLayerStackEntryVisible(design, id) {
   if (id === 'builtin-chip') return Boolean(design.chip);
   if (id === 'builtin-contactless') return Boolean(design.contactless);
+  if (id === 'builtin-visa') return Boolean(design.visa);
   if (id === 'builtin-text') return Boolean(design.badge || design.number || design.holder || design.expiry);
   const layer = (design.customLayers || []).find((entry) => entry.id === id);
   return Boolean(layer && !layer.hidden);
@@ -757,6 +777,9 @@ const CONTACTLESS_BOUNDS = {
   right: 84,
   bottom: 58
 };
+
+const VISA_BOUNDS = { left: -150, top: -52, right: 150, bottom: 52 };
+const VISA_PATH = 'M9.112 8.262L5.97 15.758H3.92L2.374 9.775c-.094-.368-.175-.503-.461-.658C1.447 8.864.677 8.627 0 8.479l.046-.217h3.3a.904.904 0 01.894.764l.817 4.338 2.018-5.102zm8.033 5.049c.008-1.979-2.736-2.088-2.717-2.972.006-.269.262-.555.822-.628a3.66 3.66 0 011.913.336l.34-1.59a5.207 5.207 0 00-1.814-.333c-1.917 0-3.266 1.02-3.278 2.479-.012 1.079.963 1.68 1.698 2.04.756.367 1.01.603 1.006.931-.005.504-.602.725-1.16.734-.975.015-1.54-.263-1.992-.473l-.351 1.642c.453.208 1.289.39 2.156.398 2.037 0 3.37-1.006 3.377-2.564m5.061 2.447H24l-1.565-7.496h-1.656a.883.883 0 00-.826.55l-2.909 6.946h2.036l.405-1.12h2.488zm-2.163-2.656l1.02-2.815.588 2.815zm-8.16-4.84l-1.603 7.496H8.34l1.605-7.496z';
 
 function splitGraphemes(value) {
   const text = String(value ?? '');
@@ -1281,6 +1304,54 @@ function drawContactlessLayerAtOrigin(ctx, color = '#ffffff') {
     ctx.arc(0, 0, radius, -0.72, 0.72);
     ctx.stroke();
   });
+}
+
+function drawVisaLayerAtOrigin(ctx, d, pixelScale = 1) {
+  if (typeof Path2D !== 'function') return;
+  const path = new Path2D(VISA_PATH);
+  const finish = d.visaFinish || 'silver';
+  const gloss = clamp(Number(d.visaGloss ?? 0.48), 0, 1);
+  const reflection = clamp(Number(d.visaReflection ?? 0.42), 0, 1);
+  const palettes = {
+    silver: ['#ffffff', '#aeb8c5', '#ffffff', '#7d8794', '#f8fbff'],
+    white: ['#ffffff', '#dfe5eb', '#ffffff', '#c9d1da', '#ffffff'],
+    black: ['#666b73', '#17191d', '#8b929c', '#08090b', '#4a4f57']
+  };
+  const stops = palettes[finish] || palettes.silver;
+  ctx.save();
+  ctx.globalAlpha *= clamp(Number(d.visaOpacity ?? 1), 0.1, 1);
+  ctx.scale(12.5, 12.5);
+  ctx.translate(-12, -12);
+  const gradient = ctx.createLinearGradient(0, 7, 24, 17);
+  gradient.addColorStop(0, stops[0]); gradient.addColorStop(0.28, stops[1]); gradient.addColorStop(0.48, stops[2]); gradient.addColorStop(0.72, stops[3]); gradient.addColorStop(1, stops[4]);
+  ctx.fillStyle = gradient;
+  ctx.shadowColor = 'rgba(0,0,0,.38)';
+  ctx.shadowBlur = 1.15 * pixelScale;
+  ctx.shadowOffsetY = 0.35 * pixelScale;
+  ctx.fill(path);
+  if (gloss > 0) {
+    ctx.save(); ctx.clip(path);
+    const shine = ctx.createLinearGradient(2, 7, 21, 16);
+    shine.addColorStop(0, 'rgba(255,255,255,0)'); shine.addColorStop(0.38, 'rgba(255,255,255,' + (0.16 * gloss) + ')'); shine.addColorStop(0.5, 'rgba(255,255,255,' + (0.72 * gloss) + ')'); shine.addColorStop(0.62, 'rgba(255,255,255,' + (0.12 * gloss) + ')'); shine.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = shine; ctx.fillRect(0, 6, 24, 12); ctx.restore();
+  }
+  if (reflection > 0) {
+    ctx.save(); ctx.clip(path); ctx.globalCompositeOperation = finish === 'black' ? 'screen' : 'multiply';
+    const reflective = ctx.createLinearGradient(0, 16, 24, 8);
+    reflective.addColorStop(0, 'rgba(90,105,122,' + (0.16 * reflection) + ')'); reflective.addColorStop(0.5, 'rgba(255,255,255,0)'); reflective.addColorStop(1, 'rgba(100,115,132,' + (0.22 * reflection) + ')');
+    ctx.fillStyle = reflective; ctx.fillRect(0, 6, 24, 12); ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawVisa(ctx, d, pixelScale = 1) {
+  ctx.save();
+  ctx.translate(Number(d.visaX ?? 0.84) * OUT_W, Number(d.visaY ?? 0.84) * OUT_H);
+  ctx.rotate((Number(d.visaRotation || 0) * Math.PI) / 180);
+  const scale = clamp(Number(d.visaScale ?? 1), 0.45, 2.2);
+  ctx.scale(scale, scale);
+  drawVisaLayerAtOrigin(ctx, d, pixelScale);
+  ctx.restore();
 }
 
 function drawContactless(ctx, d) {
@@ -3982,6 +4053,11 @@ export default function Page() {
         continue;
       }
 
+      if (stackId === 'builtin-visa') {
+        if (renderDesign.visa) drawVisa(ctx, renderDesign, renderPixelScale);
+        continue;
+      }
+
       if (stackId === 'builtin-text') {
         drawBuiltinText();
         continue;
@@ -5988,6 +6064,11 @@ export default function Page() {
         continue;
       }
 
+      if (stackId === 'builtin-visa' && currentDesign.visa) {
+        if (pointInRotatedBounds(px, py, currentDesign.visaX * OUT_W, currentDesign.visaY * OUT_H, currentDesign.visaRotation, Number(currentDesign.visaScale || 1), VISA_BOUNDS, hitPadding)) return 'visa';
+        continue;
+      }
+
       if (stackId === 'builtin-chip' && currentDesign.chip) {
         const chipW = 255 * Number(currentDesign.chipScale || 1);
         const chipH = 188 * Number(currentDesign.chipScale || 1);
@@ -6201,6 +6282,18 @@ export default function Page() {
             recordGestureHistory();
             patch({ contactlessX: snapX.value, contactlessY: snapY.value }, false);
           }
+        } else if (target === 'visa') {
+          const snapX = snapValue(clamp(currentDesign.visaX + dx, 0.1, 0.9), [0.2, 1 / 3, 0.5, 2 / 3, 0.8, 0.84]);
+          const snapY = snapValue(clamp(currentDesign.visaY + dy, 0.08, 0.92), [0.16, 1 / 3, 0.5, 2 / 3, 0.84]);
+          setActiveGuides({ x: snapX.snapped ? snapX.value : null, y: snapY.snapped ? snapY.value : null });
+          if (!Object.is(currentDesign.visaX, snapX.value) || !Object.is(currentDesign.visaY, snapY.value)) { recordGestureHistory(); patch({ visaX: snapX.value, visaY: snapY.value }, false); }
+        } else if (target === 'visa') {
+          const nextScale = clamp(currentDesign.visaScale * factor, 0.45, 2.2);
+          const nextRotation = normalizeFreeRotation(currentDesign.visaRotation + angleDelta);
+          if (!Object.is(currentDesign.visaScale, nextScale) || !Object.is(currentDesign.visaRotation, nextRotation)) {
+            recordGestureHistory();
+            patch({ visaScale: nextScale, visaRotation: nextRotation }, false);
+          }
         } else if (target !== 'artwork') {
           const layer = (currentDesign.customLayers || []).find((entry) => entry.id === target);
           if (layer && !layer.locked) {
@@ -6267,7 +6360,7 @@ export default function Page() {
         : normalizeAngleDelta(((angle - lastAngle.current) * 180) / Math.PI);
       const transformed = Math.abs(factor - 1) > 0.0005 || Math.abs(angleDelta) > 0.02;
       const currentDesign = designRef.current;
-      const gestureLayer = target !== 'artwork' && target !== 'chip' && target !== 'contactless'
+      const gestureLayer = target !== 'artwork' && target !== 'chip' && target !== 'contactless' && target !== 'visa'
         ? (currentDesign.customLayers || []).find((layer) => layer.id === target)
         : null;
       const transformBlocked = Boolean(
@@ -6643,6 +6736,9 @@ export default function Page() {
         }
         if (id === 'builtin-contactless') {
           return { id, name: 'Contactless', type: 'Built-in hardware', selection: 'contactless', builtin: true };
+        }
+        if (id === 'builtin-visa') {
+          return { id, name: 'VISA', type: 'Built-in card mark', selection: 'visa', builtin: true };
         }
         if (id === 'builtin-text') {
           return {
@@ -7318,6 +7414,24 @@ export default function Page() {
                     </div>
                   ) : null}
                   <SwitchRow label="Contactless" detail="Tap the symbol on the card to position it directly" value={design.contactless} onChange={(value) => patch({ contactless: value })} />
+                  <SwitchRow label="VISA" detail="Reflective card mark · tap to move, pinch to scale and rotate" value={design.visa} onChange={(value) => patch({ visa: value })} />
+                  {design.visa ? (
+                    <div className="nestedControls">
+                      <div className="tonePicker" role="radiogroup" aria-label="VISA finish">
+                        {['silver', 'white', 'black'].map((finish) => (
+                          <button type="button" role="radio" aria-checked={design.visaFinish === finish} key={finish} className={design.visaFinish === finish ? 'selected' : ''} onClick={() => patch({ visaFinish: finish })}>
+                            <span>{finish === 'silver' ? 'White Gloss' : finish[0].toUpperCase() + finish.slice(1)}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <SliderRow label="VISA Gloss" value={design.visaGloss} min={0} max={1} step={0.01} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ visaGloss: value })} />
+                      <SliderRow label="VISA Reflection" value={design.visaReflection} min={0} max={1} step={0.01} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ visaReflection: value })} />
+                      <SliderRow label="VISA Opacity" value={design.visaOpacity} min={0.1} max={1} step={0.01} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ visaOpacity: value })} />
+                      <SliderRow label="VISA Scale" value={design.visaScale} min={0.45} max={2.2} step={0.01} onChange={(value) => patch({ visaScale: value })} />
+                      <SliderRow label="VISA Rotation" value={design.visaRotation} min={-180} max={180} step={1} suffix="°" onChange={(value) => patch({ visaRotation: value })} />
+                      <button type="button" className="settingsResetButton" onClick={() => patch({ visaX: DEFAULTS.visaX, visaY: DEFAULTS.visaY, visaScale: DEFAULTS.visaScale, visaRotation: 0, visaOpacity: 1, visaFinish: 'silver', visaGloss: DEFAULTS.visaGloss, visaReflection: DEFAULTS.visaReflection })}>Reset VISA</button>
+                    </div>
+                  ) : null}
                 </Group>
 
                 <Group title="Card Text">
