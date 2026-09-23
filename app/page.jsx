@@ -7580,6 +7580,7 @@ export default function Page() {
                   <strong>{studioSubtool ? studioSubtool[0].toUpperCase()+studioSubtool.slice(1) : 'Effects'}</strong>
                   <button type="button" onClick={() => setStudioSubtool('')}>✓</button>
                 </div>
+                {selectedImageLayer ? <small className="contextTargetNote">Effects apply only to this imported layer</small> : null}
                 {!studioSubtool ? (
                   <div className="effectTileRail">
                     <button type="button" onClick={() => patchImageTarget({vignette:0,grain:0,gloss:0,overlay:0,fade:0,effectTintStrength:0})}><i className="effectNone"/><small>None</small></button>
