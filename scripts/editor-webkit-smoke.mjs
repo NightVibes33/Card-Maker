@@ -951,10 +951,14 @@ try {
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
   await page.getByRole('button', { name: 'Delete', exact: true }).click();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await page.getByRole('button', { name: /^Shape Copy shape selected/i }).first()
-    .waitFor({ state: 'visible', timeout: 5000 });
-
-  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  // Undo restores the duplicated layer, but selection is intentionally not
+  // part of design history. Verify restoration independently, then select it
+  // explicitly for the following editor checks.
+  const restoredDuplicateRow = page.getByRole('button', { name: /^Shape Copy shape /i }).first();
+  await restoredDuplicateRow.waitFor({ state: 'visible', timeout: 5000 });
+  if (!/selected/i.test(await restoredDuplicateRow.getAttribute('aria-label') || '')) {
+    await restoredDuplicateRow.click();
+  }
 
   // Exercise the real custom image-layer import path in mobile WebKit.
   const layerFileInput = page.locator('.layerAddRow + input[type="file"]').first();
