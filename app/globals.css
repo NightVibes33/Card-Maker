@@ -2025,3 +2025,123 @@ button:disabled{opacity:.38}
     top:var(--safe-top);
   }
 }
+
+
+/* CapCut-style Studio shell — editor only */
+.isStudioEditor{
+  --studio-panel:#15171b;
+  --studio-panel-2:#1c1f24;
+  --studio-blue:#0a84ff;
+  background:#08090b;
+}
+.isStudioEditor > .largeTitleBar{display:none}
+.isStudioEditor .studioPreview{
+  padding:calc(var(--safe-top) + 4px) 18px 8px;
+  background:#08090b;
+}
+.isStudioEditor .studioFloatingBar{
+  min-height:48px;
+  margin:0 0 28px;
+  display:grid;
+  grid-template-columns:44px 1fr auto auto;
+  align-items:center;
+  gap:4px;
+}
+.isStudioEditor .studioEditorBack{
+  width:44px;height:44px;display:grid;place-items:center;color:#fff;background:transparent;border:0;
+  transform:rotate(180deg);
+}
+.isStudioEditor .studioEditorTitle{
+  position:absolute;left:50%;transform:translateX(-50%);
+  color:#fff;font-size:16px;font-weight:750;letter-spacing:-.2px;
+}
+.isStudioEditor .studioPreview .historyButtons{grid-column:3;background:transparent;box-shadow:none;padding:0}
+.isStudioEditor .studioPreview .historyButtons button{background:transparent;color:#f5f5f7;width:38px;min-width:38px;height:44px}
+.isStudioEditor .studioPreview .savePill{display:none}
+.isStudioEditor .studioPreview .doneSelectionButton{display:none}
+.isStudioEditor .studioPreview .beforeAfterButton{
+  grid-column:4;width:44px;min-width:44px;height:44px;padding:0;background:transparent!important;box-shadow:none!important;color:#fff;
+}
+.isStudioEditor .studioPreview .beforeAfterButton svg{display:none}
+.isStudioEditor .studioPreview .beforeAfterButton span{font-size:0;overflow:visible}
+.isStudioEditor .studioPreview .beforeAfterButton span:after{content:"•••";font-size:18px;letter-spacing:2px}
+.isStudioEditor .cardFrame{
+  width:min(100%,430px);
+  margin:0 auto;
+  border-radius:15px;
+  box-shadow:0 16px 40px rgba(0,0,0,.55),0 0 0 .5px rgba(255,255,255,.18);
+}
+.isStudioEditor .previewCaption{display:none}
+.isStudioEditor .screenContent{padding:0}
+.isStudioEditor .studioScreen{padding:0 0 calc(78px + var(--safe-bottom));background:#08090b}
+.isStudioEditor .studioModeRow{
+  position:relative;top:auto;margin:18px 0 0;padding:0 14px 12px;border:0;background:#08090b;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+  display:flex;flex-direction:column;
+}
+.isStudioEditor .studioModeActions{order:-1;margin:0 0 28px;display:flex;justify-content:center;min-height:40px}
+.isStudioEditor .studioModeLabel{display:none}
+.isStudioEditor .previewModeToggle{
+  width:190px;grid-template-columns:1fr 1fr;padding:3px;border-radius:999px;background:#111318;box-shadow:inset 0 0 0 .5px rgba(255,255,255,.12);
+}
+.isStudioEditor .previewModeToggle button{min-height:38px;border-radius:999px;color:#aeb1b8;font-size:12px;font-weight:650}
+.isStudioEditor .previewModeToggle button.active{background:#353942;color:#fff;box-shadow:0 1px 5px rgba(0,0,0,.35)}
+.isStudioEditor .studioToolBar{
+  display:flex;overflow-x:auto;gap:5px;padding:0 0 3px;background:transparent;box-shadow:none;border-radius:0;scrollbar-width:none;
+}
+.isStudioEditor .studioToolBar::-webkit-scrollbar{display:none}
+.isStudioEditor .studioToolBar button{
+  flex:0 0 58px;min-height:64px;border-radius:12px;padding:6px 4px;color:#f2f2f4;font-size:10px;font-weight:560;background:transparent;
+}
+.isStudioEditor .studioToolBar button svg{width:23px;height:23px}
+.isStudioEditor .studioToolBar button.active{
+  color:#fff;background:linear-gradient(180deg,rgba(10,132,255,.28),rgba(10,132,255,.15));
+  box-shadow:inset 0 0 0 1px rgba(10,132,255,.7),0 5px 18px rgba(0,100,255,.14);
+}
+.isStudioEditor #panel-studio > .settingsSection,
+.isStudioEditor .studioContextCard{
+  margin:0 10px 12px;border-radius:17px;background:var(--studio-panel);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.07);
+  overflow:hidden;
+}
+.isStudioEditor #panel-studio .sectionLabel{
+  margin:0;padding:14px 14px 8px;color:#fff;font-size:15px;font-weight:750;text-transform:none;letter-spacing:0;
+}
+.isStudioEditor #panel-studio .insetGroup{border-radius:0;background:transparent;box-shadow:none}
+.isStudioEditor #panel-studio .sectionFooter{padding:8px 14px 12px;color:#7e828b}
+.contextPanelHeader{
+  min-height:48px;padding:0 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:.5px solid rgba(255,255,255,.08)
+}
+.contextPanelHeader strong{font-size:15px;color:#fff}
+.contextPanelHeader button{width:44px;height:44px;color:#5ac8fa;background:transparent;border:0;font-size:20px}
+.capcutSubtools{display:flex;gap:10px;overflow-x:auto;padding:14px;scrollbar-width:none}
+.capcutSubtools::-webkit-scrollbar{display:none}
+.capcutSubtools button,.capcutSubtools label{
+  flex:0 0 58px;min-height:70px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:6px;color:#fff;background:transparent;border:0;font-size:11px;
+}
+.capcutSubtools button>span,.capcutSubtools label>span,.capcutSubtools label>input{
+  width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:#25282e;border:0;color:#fff;font-size:20px;font-weight:700;
+}
+.capcutSubtools button.active>span{background:#0b4f91;box-shadow:inset 0 0 0 1px #2997ff}
+.capcutSubtools small{font-size:10px;color:#d7d8dc;white-space:nowrap}
+.capcutSubtools input[type=color]{padding:5px;overflow:hidden}
+.capcutTextInput{
+  display:block;width:calc(100% - 28px);height:44px;margin:12px 14px 0;padding:0 14px;border:0;border-radius:11px;background:#25282e;color:#fff;font-size:15px;outline:none;
+}
+.capcutPrimaryTile{min-height:50px;margin:14px;width:calc(100% - 28px);border:0;border-radius:12px;background:#25282e;color:#fff;font-weight:700}
+.capcutLayerList{padding:4px 0 10px}
+.capcutLayerList button{
+  width:100%;min-height:48px;padding:0 14px;display:grid;grid-template-columns:26px 1fr 30px;align-items:center;text-align:left;border:0;border-bottom:.5px solid rgba(255,255,255,.06);background:transparent;color:#fff;
+}
+.capcutLayerList button.selected{background:rgba(10,132,255,.13)}
+.capcutLayerList button strong{font-size:13px;font-weight:600}
+.isStudioEditor #panel-studio .sliderRow{background:transparent;border-color:rgba(255,255,255,.07)}
+.isStudioEditor #panel-studio .rowHeader{color:#fff;font-size:13px}
+.isStudioEditor #panel-studio .rowValue{background:#25282e;color:#c8cbd1}
+.isStudioEditor #panel-studio .settingsResetButton{margin:8px 14px 12px;width:calc(100% - 28px);border-radius:11px;background:#25282e;color:#fff}
+.isStudioEditor .tabBar{background:rgba(10,10,12,.92);border-top-color:rgba(255,255,255,.08)}
+@media (max-width:390px){
+  .isStudioEditor .studioPreview{padding-left:14px;padding-right:14px}
+  .isStudioEditor .studioFloatingBar{margin-bottom:20px}
+  .isStudioEditor .studioModeActions{margin-bottom:20px}
+  .isStudioEditor .studioToolBar button{flex-basis:55px}
+}
