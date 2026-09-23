@@ -74,6 +74,28 @@ const CUCU_CATEGORIES = [
   ['crypto', 'Crypto']
 ];
 
+function interleaveCatalogItems(groups, limit = Number.POSITIVE_INFINITY) {
+  const lists = groups.filter(Array.isArray);
+  const output = [];
+  let index = 0;
+
+  while (output.length < limit) {
+    let added = false;
+
+    for (const list of lists) {
+      if (index >= list.length) continue;
+      output.push(list[index]);
+      added = true;
+      if (output.length >= limit) break;
+    }
+
+    if (!added) break;
+    index += 1;
+  }
+
+  return output;
+}
+
 const GRADIENTS = [
   ['Midnight', '#11131b', '#3b1e70', '#7b61ff'],
   ['Obsidian', '#080909', '#202326', '#6a6f74'],
@@ -4165,21 +4187,52 @@ export default function Page() {
       });
       if (search.trim()) params.set('q', search.trim());
 
-      const response = await fetch('/api/cucu?' + params.toString());
-      const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Card library failed');
+      const providerUrls = ['/api/cucu?' + params.toString()];
+      if (category === 'anime') {
+        providerUrls.push('/api/animedeskmat?' + params.toString());
+      }
+
+      const providerResults = await Promise.all(
+        providerUrls.map(async (url) => {
+          try {
+            const response = await fetch(url);
+            const json = await response.json();
+            if (!response.ok) throw new Error(json.error || 'Card library failed');
+            return { ok: true, json };
+          } catch (error) {
+            return { ok: false, error };
+          }
+        })
+      );
       if (!isCurrentIntent()) return;
 
-      const rawList = Array.isArray(json.results) ? json.results : [];
+      const availableProviders = providerResults.filter((entry) => entry.ok);
+      if (!availableProviders.length) {
+        throw providerResults[0]?.error || new Error('Card library failed');
+      }
+
+      const rawList = interleaveCatalogItems(
+        availableProviders.map((entry) =>
+          Array.isArray(entry.json?.results) ? entry.json.results : []
+        )
+      );
       const cleanList = await prepareCleanResults(rawList);
       if (!isCurrentIntent()) return;
 
-      setCucuTotal(Number(json.total) || 0);
-      setCucuHasMore(Boolean(json.hasMore));
+      const knownTotals = availableProviders
+        .map((entry) => Number(entry.json?.total) || 0)
+        .filter((value) => value > 0);
+      setCucuTotal(
+        knownTotals.length === availableProviders.length
+          ? knownTotals.reduce((sum, value) => sum + value, 0)
+          : 0
+      );
+      setCucuHasMore(availableProviders.some((entry) => Boolean(entry.json?.hasMore)));
+      const primaryJson = availableProviders[0]?.json || {};
       setCucuCategoryLabel(
         search.trim()
           ? 'Search Results'
-          : json.categoryLabel || CUCU_CATEGORIES.find(([key]) => key === category)?.[1] || 'Card Skins'
+          : primaryJson.categoryLabel || CUCU_CATEGORIES.find(([key]) => key === category)?.[1] || 'Card Skins'
       );
 
       setCucuItems((current) => {
@@ -4247,10 +4300,26 @@ export default function Page() {
       const next = {};
       await Promise.all(shelves.map(async ([category, label]) => {
         try {
-          const response = await fetch('/api/cucu?category=' + encodeURIComponent(category) + '&page=1&limit=8');
-          const json = await response.json();
-          if (!response.ok) return;
-          const items = Array.isArray(json.results) ? json.results.slice(0, 8) : [];
+          const urls = [
+            '/api/cucu?category=' + encodeURIComponent(category) + '&page=1&limit=8'
+          ];
+          if (category === 'anime') {
+            urls.push('/api/animedeskmat?category=anime&page=1&limit=8');
+          }
+
+          const providerResults = await Promise.all(
+            urls.map(async (url) => {
+              try {
+                const response = await fetch(url);
+                const json = await response.json();
+                return response.ok && Array.isArray(json.results) ? json.results : [];
+              } catch {
+                return [];
+              }
+            })
+          );
+
+          const items = interleaveCatalogItems(providerResults, 8);
           next[label] = await prepareCleanResults(items, 8);
         } catch {}
       }));

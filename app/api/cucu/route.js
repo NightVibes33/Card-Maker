@@ -209,6 +209,18 @@ function matchesCategory(product, categoryKey) {
   return terms.some((term) => evidence.includes(term));
 }
 
+function isCardCoverProduct(product) {
+  const productType = cleanText(product?.product_type || '').toLowerCase();
+  if (productType) return /\bcard covers?\b/.test(productType);
+
+  const fallback = [
+    cleanText(product?.title || ''),
+    String(product?.handle || '')
+  ].join(' ').toLowerCase();
+
+  return /\b(?:card|credit card|debit card)\s+(?:cover|covers|skin|skins)\b/.test(fallback);
+}
+
 async function getFallbackCatalog(categoryKey) {
   const now = Date.now();
   const cached = fallbackCache.get(categoryKey);
@@ -240,7 +252,12 @@ async function getFallbackCatalog(categoryKey) {
     const seen = new Set();
     return batches.filter((product) => {
       const handle = String(product?.handle || '');
-      if (!handle || seen.has(handle) || !matchesCategory(product, categoryKey)) return false;
+      if (
+        !handle ||
+        seen.has(handle) ||
+        !isCardCoverProduct(product) ||
+        !matchesCategory(product, categoryKey)
+      ) return false;
       seen.add(handle);
       return true;
     });
@@ -319,6 +336,7 @@ function flattenProduct(product) {
     assetMode: 'direct-card-art',
     mediaAlt: candidates[0].alt || title,
     collection: product.__collection || DEFAULT_COLLECTION,
+    upstreamProductType: cleanText(product?.product_type || ''),
     tags
   };
 }
@@ -379,7 +397,9 @@ export async function GET(request) {
         __collection: collection.handle
       }));
 
-      const wanted = combined.slice(localStart, localStart + limit);
+      const wanted = combined
+        .slice(localStart, localStart + limit)
+        .filter(isCardCoverProduct);
       results = wanted.map(flattenProduct).filter(Boolean);
 
       const hasBufferedNext = combined.length > localStart + limit;

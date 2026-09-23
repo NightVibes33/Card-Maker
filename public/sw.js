@@ -1,7 +1,7 @@
 const SHELL_CACHE = 'card-studio-shell-v4';
 const ART_CACHE = 'card-studio-art-v5';
 const THUMB_CACHE = 'card-studio-thumb-v2';
-const CATALOG_CACHE = 'card-studio-catalog-v3';
+const CATALOG_CACHE = 'card-studio-catalog-v4';
 const STATIC_CACHE = 'card-studio-static-v4';
 const OWNED_CACHE_PREFIX = 'card-studio-';
 
@@ -180,7 +180,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.pathname.startsWith('/api/cucu')) {
+  if (
+    url.pathname.startsWith('/api/cucu') ||
+    url.pathname.startsWith('/api/animedeskmat')
+  ) {
     event.respondWith(staleWhileRevalidate(event.request, CATALOG_CACHE));
     return;
   }

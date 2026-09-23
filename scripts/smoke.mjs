@@ -102,6 +102,7 @@ async function checkCatalog() {
 
   const invalid = json.results.find((item) =>
     item.source !== 'CUCU Covers' ||
+    !/card covers?/i.test(String(item.upstreamProductType || '')) ||
     item.mediaType !== 'premade-card-skin' ||
     item.assetMode !== 'direct-card-art' ||
     !item.image?.startsWith('/api/image?') ||
@@ -142,6 +143,66 @@ async function checkCatalog() {
     thumbMeta.width + 'x' + thumbMeta.height
   );
   return json.results;
+}
+
+async function checkAnimeDeskMat() {
+  const { response, json } = await fetchJsonRetry(
+    base + '/api/animedeskmat?page=1&limit=12',
+    'AnimeDeskMat catalog'
+  );
+
+  if (!Array.isArray(json.results) || json.results.length < 1) {
+    throw new Error('AnimeDeskMat catalog returned no products');
+  }
+
+  const invalid = json.results.find((item) => {
+    const assets = Array.isArray(item.directAssetUrls) ? item.directAssetUrls : [];
+    if (
+      item.source !== 'AnimeDeskMat' ||
+      item.mediaType !== 'premade-card-skin' ||
+      item.assetMode !== 'direct-card-art' ||
+      assets.length !== 1 ||
+      !item.image?.startsWith('/api/image?') ||
+      !item.thumbnail?.includes('w=560') ||
+      !Array.isArray(item.inspectUrls) ||
+      item.inspectUrls.length !== 1 ||
+      !item.inspectUrls[0].startsWith('/api/cucu/inspect?')
+    ) return true;
+
+    let filename = '';
+    try {
+      filename = decodeURIComponent(new URL(assets[0]).pathname.split('/').pop() || '').toLowerCase();
+    } catch {
+      return true;
+    }
+
+    return (
+      !/full-cover(?:_[a-z0-9-]+)?\.(?:png|webp|jpe?g)$/.test(filename) ||
+      /with[-_](?:chip|window)|half[-_]cover|4[-_]sets?/.test(filename)
+    );
+  });
+
+  if (invalid) {
+    throw new Error('AnimeDeskMat returned a non-plain full-cover asset: ' + JSON.stringify(invalid));
+  }
+
+  const cache = response.headers.get('cache-control') || '';
+  if (!/s-maxage=21600/.test(cache)) {
+    throw new Error('AnimeDeskMat catalog missing 6h edge cache: ' + cache);
+  }
+
+  const inspected = await fetchJsonRetry(
+    base + json.results[0].inspectUrls[0],
+    'AnimeDeskMat artwork preprocessing',
+    3
+  );
+  if (!inspected.json?.usable || !inspected.json?.full || !inspected.json?.thumbnail) {
+    throw new Error('AnimeDeskMat plain full-cover artwork was not usable');
+  }
+
+  console.log(
+    'PASS AnimeDeskMat => strict no-chip full-cover assets through shared preprocessing'
+  );
 }
 
 async function checkPreprocessing(results) {
@@ -215,6 +276,7 @@ async function checkSearch(catalogResults) {
 await checkHome();
 await checkInstallIcons();
 const results = await checkCatalog();
+await checkAnimeDeskMat();
 await checkPreprocessing(results);
 await checkSearch(results);
 console.log('Card Studio V2 CUCU smoke tests passed.');
