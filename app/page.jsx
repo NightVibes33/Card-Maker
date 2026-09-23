@@ -5043,6 +5043,8 @@ export default function Page() {
       ]
     }));
     setSelectedElement(id);
+    setStudioTool('text');
+    setStudioSubtool('');
     setMessage('Text layer added');
   }
 
@@ -5075,6 +5077,8 @@ export default function Page() {
       ]
     }));
     setSelectedElement(id);
+    setStudioTool('crop');
+    setStudioSubtool('transform');
     setMessage('Shape layer added');
   }
 
