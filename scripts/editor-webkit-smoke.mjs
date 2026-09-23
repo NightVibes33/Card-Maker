@@ -1264,6 +1264,10 @@ try {
   await backgroundImageInput.waitFor({ state: 'attached', timeout: 5000 });
 
   const replaceBackground = async (name, buffer) => {
+    // Exercise the real control so uploadIntentRef is set to replace-artwork,
+    // then feed the mounted input directly to avoid relying on WebKit's
+    // filechooser-event timing.
+    await page.getByRole('button', { name: /Replace Artwork/ }).click({ noWaitAfter: true });
     await backgroundImageInput.setInputFiles({ name, mimeType: 'image/png', buffer });
     await page.getByText('Artwork replaced · existing card settings kept', { exact: true }).waitFor({
       state: 'visible',
