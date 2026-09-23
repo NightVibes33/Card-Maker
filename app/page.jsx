@@ -5484,7 +5484,7 @@ export default function Page() {
     startFreshWorkingProject(
       { ...DEFAULTS, ...project.design },
       {
-        studioTool: 'position',
+        studioTool: 'crop',
         statusMessage: (project.name || 'Design') + ' opened · previous unsaved work cleared'
       }
     );
@@ -6024,7 +6024,7 @@ export default function Page() {
       startFreshWorkingProject(
         { ...DEFAULTS, ...imported },
         {
-          studioTool: 'position',
+          studioTool: 'crop',
           statusMessage: 'Design preset imported'
         }
       );
@@ -6051,7 +6051,7 @@ export default function Page() {
     }
 
     startFreshWorkingProject(createDefaultProjectDesign(), {
-      studioTool: 'position',
+      studioTool: 'crop',
       statusMessage: 'New card ready · unsaved work cleared'
     });
   }
