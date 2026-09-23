@@ -4385,7 +4385,13 @@ export default function Page() {
             })
           );
 
-          const items = interleaveCatalogItems(providerResults, 8);
+          // Keep the existing CUCU shelf positions stable. AnimeDeskMat is
+          // appended to Anime instead of alternating provider items, so an
+          // AnimeDeskMat card loading/rejecting cannot leave a CUCU-sized hole
+          // between neighboring cards.
+          const items = category === 'anime'
+            ? [...(providerResults[0] || []), ...(providerResults[1] || [])].slice(0, 8)
+            : interleaveCatalogItems(providerResults, 8);
           next[label] = await prepareCleanResults(items, 8);
           for (const item of next[label]) {
             if (item?.thumbnail) cacheArtwork(proxyImageWidth(item.thumbnail, 560));
