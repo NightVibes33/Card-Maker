@@ -114,6 +114,11 @@ export async function GET(request) {
   const width = Number.isFinite(requestedWidth)
     ? Math.max(0, Math.min(3072, Math.floor(requestedWidth)))
     : 0;
+  const requestedCrop = String(request.nextUrl.searchParams.get('crop') || '');
+  const crop = requestedCrop.match(/^(\d+),(\d+),(\d+),(\d+)$/);
+  const cropRect = crop
+    ? { left: Number(crop[1]), top: Number(crop[2]), width: Number(crop[3]), height: Number(crop[4]) }
+    : null;
 
   // Prefer origin/CDN resizing when it is known to be supported. Other
   // allowlisted hosts are normalized server-side below so a thumbnail request
@@ -167,20 +172,37 @@ export async function GET(request) {
     // Always enforce requested dimensions ourselves. Known CDNs still receive
     // the width hint above to reduce transfer size, but the proxy never trusts
     // an upstream to have actually honored it before the image reaches iOS.
-    const shouldNormalize = width >= 160;
+    const shouldNormalize = width >= 160 || Boolean(cropRect);
 
     if (shouldNormalize) {
       try {
-        responseBody = await sharp(Buffer.from(buffer), {
+        let pipeline = sharp(Buffer.from(buffer), {
           animated: false,
           limitInputPixels: MAX_DECODED_IMAGE_PIXELS
-        })
-          .rotate()
-          .resize({
+        }).rotate();
+
+        if (cropRect) {
+          const meta = await pipeline.metadata();
+          if (
+            cropRect.left < 0 || cropRect.top < 0 ||
+            cropRect.width < 1 || cropRect.height < 1 ||
+            cropRect.left + cropRect.width > Number(meta.width || 0) ||
+            cropRect.top + cropRect.height > Number(meta.height || 0)
+          ) {
+            return new NextResponse('Invalid crop', { status: 400 });
+          }
+          pipeline = pipeline.extract(cropRect);
+        }
+
+        if (width >= 160) {
+          pipeline = pipeline.resize({
             width,
             withoutEnlargement: true,
             fit: 'inside'
-          })
+          });
+        }
+
+        responseBody = await pipeline
           .webp({
             quality: width <= 800 ? 84 : 92,
             effort: 4
