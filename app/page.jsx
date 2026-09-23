@@ -7142,22 +7142,18 @@ export default function Page() {
 
             {studioTool === 'text' ? (
               <section className="studioContextCard capcutContextPanel">
-                <div className="contextPanelHeader"><strong>Text</strong><button type="button" onClick={() => setStudioTool('crop')}>✓</button></div>
-                {selectedLayer?.type === 'text' ? (
-                  <>
-                    <input className="capcutTextInput" value={selectedLayer.text || ''} aria-label="Text content" onChange={(event) => updateLayer(selectedLayer.id, { text: event.target.value })} />
-                    <div className="capcutSubtools">
-                      <label><span>Aa</span><small>Font</small></label>
-                      <button type="button" className={Number(selectedLayer.weight || 700) >= 700 ? 'active' : ''} onClick={() => updateLayer(selectedLayer.id, { weight: Number(selectedLayer.weight || 700) >= 700 ? 400 : 800 })}><span>B</span><small>Style</small></button>
-                      <label><input type="color" value={selectedLayer.color || '#ffffff'} onChange={(event) => updateLayer(selectedLayer.id, { color: event.target.value })}/><small>Color</small></label>
-                      <button type="button" className={selectedLayer.shadow ? 'active' : ''} onClick={() => updateLayer(selectedLayer.id, { shadow: !selectedLayer.shadow })}><span>◔</span><small>Shadow</small></button>
-                    </div>
-                    <SliderRow label="Size" value={selectedLayer.fontSize || 58} min={10} max={240} step={1} onChange={(value) => updateLayer(selectedLayer.id, { fontSize: value })} />
-                    <SliderRow label="Spacing" value={selectedLayer.letterSpacing || 0} min={-4} max={30} step={0.1} onChange={(value) => updateLayer(selectedLayer.id, { letterSpacing: value })} />
-                  </>
-                ) : (
-                  <button type="button" className="capcutPrimaryTile" onClick={addTextLayer}>+ Add Text</button>
-                )}
+                <div className="contextPanelHeader">{studioSubtool ? <button type="button" className="contextBack" onClick={()=>setStudioSubtool('')}>‹</button> : <span/>}<strong>{studioSubtool ? ({font:'Font',style:'Style',color:'Color',shadow:'Shadow',spacing:'Spacing',align:'Align'}[studioSubtool] || 'Text') : 'Text'}</strong><button type="button" onClick={()=>{setStudioSubtool('');setStudioTool('crop')}}>✓</button></div>
+                {selectedLayer?.type === 'text' ? <>
+                  {!studioSubtool ? <><input className="capcutTextInput" value={selectedLayer.text||''} aria-label="Text content" onChange={(e)=>updateLayer(selectedLayer.id,{text:e.target.value})}/><div className="capcutSubtools">
+                    {['font','style','color','shadow','spacing','align'].map((key)=><button type="button" key={key} onClick={()=>setStudioSubtool(key)}><span>{{font:'Aa',style:'B',color:'●',shadow:'◔',spacing:'≡',align:'☰'}[key]}</span><small>{key[0].toUpperCase()+key.slice(1)}</small></button>)}
+                  </div></> : null}
+                  {studioSubtool==='font'?<><div className="segmentedControl capcutSegmented">{[['system','System'],['serif','Serif'],['monospace','Mono']].map(([v,l])=><button type="button" key={v} className={selectedLayer.fontFamily===v?'selected':''} onClick={()=>updateLayer(selectedLayer.id,{fontFamily:v})}>{l}</button>)}</div><SliderRow label="Size" value={selectedLayer.fontSize||58} min={10} max={240} step={1} onChange={(v)=>updateLayer(selectedLayer.id,{fontSize:v})}/></>:null}
+                  {studioSubtool==='style'?<div className="capcutSubtools"><button type="button" className={Number(selectedLayer.weight||700)>=700?'active':''} onClick={()=>updateLayer(selectedLayer.id,{weight:Number(selectedLayer.weight||700)>=700?400:800})}><span>B</span><small>Bold</small></button></div>:null}
+                  {studioSubtool==='color'?<label className="capcutColorPicker"><input type="color" value={selectedLayer.color||'#ffffff'} onChange={(e)=>updateLayer(selectedLayer.id,{color:e.target.value})}/><span>{selectedLayer.color||'#ffffff'}</span></label>:null}
+                  {studioSubtool==='shadow'?<SwitchRow label="Shadow" value={Boolean(selectedLayer.shadow)} onChange={(v)=>updateLayer(selectedLayer.id,{shadow:v})}/>:null}
+                  {studioSubtool==='spacing'?<><SliderRow label="Letter Spacing" value={selectedLayer.letterSpacing||0} min={-4} max={30} step={0.1} onChange={(v)=>updateLayer(selectedLayer.id,{letterSpacing:v})}/><SliderRow label="Line Height" value={selectedLayer.lineHeight||1.18} min={0.7} max={2.4} step={0.01} onChange={(v)=>updateLayer(selectedLayer.id,{lineHeight:v})}/></>:null}
+                  {studioSubtool==='align'?<div className="segmentedControl capcutSegmented">{['left','center','right'].map(v=><button type="button" key={v} className={selectedLayer.align===v?'selected':''} onClick={()=>updateLayer(selectedLayer.id,{align:v})}>{v}</button>)}</div>:null}
+                </> : <button type="button" className="capcutPrimaryTile" onClick={addTextLayer}>+ Add Text</button>}
               </section>
             ) : null}
 
