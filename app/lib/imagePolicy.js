@@ -8,6 +8,8 @@ export const ALLOWED_IMAGE_HOSTS = Object.freeze([
   'www.stickyinkdesigns.com',
   'cucucovers.com',
   'www.cucucovers.com',
+  'animedeskmat.com',
+  'www.animedeskmat.com',
   'styledcards.com',
   'www.styledcards.com'
 ]);
