@@ -5107,6 +5107,8 @@ export default function Page() {
       ]
     }));
     setSelectedElement(id);
+    setStudioTool('crop');
+    setStudioSubtool('transform');
     setMessage('Chip layer added');
   }
 
@@ -5135,6 +5137,8 @@ export default function Page() {
       ]
     }));
     setSelectedElement(id);
+    setStudioTool('crop');
+    setStudioSubtool('transform');
     setMessage('Contactless layer added');
   }
 
@@ -7221,6 +7225,7 @@ export default function Page() {
                         if (entry.selection === 'visa' || entry.selection === 'chip' || entry.selection === 'contactless') { setStudioTool('card'); setStudioSubtool(entry.selection); }
                         else if (entry.selection === 'card-text') { setStudioTool('card'); setStudioSubtool('number'); }
                         else if (entry.type === 'text') { setStudioTool('text'); setStudioSubtool(''); }
+                        else if (!entry.builtin) { setStudioTool('crop'); setStudioSubtool('transform'); }
                       }}><strong>{entry.name}</strong></button>
                       <span className="layerReorderButtons"><button type="button" aria-label={'Move '+entry.name+' up'} onClick={()=>moveLayer(entry.id,1)}>↑</button><button type="button" aria-label={'Move '+entry.name+' down'} onClick={()=>moveLayer(entry.id,-1)}>↓</button></span>
                     </div>
