@@ -6225,11 +6225,12 @@ export default function Page() {
         setSelectedElement(target);
         if (target === 'chip' || target === 'contactless' || target === 'visa') {
           setStudioTool('card');
+          setStudioSubtool(target);
         } else if (target === 'artwork') {
           setStudioTool('crop');
         } else {
           const tappedLayer = (designRef.current.customLayers || []).find((layer) => layer.id === target);
-          if (tappedLayer?.type === 'text') setStudioTool('text');
+          if (tappedLayer?.type === 'text') { setStudioTool('text'); setStudioSubtool(''); }
         }
       }
     }
