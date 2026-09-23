@@ -191,7 +191,7 @@ try {
   // original defaults to return before any unrelated editor smoke can fail.
   await page.getByRole('button', { name: 'Black Metal', exact: true }).click();
   await page.getByLabel('Text color').evaluate((node) => {
-    node.value = '#123456';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(node, '#123456');
     node.dispatchEvent(new Event('input', { bubbles: true }));
     node.dispatchEvent(new Event('change', { bubbles: true }));
   });
@@ -199,7 +199,7 @@ try {
   await page.getByLabel('Layer text').fill('MUST BE CLEARED');
   await page.getByRole('button', { name: '+ Contactless', exact: true }).click();
   await page.getByLabel('Contactless Color').evaluate((node) => {
-    node.value = '#00ff66';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(node, '#00ff66');
     node.dispatchEvent(new Event('input', { bubbles: true }));
     node.dispatchEvent(new Event('change', { bubbles: true }));
   });
@@ -222,7 +222,7 @@ try {
     ['Chip rotation', '23']
   ]) {
     await page.getByLabel(label).evaluate((node, nextValue) => {
-      node.value = nextValue;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(node, nextValue);
       node.dispatchEvent(new Event('input', { bubbles: true }));
       node.dispatchEvent(new Event('change', { bubbles: true }));
     }, value);
@@ -406,7 +406,7 @@ try {
   // Dirty hardware state again, then select the same card from Library -> Recent.
   await page.getByRole('tab', { name: 'Position', exact: true }).click();
   await page.getByLabel('Chip horizontal position').evaluate((node) => {
-    node.value = '0.48';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(node, '0.48');
     node.dispatchEvent(new Event('input', { bubbles: true }));
     node.dispatchEvent(new Event('change', { bubbles: true }));
   });
@@ -414,7 +414,7 @@ try {
   await page.getByRole('button', { name: 'Black Metal', exact: true }).click();
   await page.getByRole('button', { name: '+ Contactless', exact: true }).click();
   await page.getByLabel('Contactless Color').evaluate((node) => {
-    node.value = '#ff3300';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(node, '#ff3300');
     node.dispatchEvent(new Event('input', { bubbles: true }));
     node.dispatchEvent(new Event('change', { bubbles: true }));
   });
@@ -459,7 +459,7 @@ try {
   await page.getByRole('button', { name: 'Black Metal', exact: true }).click();
   await page.getByRole('button', { name: '+ Contactless', exact: true }).click();
   await page.getByLabel('Contactless Color').evaluate((node) => {
-    node.value = '#ff00aa';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(node, '#ff00aa');
     node.dispatchEvent(new Event('input', { bubbles: true }));
     node.dispatchEvent(new Event('change', { bubbles: true }));
   });
@@ -893,7 +893,7 @@ try {
   // Zero is a valid normalized coordinate. Older editor code used x || 0.5
   // and silently snapped an exact zero back to center.
   await layerX.evaluate((node) => {
-    node.value = '0';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(node, '0');
     node.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.waitForFunction(() => {
@@ -919,7 +919,7 @@ try {
   await page.getByRole('tab', { name: 'Position', exact: true }).click();
   const duplicateSourceX = page.getByLabel('Layer horizontal position');
   await duplicateSourceX.evaluate((node) => {
-    node.value = '1';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(node, '1');
     node.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.waitForFunction(() => {
@@ -984,7 +984,7 @@ try {
   const imageCropLeft = page.getByLabel('Layer Crop Left');
   await imageCropLeft.waitFor({ state: 'visible', timeout: 5000 });
   await imageCropLeft.evaluate((node) => {
-    node.value = '0.1';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(node, '0.1');
     node.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.waitForFunction(() => {
@@ -1063,7 +1063,7 @@ try {
   const contactlessRotation = page.getByLabel('Contactless rotation');
   const contactlessRotationBefore = Number(await contactlessRotation.inputValue());
   await contactlessRotation.evaluate((node) => {
-    node.value = '24';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(node, '24');
     node.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.waitForFunction(() => {
@@ -1194,7 +1194,7 @@ try {
     return Boolean(input && !input.disabled);
   }, null, { timeout: 15000 });
   await layerCropLeft.evaluate((node) => {
-    node.value = '0.1';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(node, '0.1');
     node.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.waitForFunction(() => {
@@ -1378,7 +1378,7 @@ try {
   // first; the selected skin must then open on the exact original card defaults.
   await page.getByRole('button', { name: 'Black Metal', exact: true }).click();
   await page.getByLabel('Text color').evaluate((node) => {
-    node.value = '#123456';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(node, '#123456');
     node.dispatchEvent(new Event('input', { bubbles: true }));
     node.dispatchEvent(new Event('change', { bubbles: true }));
   });
@@ -1393,7 +1393,7 @@ try {
   ];
   for (const [label, value] of dirtyChipValues) {
     await page.getByLabel(label).evaluate((node, nextValue) => {
-      node.value = nextValue;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(node, nextValue);
       node.dispatchEvent(new Event('input', { bubbles: true }));
       node.dispatchEvent(new Event('change', { bubbles: true }));
     }, value);
@@ -1412,7 +1412,7 @@ try {
   ];
   for (const [label, value] of dirtyArtworkValues) {
     await page.getByLabel(label).evaluate((node, nextValue) => {
-      node.value = nextValue;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(node, nextValue);
       node.dispatchEvent(new Event('input', { bubbles: true }));
       node.dispatchEvent(new Event('change', { bubbles: true }));
     }, value);
@@ -1420,7 +1420,7 @@ try {
 
   await page.getByRole('tab', { name: 'Effects', exact: true }).click();
   await page.getByLabel('Vignette intensity').evaluate((node) => {
-    node.value = '0.55';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(node, '0.55');
     node.dispatchEvent(new Event('input', { bubbles: true }));
     node.dispatchEvent(new Event('change', { bubbles: true }));
   });
