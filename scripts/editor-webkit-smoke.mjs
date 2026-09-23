@@ -1265,14 +1265,16 @@ try {
 
   const replaceBackground = async (name, buffer) => {
     await backgroundImageInput.setInputFiles({ name, mimeType: 'image/png', buffer });
-    await page.getByText('Imported image ready to crop', { exact: true }).waitFor({
+    await page.getByText('Artwork replaced · existing card settings kept', { exact: true }).waitFor({
       state: 'visible',
       timeout: 15000
     });
-    await page.getByText('Artwork loaded', { exact: true }).waitFor({
-      state: 'visible',
-      timeout: 15000
-    });
+    // The status above confirms the import/patch. Wait for the new background
+    // decode too, otherwise the next replacement can race the previous image.
+    await page.waitForFunction(() => {
+      const compare = document.querySelector('.beforeAfterButton');
+      return Boolean(compare && !compare.disabled);
+    }, null, { timeout: 15000 });
     await page.waitForFunction(() => {
       const input = document.querySelector('#panel-studio input[type="file"][accept="image/*"]');
       return Boolean(input && input.value === '');
