@@ -2220,3 +2220,19 @@ button:disabled{opacity:.38}
 .visaToolGlyph{font-size:11px!important;letter-spacing:-.4px}
 .capcutCardInput{margin:10px 14px 14px;width:calc(100% - 28px)}
 @media(max-height:720px){.isStudioEditor .studioFloatingBar{margin-bottom:10px}.isStudioEditor .studioModeActions{margin-bottom:10px}.isStudioEditor .cardFrame{width:min(88vw,360px)}}
+
+/* Reference-locked Studio proportions */
+.isStudioEditor .studioPreview{min-height:440px;display:flex;flex-direction:column;justify-content:flex-start}
+.isStudioEditor .cardFrame{margin-top:10px}
+.isStudioEditor .studioModeRow{margin-top:0;padding-top:8px;border-top:.5px solid rgba(255,255,255,.05)}
+.isStudioEditor .studioToolBar{min-height:76px;align-items:center;border-bottom:.5px solid rgba(255,255,255,.07)}
+.isStudioEditor .studioToolBar button{flex-basis:62px;min-height:68px}
+.isStudioEditor .studioToolBar button.active{background:linear-gradient(180deg,rgba(10,132,255,.32),rgba(10,132,255,.17));border:1px solid rgba(45,151,255,.8)}
+.isStudioEditor .capcutContextPanel{min-height:168px}
+.isStudioEditor #panel-studio{background:#0b0c0f}
+.isStudioEditor #panel-studio>.settingsSection{min-height:168px}
+@media(max-width:430px){
+ .isStudioEditor .studioPreview{min-height:420px}
+ .isStudioEditor .cardFrame{width:calc(100vw - 44px)}
+ .isStudioEditor .studioToolBar{padding-left:4px;padding-right:4px}
+}
