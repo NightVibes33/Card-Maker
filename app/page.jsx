@@ -6220,6 +6220,7 @@ export default function Page() {
       if (target === 'card-text') {
         setSelectedElement('card-text');
         setStudioTool('card');
+        setStudioSubtool('number');
         setMessage('Card text controls ready');
       } else {
         setSelectedElement(target);
@@ -6231,6 +6232,7 @@ export default function Page() {
         } else {
           const tappedLayer = (designRef.current.customLayers || []).find((layer) => layer.id === target);
           if (tappedLayer?.type === 'text') { setStudioTool('text'); setStudioSubtool(''); }
+          else if (tappedLayer?.type === 'image' || tappedLayer?.type === 'shape' || tappedLayer?.type === 'chip' || tappedLayer?.type === 'contactless') { setStudioTool('crop'); setStudioSubtool('transform'); }
         }
       }
     }
