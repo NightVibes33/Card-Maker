@@ -296,7 +296,7 @@ export async function GET(request) {
   try {
     const startIndex = (page - 1) * limit;
     let results = [];
-    let total = null;
+    let total = query ? null : KNOWN_COLLECTION_TOTAL;
     let hasMore = false;
     let mode = 'shopify-collection';
 
