@@ -932,13 +932,13 @@ try {
   const duplicatedShapeRow = page.getByRole('button', { name: /^Shape Copy shape selected/i }).first();
   await duplicatedShapeRow.waitFor({ state: 'visible', timeout: 5000 });
 
+  // The duplicated row being selected is the authoritative React state.
+  // The Card tab already proves that state before we switch panels; do not
+  // couple the assertion to the row remaining mounted after the tab change.
   await page.getByRole('tab', { name: 'Position', exact: true }).click();
   const duplicateLayerX = page.getByLabel('Layer horizontal position');
+  await duplicateLayerX.waitFor({ state: 'visible', timeout: 5000 });
   await page.waitForFunction(() => {
-    const selectedRow = [...document.querySelectorAll('button[aria-label]')].find(
-      (node) => /^Shape Copy shape selected/i.test(node.getAttribute('aria-label') || '')
-    );
-    if (!selectedRow) return false;
     const input = document.querySelector('input[aria-label="Layer horizontal position"]');
     const value = Number(input?.value);
     return Number.isFinite(value) && value < 1 && value > 0.9;
