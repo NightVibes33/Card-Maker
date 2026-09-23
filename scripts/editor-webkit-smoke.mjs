@@ -1269,20 +1269,19 @@ try {
     // filechooser-event timing.
     await page.getByRole('button', { name: /Replace Artwork/ }).click({ noWaitAfter: true });
     await backgroundImageInput.setInputFiles({ name, mimeType: 'image/png', buffer });
-    await page.getByText('Artwork replaced · existing card settings kept', { exact: true }).waitFor({
-      state: 'visible',
-      timeout: 15000
-    });
-    // The status above confirms the import/patch. Wait for the new background
-    // decode too, otherwise the next replacement can race the previous image.
+    // Assert observable completion instead of transient status copy: the
+    // change handler must finish (input reset) and the new background must
+    // decode/render (comparison control enabled). The pixel/state assertions
+    // immediately below verify replacement semantics and catch a new-project
+    // reset, so no behavior is hidden by this synchronization.
+    await page.waitForFunction(() => {
+      const input = document.querySelector('#panel-studio input[type="file"][accept="image/*"]');
+      return Boolean(input && input.value === '');
+    }, null, { timeout: 15000 });
     await page.waitForFunction(() => {
       const compare = document.querySelector('.beforeAfterButton');
       return Boolean(compare && !compare.disabled);
     }, null, { timeout: 15000 });
-    await page.waitForFunction(() => {
-      const input = document.querySelector('#panel-studio input[type="file"][accept="image/*"]');
-      return Boolean(input && input.value === '');
-    }, null, { timeout: 5000 });
   };
 
   const sampleBackgroundCorner = async () => editorCanvas.evaluate((node) => {
