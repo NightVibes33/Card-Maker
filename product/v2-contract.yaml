@@ -154,13 +154,13 @@ features:
   position_controls:
     file: app/page.jsx
     contains:
-      - "Artwork zoom"
-      - "Artwork horizontal position"
-      - "Artwork vertical position"
-      - "Artwork rotation"
+      - "Transform"
+      - "Scale"
+      - "Horizontal"
+      - "Vertical"
+      - "Rotation"
       - "flipX"
-      - "Artwork fit in Position"
-      - "Reset Position"
+      - "sourceCrop"
   adjustment_controls:
     file: app/page.jsx
     contains:
@@ -195,7 +195,7 @@ features:
       - "Gloss"
       - "Dark Overlay"
       - "Fade"
-      - "Tint Strength"
+      - "effectTintStrength"
   card_presets:
     file: app/page.jsx
     contains:
