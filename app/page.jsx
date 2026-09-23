@@ -7192,7 +7192,7 @@ export default function Page() {
               <section className="studioContextCard capcutContextPanel">
                 <div className="contextPanelHeader"><strong>Layers</strong><button type="button" onClick={() => setStudioTool('crop')}>✓</button></div>
                 <div className="capcutLayerList">
-                  <button type="button" className={selectedElement === 'artwork' ? 'selected' : ''} onClick={() => setSelectedElement('artwork')}><span>◉</span><strong>Artwork</strong><span>≡</span></button>
+                  <button type="button" className={selectedElement === 'artwork' ? 'selected' : ''} onClick={() => { setSelectedElement('artwork'); setStudioTool('crop'); setStudioSubtool(''); }}><span>◉</span><strong>Artwork</strong><span>≡</span></button>
                   {visualLayerStack.map((entry) => (
                     <div className={'capcutLayerRow ' + (selectedElement === entry.selection ? 'selected' : '')} key={entry.id}>
                       <button type="button" className="layerVisibilityButton" aria-label={(entry.hidden ? 'Show ' : 'Hide ') + entry.name} onClick={() => toggleVisualLayerVisibility(entry)}>
@@ -7207,6 +7207,11 @@ export default function Page() {
                       {!entry.builtin ? <span className="layerReorderButtons"><button type="button" aria-label={'Move '+entry.name+' up'} onClick={()=>moveLayer(entry.id,1)}>↑</button><button type="button" aria-label={'Move '+entry.name+' down'} onClick={()=>moveLayer(entry.id,-1)}>↓</button></span> : <span className="layerBuiltinMark">≡</span>}
                     </div>
                   ))}
+                  <div className="capcutLayerRow">
+                    <span className="layerVisibilityButton">◉</span>
+                    <button type="button" className="layerSelectButton" onClick={() => { setSelectedElement('artwork'); setStudioTool('background'); setStudioSubtool(''); }}><strong>Background</strong></button>
+                    <span className="layerBuiltinMark">≡</span>
+                  </div>
                 </div>
               </section>
             ) : null}
