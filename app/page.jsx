@@ -7514,7 +7514,7 @@ export default function Page() {
                 {!studioSubtool ? (
                   <div className="effectTileRail">
                     <button type="button" onClick={() => patchImageTarget({vignette:0,grain:0,gloss:0,overlay:0,fade:0,effectTintStrength:0})}><i className="effectNone"/><small>None</small></button>
-                    {[['gloss','Gloss'],['grain','Grain'],['vignette','Vignette'],['fade','Film'],['overlay','Dark']].map(([key,label]) => <button type="button" key={key} onClick={() => setStudioSubtool(key)}><i className={'effectSwatch '+key}/><small>{label}</small></button>)}
+                    {[['gloss','Gloss'],['grain','Grain'],['vignette','Vignette'],['fade','Film'],['overlay','Dark'],['tintfx','Tint']].map(([key,label]) => <button type="button" key={key} onClick={() => setStudioSubtool(key)}><i className={'effectSwatch '+key}/><small>{label}</small></button>)}
                   </div>
                 ) : (
                   <>
@@ -7523,6 +7523,7 @@ export default function Page() {
                     {studioSubtool === 'vignette' ? <SliderRow label="Vignette intensity" value={activeImageSettings.vignette} min={0} max={0.8} step={0.01} onChange={(value)=>patchImageTarget({vignette:value})}/> : null}
                     {studioSubtool === 'fade' ? <SliderRow label="Fade" value={activeImageSettings.fade} min={0} max={1} step={0.01} onChange={(value)=>patchImageTarget({fade:value})}/> : null}
                     {studioSubtool === 'overlay' ? <SliderRow label="Dark Overlay" value={activeImageSettings.overlay} min={0} max={0.75} step={0.01} onChange={(value)=>patchImageTarget({overlay:value})}/> : null}
+                    {studioSubtool === 'tintfx' ? <><label className="colorRow"><span>Color Tint</span><input aria-label="Effect tint color" type="color" disabled={!activeImageEditable} value={activeImageSettings.effectTint || '#7b61ff'} onChange={(event)=>patchImageTarget({effectTint:event.target.value})}/></label><SliderRow label="Tint Strength" value={activeImageSettings.effectTintStrength} min={0} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value)=>patchImageTarget({effectTintStrength:value})}/></> : null}
                   </>
                 )}
               </section>
@@ -7532,7 +7533,7 @@ export default function Page() {
               <section className="studioContextCard capcutContextPanel">
                 <div className="contextPanelHeader">
                   {studioSubtool ? <button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button> : <span/>}
-                  <strong>{studioSubtool ? ({chip:'Chip',contactless:'Contactless',visa:'VISA',number:'Number',name:'Name',expiry:'Expiry'}[studioSubtool] || 'Card') : 'Card'}</strong>
+                  <strong>{studioSubtool ? ({chip:'Chip',contactless:'Contactless',visa:'VISA',number:'Number',name:'Name',expiry:'Expiry',badge:'Badge',textstyle:'Text Style'}[studioSubtool] || 'Card') : 'Card'}</strong>
                   <button type="button" onClick={() => setStudioSubtool('')}>✓</button>
                 </div>
                 {!studioSubtool ? (
@@ -7544,6 +7545,8 @@ export default function Page() {
                       <button type="button" onClick={() => setStudioSubtool('number')}><span>123</span><small>Number</small></button>
                       <button type="button" onClick={() => setStudioSubtool('name')}><span>A</span><small>Name</small></button>
                       <button type="button" onClick={() => setStudioSubtool('expiry')}><span>▦</span><small>Expiry</small></button>
+                      <button type="button" onClick={() => setStudioSubtool('badge')}><span>★</span><small>Badge</small></button>
+                      <button type="button" onClick={() => setStudioSubtool('textstyle')}><span>Aa</span><small>Text Style</small></button>
                     </div>
                     <div className="presetScroller capcutPresetStrip">{Object.keys(CARD_PRESETS).map((name)=><button type="button" key={name} onClick={()=>applyCardPreset(name)}>{name}</button>)}</div>
                   </>
@@ -7578,6 +7581,8 @@ export default function Page() {
                 {studioSubtool === 'number' ? <><SwitchRow label="Masked Number" value={design.number} onChange={(value)=>patch({number:value})}/>{design.number?<input className="iosTextField capcutCardInput" aria-label="Masked card number" value={design.numberText} onChange={(e)=>patch({numberText:singleLineCardText(e.target.value,32)})}/>:null}</> : null}
                 {studioSubtool === 'name' ? <><SwitchRow label="Card Holder" value={design.holder} onChange={(value)=>patch({holder:value})}/>{design.holder?<input className="iosTextField capcutCardInput" aria-label="Card holder" value={design.holderText} onChange={(e)=>patch({holderText:singleLineCardText(e.target.value,28)})}/>:null}</> : null}
                 {studioSubtool === 'expiry' ? <><SwitchRow label="Expiry" value={design.expiry} onChange={(value)=>patch({expiry:value})}/>{design.expiry?<input className="iosTextField capcutCardInput" aria-label="Expiry date" value={design.expiryText} onChange={(e)=>patch({expiryText:singleLineCardText(e.target.value,8)})}/>:null}</> : null}
+                {studioSubtool === 'badge' ? <><SwitchRow label="Top Badge" value={design.badge} onChange={(value)=>patch({badge:value})}/>{design.badge?<input className="iosTextField capcutCardInput" aria-label="Top badge text" value={design.badgeText} onChange={(e)=>patch({badgeText:singleLineCardText(e.target.value,18)})}/>:null}</> : null}
+                {studioSubtool === 'textstyle' ? <><label className="colorRow"><span>Text Color</span><input aria-label="Text color" type="color" value={design.textColor} onChange={(e)=>patch({textColor:e.target.value})}/></label><SwitchRow label="Text Shadow" value={Boolean(design.shadow)} onChange={(value)=>patch({shadow:value})}/></> : null}
               </section>
             ) : null}
           </div>
