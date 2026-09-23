@@ -2669,6 +2669,21 @@ function imageLayerSourceKeyForDesign(value) {
 export default function Page() {
   const [tab, setTab] = useState('discover');
   const [studioTool, setStudioTool] = useState('position');
+
+  // Each bottom-tab screen is a fresh navigation destination. Reset the
+  // document and any app-level scroll container after the destination mounts.
+  useEffect(() => {
+    const resetScroll = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      const screen = document.querySelector('.tabScreen:not([hidden])');
+      if (screen && 'scrollTop' in screen) screen.scrollTop = 0;
+    };
+    resetScroll();
+    const frame = requestAnimationFrame(resetScroll);
+    return () => cancelAnimationFrame(frame);
+  }, [tab]);
   const [design, setDesign] = useState(DEFAULTS);
   const [image, setImage] = useState(null);
   const [loadedBackgroundKey, setLoadedBackgroundKey] = useState('');
