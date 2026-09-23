@@ -2284,3 +2284,6 @@ button:disabled{opacity:.38}
 .isStudioEditor .capcutColorPicker{margin:12px 14px;padding:10px 12px;border-radius:14px;background:#202226}
 .isStudioEditor .capcutColorPicker input[type=color]{width:42px;height:42px;border:0;padding:0;background:transparent}
 .isStudioEditor .layerActionGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 14px}
+
+.backgroundImportActions{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:12px 14px}
+.backgroundImportActions .capcutPrimaryTile{min-height:64px;display:flex;align-items:center;justify-content:center;gap:7px}
