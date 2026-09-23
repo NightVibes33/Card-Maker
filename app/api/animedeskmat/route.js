@@ -39,19 +39,6 @@ function imageProxy(url, width = 0) {
     '&v=' + encodeURIComponent(IMAGE_PROXY_VERSION);
 }
 
-// AnimeDeskMat's plain no-chip "full-cover" files are product-sheet PNGs:
-// a 1200x1200 white canvas with the actual card art consistently occupying
-// x=126..1074 and y=295..905. Seed the real normalized card bounds so Home and
-// Anime never render the white product-sheet border, even before/without the
-// shared CUCU pixel inspector.
-const FULL_COVER_SOURCE_CROP = Object.freeze({
-  x: 126 / 1200,
-  y: 295 / 1200,
-  w: 948 / 1200,
-  h: 610 / 1200
-});
-const FULL_COVER_MEDIA_RATIO = 948 / 610;
-
 function plainFullCoverAsset(raw) {
   const src = normalizeImageUrl(raw);
   if (!src) return '';
@@ -272,6 +259,9 @@ function flattenProduct(product) {
 
   if (!candidates.length) return null;
 
+  // Feed AnimeDeskMat through the exact CUCU candidate/inspector contract.
+  // Do not inject provider-specific crop geometry here; the shared inspector is
+  // the single authority for both providers.
   const asset = candidates[0];
   const title = cleanText(product?.title || handle.replace(/[-_]+/g, ' '));
   const tags = Array.isArray(product?.tags) ? product.tags : [];
@@ -282,19 +272,17 @@ function flattenProduct(product) {
     subtitle: 'AnimeDeskMat',
     image: imageProxy(asset.src),
     thumbnail: imageProxy(asset.src, 560),
-    inspectUrls: [
-      '/api/cucu/inspect?url=' + encodeURIComponent(asset.src)
-    ],
-    candidateImages: [imageProxy(asset.src)],
-    directAssetUrls: [asset.src],
+    inspectUrls: candidates.slice(0, 3).map((candidate) =>
+      '/api/cucu/inspect?url=' + encodeURIComponent(candidate.src)
+    ),
+    candidateImages: candidates.map((candidate) => imageProxy(candidate.src)),
+    directAssetUrls: candidates.map((candidate) => candidate.src),
     source: 'AnimeDeskMat',
     sourceUrl: ORIGIN + '/products/' + handle,
     mediaType: 'premade-card-skin',
     cleanFilter: 'strict-full-cover-no-chip',
     assetMode: 'direct-card-art',
     mediaAlt: asset.alt || title,
-    sourceCrop: FULL_COVER_SOURCE_CROP,
-    mediaAspectRatio: FULL_COVER_MEDIA_RATIO,
     collection: COLLECTION,
     tags
   };
