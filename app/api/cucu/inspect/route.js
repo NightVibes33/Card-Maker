@@ -7,7 +7,9 @@ export const runtime = 'nodejs';
 const ALLOWED_HOSTS = new Set([
   'cdn.shopify.com',
   'cucucovers.com',
-  'www.cucucovers.com'
+  'www.cucucovers.com',
+  'animedeskmat.com',
+  'www.animedeskmat.com'
 ]);
 
 const SAFE_IMAGE_TYPES = new Set([
