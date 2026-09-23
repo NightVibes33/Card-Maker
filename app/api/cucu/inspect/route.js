@@ -278,6 +278,9 @@ export async function GET(request) {
         ratio: effectiveRatio,
         naturalWidth,
         naturalHeight,
+        // The shared inspector is the canonical media source for every
+        // catalog provider. Keep the proxy URLs identical across CUCU and
+        // AnimeDeskMat; crop metadata above is applied by the same renderer.
         thumbnail: proxy(source, 560),
         full: proxy(source),
         quality: {
