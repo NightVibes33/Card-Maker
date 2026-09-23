@@ -935,6 +935,10 @@ try {
   await page.getByRole('tab', { name: 'Position', exact: true }).click();
   const duplicateLayerX = page.getByLabel('Layer horizontal position');
   await page.waitForFunction(() => {
+    const selectedRow = [...document.querySelectorAll('button[aria-label]')].find(
+      (node) => /^Shape Copy shape selected/i.test(node.getAttribute('aria-label') || '')
+    );
+    if (!selectedRow) return false;
     const input = document.querySelector('input[aria-label="Layer horizontal position"]');
     const value = Number(input?.value);
     return Number.isFinite(value) && value < 1 && value > 0.9;
