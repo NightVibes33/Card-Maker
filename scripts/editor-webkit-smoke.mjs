@@ -1101,13 +1101,16 @@ try {
     timeout: 5000
   });
 
-  const imageInputs = page.locator('input[type="file"][accept="image/*"]');
-  assert.ok(await imageInputs.count() >= 2, 'background and image-layer file inputs must exist');
+  // Only the active tab is mounted. In Studio/Card the layer importer is
+  // guaranteed to exist; the background importer lives in Library or
+  // Studio/Artwork and must not be required simultaneously.
+  const layerImageInput = page.locator('.layerAddRow + input[type="file"][accept="image/*"]').first();
+  await layerImageInput.waitFor({ state: 'attached', timeout: 5000 });
 
   const oversizedSvg = Buffer.from(
     '<svg xmlns="http://www.w3.org/2000/svg" width="20000" height="20000"><rect width="100%" height="100%" fill="black"/></svg>'
   );
-  await imageInputs.last().setInputFiles({
+  await layerImageInput.setInputFiles({
     name: 'oversized-safe.svg',
     mimeType: 'image/svg+xml',
     buffer: oversizedSvg
