@@ -1479,6 +1479,14 @@ function proxyImageWidth(src = '', width = 1600) {
 
   const normalized = new URLSearchParams();
   normalized.set('url', remote.toString());
+  // Preserve proxy transforms (notably AnimeDeskMat's baked product-sheet
+  // crop) when changing thumbnail/full resolution. Dropping these parameters
+  // here was the reason Home/Anime kept showing the white square even though
+  // the API returned a cropped URL.
+  for (const key of ['crop']) {
+    const value = params.get(key);
+    if (value) normalized.set(key, value);
+  }
   normalized.set('w', String(Math.max(160, Math.min(3072, Math.round(width)))));
   normalized.set('v', IMAGE_PROXY_VERSION);
   return '/api/image?' + normalized.toString();
