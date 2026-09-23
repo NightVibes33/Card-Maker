@@ -1130,7 +1130,7 @@ try {
   const scientificSvg = Buffer.from(
     '<svg xmlns="http://www.w3.org/2000/svg" width="1e5pt" height="1e5pt"><rect width="100%" height="100%" fill="black"/></svg>'
   );
-  await imageInputs.last().setInputFiles({
+  await layerImageInput.setInputFiles({
     name: 'oversized-scientific-units.svg',
     mimeType: 'image/svg+xml',
     buffer: scientificSvg
@@ -1148,7 +1148,7 @@ try {
   const unsafeSvg = Buffer.from(
     '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><image href="https://example.com/remote.png" width="120" height="80"/></svg>'
   );
-  await imageInputs.last().setInputFiles({
+  await layerImageInput.setInputFiles({
     name: 'unsafe-remote.svg',
     mimeType: 'image/svg+xml',
     buffer: unsafeSvg
@@ -1166,7 +1166,7 @@ try {
   const escapedCssSvg = Buffer.from(
     '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><style>.x{fill:u\\72l(https://example.com/remote.png)}</style><rect class="x" width="120" height="80"/></svg>'
   );
-  await imageInputs.last().setInputFiles({
+  await layerImageInput.setInputFiles({
     name: 'unsafe-css-escape.svg',
     mimeType: 'image/svg+xml',
     buffer: escapedCssSvg
@@ -1185,7 +1185,7 @@ try {
     'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mNk+M9QzwAEYBxVSFUAAGMABf4C/WQAAAAASUVORK5CYII=',
     'base64'
   );
-  await imageInputs.last().setInputFiles({
+  await layerImageInput.setInputFiles({
     name: 'webkit-smoke.png',
     mimeType: 'image/png',
     buffer: tinyPng
