@@ -1571,6 +1571,9 @@ function CatalogArtwork({ item, alt, useThumbnail = true }) {
           onLoad={(event) => rememberDecodedCatalogImage(src, event.currentTarget)}
           onError={() => setFailed(true)}
           style={{
+            // crop coordinates are in source-image space. The old math used
+            // percentages relative to the already enlarged element, which
+            // shifted/scaled product-sheet crops incorrectly in Home/Anime.
             width: (100 / crop.w) + '%',
             height: (100 / crop.h) + '%',
             left: (-100 * crop.x / crop.w) + '%',
