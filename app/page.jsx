@@ -719,7 +719,7 @@ function isLayerStackEntryVisible(design, id) {
 }
 
 function isLayerStackEntryListed(design, id) {
-  if (BUILTIN_LAYER_IDS.includes(id)) return isLayerStackEntryVisible(design, id);
+  if (BUILTIN_LAYER_IDS.includes(id)) return true;
   return Boolean((design.customLayers || []).some((entry) => entry.id === id));
 }
 
@@ -6765,13 +6765,13 @@ export default function Page() {
       .reverse()
       .map((id) => {
         if (id === 'builtin-chip') {
-          return { id, name: 'EMV Chip', type: 'Built-in hardware', selection: 'chip', builtin: true };
+          return { id, name: 'Chip', type: 'Built-in hardware', selection: 'chip', builtin: true, hidden: !design.chip };
         }
         if (id === 'builtin-contactless') {
-          return { id, name: 'Contactless', type: 'Built-in hardware', selection: 'contactless', builtin: true };
+          return { id, name: 'Contactless', type: 'Built-in hardware', selection: 'contactless', builtin: true, hidden: !design.contactless };
         }
         if (id === 'builtin-visa') {
-          return { id, name: 'VISA', type: 'Built-in card mark', selection: 'visa', builtin: true };
+          return { id, name: 'VISA', type: 'Built-in card mark', selection: 'visa', builtin: true, hidden: !design.visa };
         }
         if (id === 'builtin-text') {
           return {
@@ -6780,7 +6780,8 @@ export default function Page() {
             type: 'Built-in text',
             selection: 'card-text',
             builtin: true,
-            action: 'card-text'
+            action: 'card-text',
+            hidden: !(design.badge || design.number || design.holder || design.expiry)
           };
         }
         const layer = custom.get(id);
@@ -6798,6 +6799,22 @@ export default function Page() {
       })
       .filter(Boolean);
   }, [design]);
+
+  const toggleVisualLayerVisibility = useCallback((entry) => {
+    if (!entry) return;
+    if (!entry.builtin) {
+      updateLayer(entry.id, { hidden: !entry.hidden });
+      return;
+    }
+    if (entry.id === 'builtin-chip') patch({ chip: !designRef.current.chip });
+    else if (entry.id === 'builtin-contactless') patch({ contactless: !designRef.current.contactless });
+    else if (entry.id === 'builtin-visa') patch({ visa: !designRef.current.visa });
+    else if (entry.id === 'builtin-text') {
+      const current = designRef.current;
+      const visible = Boolean(current.badge || current.number || current.holder || current.expiry);
+      patch(visible ? { badge:false, number:false, holder:false, expiry:false } : { number:true });
+    }
+  }, [patch, updateLayer]);
 
   const preview = (
     <section className={'previewShell editingPreview ' + (tab === 'studio' ? 'studioPreview ' : 'exportPreview ') + (previewMode === 'physical' ? 'physicalPreview' : '')}>
@@ -7178,7 +7195,7 @@ export default function Page() {
                   <button type="button" className={selectedElement === 'artwork' ? 'selected' : ''} onClick={() => setSelectedElement('artwork')}><span>◉</span><strong>Artwork</strong><span>≡</span></button>
                   {visualLayerStack.map((entry) => (
                     <div className={'capcutLayerRow ' + (selectedElement === entry.selection ? 'selected' : '')} key={entry.id}>
-                      <button type="button" className="layerVisibilityButton" aria-label={(entry.hidden ? 'Show ' : 'Hide ') + entry.name} onClick={() => { if (!entry.builtin) updateLayer(entry.id, { hidden: !entry.hidden }); }}>
+                      <button type="button" className="layerVisibilityButton" aria-label={(entry.hidden ? 'Show ' : 'Hide ') + entry.name} onClick={() => toggleVisualLayerVisibility(entry)}>
                         <span>{entry.hidden ? '○' : '◉'}</span>
                       </button>
                       <button type="button" className="layerSelectButton" onClick={() => {
