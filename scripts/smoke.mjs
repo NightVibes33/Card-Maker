@@ -161,25 +161,28 @@ async function checkAnimeDeskMat() {
       item.source !== 'AnimeDeskMat' ||
       item.mediaType !== 'premade-card-skin' ||
       item.assetMode !== 'direct-card-art' ||
-      assets.length !== 1 ||
+      assets.length < 1 ||
       !item.image?.startsWith('/api/image?') ||
       !item.thumbnail?.includes('w=560') ||
       !Array.isArray(item.inspectUrls) ||
-      item.inspectUrls.length !== 1 ||
-      !item.inspectUrls[0].startsWith('/api/cucu/inspect?')
+      item.inspectUrls.length !== Math.min(3, assets.length) ||
+      !item.inspectUrls.every((url) => url.startsWith('/api/cucu/inspect?')) ||
+      Object.prototype.hasOwnProperty.call(item, 'sourceCrop') ||
+      Object.prototype.hasOwnProperty.call(item, 'mediaAspectRatio')
     ) return true;
 
-    let filename = '';
-    try {
-      filename = decodeURIComponent(new URL(assets[0]).pathname.split('/').pop() || '').toLowerCase();
-    } catch {
-      return true;
-    }
-
-    return (
-      !/full-cover(?:_[a-z0-9-]+)?\.(?:png|webp|jpe?g)$/.test(filename) ||
-      /with[-_](?:chip|window)|half[-_]cover|4[-_]sets?/.test(filename)
-    );
+    return assets.some((assetUrl) => {
+      let filename = '';
+      try {
+        filename = decodeURIComponent(new URL(assetUrl).pathname.split('/').pop() || '').toLowerCase();
+      } catch {
+        return true;
+      }
+      return (
+        !/full-cover(?:_[a-z0-9-]+)?\.(?:png|webp|jpe?g)$/.test(filename) ||
+        /with[-_](?:chip|window)|half[-_]cover|4[-_]sets?/.test(filename)
+      );
+    });
   });
 
   if (invalid) {
@@ -196,12 +199,20 @@ async function checkAnimeDeskMat() {
     'AnimeDeskMat artwork preprocessing',
     3
   );
-  if (!inspected.json?.usable || !inspected.json?.full || !inspected.json?.thumbnail) {
-    throw new Error('AnimeDeskMat plain full-cover artwork was not usable');
+  if (
+    !inspected.json?.usable ||
+    !inspected.json?.full ||
+    !inspected.json?.thumbnail ||
+    !inspected.json?.crop ||
+    !(Number(inspected.json?.ratio) > 1.25 && Number(inspected.json?.ratio) <= 2.08)
+  ) {
+    throw new Error(
+      'AnimeDeskMat did not receive the same usable crop/full/thumbnail metadata as CUCU'
+    );
   }
 
   console.log(
-    'PASS AnimeDeskMat => strict no-chip full-cover assets through shared preprocessing'
+    'PASS AnimeDeskMat => no-chip source selection, then exact CUCU preprocessing path'
   );
 }
 
