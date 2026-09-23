@@ -4219,6 +4219,13 @@ export default function Page() {
       const cleanList = await prepareCleanResults(rawList);
       if (!isCurrentIntent()) return;
 
+      // Prime the exact same persistent Cache Storage paths used by CUCU.
+      // This makes browsed AnimeDeskMat thumbnails available offline and keeps
+      // the full-resolution working asset cached once it is selected.
+      for (const item of cleanList) {
+        if (item?.thumbnail) cacheArtwork(proxyImageWidth(item.thumbnail, 560));
+      }
+
       const knownTotals = availableProviders
         .map((entry) => Number(entry.json?.total) || 0)
         .filter((value) => value > 0);
@@ -4321,6 +4328,9 @@ export default function Page() {
 
           const items = interleaveCatalogItems(providerResults, 8);
           next[label] = await prepareCleanResults(items, 8);
+          for (const item of next[label]) {
+            if (item?.thumbnail) cacheArtwork(proxyImageWidth(item.thumbnail, 560));
+          }
         } catch {}
       }));
 
