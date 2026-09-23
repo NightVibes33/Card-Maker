@@ -7130,8 +7130,8 @@ export default function Page() {
                     )}
                     onClick={() => activateStudioTool(value)}
                   >
-                    <IOSIcon name={value} size={18} />
-                    <span>{label}</span>
+                    <span className="studioToolIcon"><IOSIcon name={value} size={22} /></span>
+                    <span className="studioToolLabel">{label}</span>
                   </button>
                 ))}
               </div>
