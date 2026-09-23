@@ -39,16 +39,18 @@ function imageProxy(url, width = 0) {
     '&v=' + encodeURIComponent(IMAGE_PROXY_VERSION);
 }
 
-// AnimeDeskMat's no-chip "full-cover" PNGs use a consistent card-art canvas.
-// Seed the same normalized crop used by the catalog renderer immediately so
-// Discover/Home never flashes the uncropped source while inspection resolves.
-// The shared CUCU inspector may refine this crop before import.
+// AnimeDeskMat's plain no-chip "full-cover" files are product-sheet PNGs:
+// a 1200x1200 white canvas with the actual card art consistently occupying
+// x=126..1074 and y=295..905. Seed the real normalized card bounds so Home and
+// Anime never render the white product-sheet border, even before/without the
+// shared CUCU pixel inspector.
 const FULL_COVER_SOURCE_CROP = Object.freeze({
-  x: 0,
-  y: 0,
-  w: 1,
-  h: 1
+  x: 126 / 1200,
+  y: 295 / 1200,
+  w: 948 / 1200,
+  h: 610 / 1200
 });
+const FULL_COVER_MEDIA_RATIO = 948 / 610;
 
 function plainFullCoverAsset(raw) {
   const src = normalizeImageUrl(raw);
@@ -292,6 +294,7 @@ function flattenProduct(product) {
     assetMode: 'direct-card-art',
     mediaAlt: asset.alt || title,
     sourceCrop: FULL_COVER_SOURCE_CROP,
+    mediaAspectRatio: FULL_COVER_MEDIA_RATIO,
     collection: COLLECTION,
     tags
   };
