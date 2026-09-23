@@ -1159,6 +1159,15 @@ function IOSIcon({ name, size = 24 }) {
   if (name === 'card') {
     return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/></svg>;
   }
+  if (name === 'text') {
+    return <svg {...common}><path d="M5 5h14M12 5v14M8 19h8"/></svg>;
+  }
+  if (name === 'add') {
+    return <svg {...common}><circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/></svg>;
+  }
+  if (name === 'background') {
+    return <svg {...common}><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="m5.5 17 4.2-4.2 2.7 2.7 2.2-2.2 3.9 3.7"/></svg>;
+  }
   if (name === 'search') {
     return <svg {...common}><circle cx="10.2" cy="10.2" r="5.8"/><path d="m14.5 14.5 4.8 4.8"/></svg>;
   }
@@ -6212,6 +6221,14 @@ export default function Page() {
         setMessage('Card text controls ready');
       } else {
         setSelectedElement(target);
+        if (target === 'chip' || target === 'contactless' || target === 'visa') {
+          setStudioTool('card');
+        } else if (target === 'artwork') {
+          setStudioTool('crop');
+        } else {
+          const tappedLayer = (designRef.current.customLayers || []).find((layer) => layer.id === target);
+          if (tappedLayer?.type === 'text') setStudioTool('text');
+        }
       }
     }
 
