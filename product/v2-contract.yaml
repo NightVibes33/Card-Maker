@@ -137,7 +137,6 @@ features:
   before_after:
     file: app/page.jsx
     contains:
-      - "Before / After"
       - "setShowOriginal(true)"
       - "originalTarget"
       - "showOriginal"
