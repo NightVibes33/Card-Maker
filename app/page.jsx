@@ -204,11 +204,14 @@ const TAB_ITEMS = [
 ];
 
 const STUDIO_TOOLS = [
-  ['crop', 'Crop'],
-  ['position', 'Position'],
+  ['crop', 'Edit'],
+  ['text', 'Text'],
+  ['add', 'Add'],
   ['adjust', 'Adjust'],
   ['effects', 'Effects'],
-  ['card', 'Card']
+  ['card', 'Card'],
+  ['layers', 'Layers'],
+  ['background', 'Background']
 ];
 
 const IMAGE_LAYER_DEFAULTS = {
@@ -2739,7 +2742,7 @@ function imageLayerSourceKeyForDesign(value) {
 
 export default function Page() {
   const [tab, setTab] = useState('discover');
-  const [studioTool, setStudioTool] = useState('position');
+  const [studioTool, setStudioTool] = useState('crop');
 
   // Each bottom-tab screen is a fresh navigation destination. Reset the
   // document and any app-level scroll container after the destination mounts.
@@ -6717,11 +6720,17 @@ export default function Page() {
     : 'Artwork';
 
   const activateStudioTool = useCallback((value) => {
-    if (selectedElement === 'card-text' && value !== 'card') {
-      setSelectedElement('artwork');
-      setMessage('Artwork selected');
-    }
     setStudioTool(value);
+    if (value === 'text') {
+      const textLayer = (designRef.current.customLayers || []).find((layer) => layer.type === 'text' && !layer.hidden);
+      if (textLayer) setSelectedElement(textLayer.id);
+    } else if (value === 'layers') {
+      setMessage('Layer stack');
+    } else if (value === 'background') {
+      setSelectedElement('artwork');
+    } else if (selectedElement === 'card-text' && value !== 'card') {
+      setSelectedElement('artwork');
+    }
   }, [selectedElement]);
 
   const visualLayerStack = useMemo(() => {
@@ -6770,16 +6779,12 @@ export default function Page() {
     <section className={'previewShell editingPreview ' + (tab === 'studio' ? 'studioPreview ' : 'exportPreview ') + (previewMode === 'physical' ? 'physicalPreview' : '')}>
       <div className="studioFloatingBar" aria-label="Studio history and comparison controls">
         {tab === 'studio' ? (
-          <button
-            type="button"
-            className="studioNewCardButton studioToolbarNewButton"
-            disabled={cleanupInProgress || presetTransferInProgress || imageImportInProgress}
-            onClick={reset}
-            aria-label="New project"
-          >
-            <IOSIcon name="reset" size={16} />
-            <span>New</span>
-          </button>
+          <>
+            <button type="button" className="studioEditorBack" onClick={() => setTab('discover')} aria-label="Back to Discover">
+              <IOSIcon name="chevron" size={20} />
+            </button>
+            <strong className="studioEditorTitle">Studio</strong>
+          </>
         ) : null}
         <div className="historyButtons">
           <button type="button" onClick={undo} disabled={!undoRef.current.length} aria-label="Undo"><IOSIcon name="undo" size={18} /></button>
@@ -6815,7 +6820,7 @@ export default function Page() {
           onBlur={() => setShowOriginal(false)}
         >
           <IOSIcon name="compare" size={16} />
-          <span>{showOriginal ? 'After' : 'Before / After'}</span>
+          <span>{tab === 'studio' ? '•••' : (showOriginal ? 'After' : 'Before / After')}</span>
         </button>
       </div>
 
@@ -6925,7 +6930,7 @@ export default function Page() {
   return (
     <>
       <main
-        className="studio"
+        className={'studio ' + (tab === 'studio' ? 'isStudioEditor' : '')}
         inert={blockingAssetOperation || undefined}
         aria-busy={blockingAssetOperation || undefined}
       >
@@ -7085,10 +7090,70 @@ export default function Page() {
                 <span className="studioModeLabel">Preview</span>
                 <div className="previewModeToggle" role="group" aria-label="Preview style">
                   <button type="button" aria-pressed={previewMode === 'flat'} className={previewMode === 'flat' ? 'active' : ''} onClick={() => setPreviewMode('flat')}>Flat</button>
-                  <button type="button" aria-pressed={previewMode === 'physical'} className={previewMode === 'physical' ? 'active' : ''} onClick={() => setPreviewMode('physical')}>Physical</button>
+                  <button type="button" aria-pressed={previewMode === 'physical'} className={previewMode === 'physical' ? 'active' : ''} onClick={() => setPreviewMode('physical')}>Preview</button>
                 </div>
               </div>
             </div>
+
+            {studioTool === 'text' ? (
+              <section className="studioContextCard capcutContextPanel">
+                <div className="contextPanelHeader"><strong>Text</strong><button type="button" onClick={() => setStudioTool('crop')}>✓</button></div>
+                {selectedLayer?.type === 'text' ? (
+                  <>
+                    <input className="capcutTextInput" value={selectedLayer.text || ''} aria-label="Text content" onChange={(event) => updateLayer(selectedLayer.id, { text: event.target.value })} />
+                    <div className="capcutSubtools">
+                      <label><span>Aa</span><small>Font</small></label>
+                      <button type="button" className={Number(selectedLayer.weight || 700) >= 700 ? 'active' : ''} onClick={() => updateLayer(selectedLayer.id, { weight: Number(selectedLayer.weight || 700) >= 700 ? 400 : 800 })}><span>B</span><small>Style</small></button>
+                      <label><input type="color" value={selectedLayer.color || '#ffffff'} onChange={(event) => updateLayer(selectedLayer.id, { color: event.target.value })}/><small>Color</small></label>
+                      <button type="button" className={selectedLayer.shadow ? 'active' : ''} onClick={() => updateLayer(selectedLayer.id, { shadow: !selectedLayer.shadow })}><span>◔</span><small>Shadow</small></button>
+                    </div>
+                    <SliderRow label="Size" value={selectedLayer.fontSize || 58} min={10} max={240} step={1} onChange={(value) => updateLayer(selectedLayer.id, { fontSize: value })} />
+                    <SliderRow label="Spacing" value={selectedLayer.letterSpacing || 0} min={-4} max={30} step={0.1} onChange={(value) => updateLayer(selectedLayer.id, { letterSpacing: value })} />
+                  </>
+                ) : (
+                  <button type="button" className="capcutPrimaryTile" onClick={addTextLayer}>+ Add Text</button>
+                )}
+              </section>
+            ) : null}
+
+            {studioTool === 'add' ? (
+              <section className="studioContextCard capcutContextPanel">
+                <div className="contextPanelHeader"><strong>Add</strong><button type="button" onClick={() => setStudioTool('crop')}>✓</button></div>
+                <div className="capcutSubtools">
+                  <button type="button" onClick={addTextLayer}><span>T</span><small>Text</small></button>
+                  <button type="button" onClick={() => layerUploadRef.current?.click()}><IOSIcon name="photo" size={22}/><small>Image</small></button>
+                  <button type="button" onClick={addShapeLayer}><span>□</span><small>Shape</small></button>
+                  <button type="button" onClick={() => layerUploadRef.current?.click()}><span>＋</span><small>Logo</small></button>
+                </div>
+              </section>
+            ) : null}
+
+            {studioTool === 'layers' ? (
+              <section className="studioContextCard capcutContextPanel">
+                <div className="contextPanelHeader"><strong>Layers</strong><button type="button" onClick={() => setStudioTool('crop')}>✓</button></div>
+                <div className="capcutLayerList">
+                  <button type="button" className={selectedElement === 'artwork' ? 'selected' : ''} onClick={() => setSelectedElement('artwork')}><span>◉</span><strong>Artwork</strong><span>≡</span></button>
+                  {visualLayerStack.map((entry) => (
+                    <button type="button" key={entry.id} className={selectedElement === entry.selection ? 'selected' : ''} onClick={() => { setSelectedElement(entry.selection); if (entry.selection === 'visa' || entry.selection === 'chip' || entry.selection === 'contactless' || entry.selection === 'card-text') setStudioTool('card'); }}>
+                      <span>{entry.hidden ? '○' : '◉'}</span><strong>{entry.name}</strong><span>≡</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {studioTool === 'background' ? (
+              <section className="studioContextCard capcutContextPanel">
+                <div className="contextPanelHeader"><strong>Background</strong><button type="button" onClick={() => setStudioTool('crop')}>✓</button></div>
+                <div className="capcutSubtools">
+                  <button type="button" onClick={() => { uploadIntentRef.current = 'replace-artwork'; uploadRef.current?.click(); }}><IOSIcon name="photo" size={22}/><small>Image</small></button>
+                  <button type="button" onClick={() => patch({ fit: design.fit === 'cover' ? 'contain' : 'cover' })}><span>▣</span><small>{design.fit === 'cover' ? 'Fit' : 'Fill'}</small></button>
+                  <button type="button" onClick={() => patch({ flipX: !design.flipX })}><span>◩</span><small>Flip</small></button>
+                  <button type="button" onClick={() => patch({ blur: design.blur > 0 ? 0 : 0.18 })}><span>✣</span><small>Blur</small></button>
+                </div>
+                <SliderRow label="Blur" value={design.blur} min={0} max={1} step={0.01} onChange={(value) => patch({ blur: value })} />
+              </section>
+            ) : null}
 
             {studioTool === 'crop' ? (
               <Group title="Crop">
