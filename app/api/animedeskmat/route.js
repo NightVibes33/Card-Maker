@@ -34,7 +34,12 @@ function normalizeImageUrl(raw) {
 }
 
 function imageProxy(url, width = 0) {
+  // AnimeDeskMat stores the actual no-chip card at a fixed 948x610 region
+  // inside its 1200x1200 Shopify product sheet. Bake that crop in at the
+  // shared image-proxy layer so Home, Anime, Studio and offline Cache Storage
+  // all consume the exact same borderless pixels.
   return '/api/image?url=' + encodeURIComponent(url) +
+    '&crop=126,295,948,610' +
     (width ? '&w=' + width : '') +
     '&v=' + encodeURIComponent(IMAGE_PROXY_VERSION);
 }
@@ -272,9 +277,9 @@ function flattenProduct(product) {
     subtitle: 'AnimeDeskMat',
     image: imageProxy(asset.src),
     thumbnail: imageProxy(asset.src, 560),
-    inspectUrls: candidates.slice(0, 3).map((candidate) =>
-      '/api/cucu/inspect?url=' + encodeURIComponent(candidate.src)
-    ),
+    // The selected no-chip asset is normalized into real card pixels by
+    // /api/image. No client-side product-sheet crop is needed.
+    inspectUrls: [],
     candidateImages: candidates.map((candidate) => imageProxy(candidate.src)),
     directAssetUrls: candidates.map((candidate) => candidate.src),
     source: 'AnimeDeskMat',
