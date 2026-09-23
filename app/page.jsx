@@ -7194,14 +7194,17 @@ export default function Page() {
 
             {studioTool === 'background' ? (
               <section className="studioContextCard capcutContextPanel">
-                <div className="contextPanelHeader"><strong>Background</strong><button type="button" onClick={() => setStudioTool('crop')}>✓</button></div>
-                <div className="capcutSubtools">
-                  <button type="button" onClick={() => { uploadIntentRef.current = 'replace-artwork'; uploadRef.current?.click(); }}><IOSIcon name="photo" size={22}/><small>Image</small></button>
-                  <button type="button" onClick={() => patch({ fit: design.fit === 'cover' ? 'contain' : 'cover' })}><span>▣</span><small>{design.fit === 'cover' ? 'Fit' : 'Fill'}</small></button>
-                  <button type="button" onClick={() => patch({ flipX: !design.flipX })}><span>◩</span><small>Flip</small></button>
-                  <button type="button" onClick={() => patch({ blur: design.blur > 0 ? 0 : 0.18 })}><span>✣</span><small>Blur</small></button>
-                </div>
-                <SliderRow label="Blur" value={design.blur} min={0} max={1} step={0.01} onChange={(value) => patch({ blur: value })} />
+                <div className="contextPanelHeader">{studioSubtool ? <button type="button" className="contextBack" onClick={()=>setStudioSubtool('')}>‹</button>:<span/>}<strong>{studioSubtool ? studioSubtool[0].toUpperCase()+studioSubtool.slice(1) : 'Background'}</strong><button type="button" onClick={()=>{setStudioSubtool('');setStudioTool('crop')}}>✓</button></div>
+                {!studioSubtool ? <div className="capcutSubtools">
+                  <button type="button" onClick={()=>setStudioSubtool('color')}><span>○</span><small>Color</small></button>
+                  <button type="button" onClick={()=>setStudioSubtool('gradient')}><span>◩</span><small>Gradient</small></button>
+                  <button type="button" onClick={()=>setStudioSubtool('image')}><IOSIcon name="photo" size={22}/><small>Image</small></button>
+                  <button type="button" onClick={()=>setStudioSubtool('blur')}><span>✣</span><small>Blur</small></button>
+                </div>:null}
+                {studioSubtool==='color'?<><div className="backgroundSwatches">{['#000000','#ffffff','#1c1c1e','#3a3a3c','#ff375f','#0a84ff','#30d158'].map(v=><button type="button" key={v} aria-label={'Background '+v} style={{background:v}} onClick={()=>patch({background:'',gradient:'solid',solidColor:v})}/>)}</div></>:null}
+                {studioSubtool==='gradient'?<div className="presetScroller capcutPresetStrip">{GRADIENTS.map(g=><button type="button" key={g.id} onClick={()=>patch({background:'',gradient:g.id})}>{g.name||g.id}</button>)}</div>:null}
+                {studioSubtool==='image'?<><button type="button" className="capcutPrimaryTile" onClick={()=>{uploadIntentRef.current='replace-artwork';uploadRef.current?.click()}}>+ Choose Image</button><div className="backgroundRecentRail">{recent.slice(0,8).map((item,i)=><button type="button" key={item.id||item.image||i} onClick={()=>item.image&&loadPreset(item)}>{item.image?<img src={item.image} alt=""/>:<span>Image</span>}</button>)}</div></>:null}
+                {studioSubtool==='blur'?<SliderRow label="Blur" value={design.blur} min={0} max={1} step={0.01} onChange={(v)=>patch({blur:v})}/>:null}
               </section>
             ) : null}
 
