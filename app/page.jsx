@@ -7425,79 +7425,65 @@ export default function Page() {
             ) : null}
 
             {studioTool === 'adjust' ? (
-              <>
-                <div className="editingTargetBar">
-                  <span>
-                    <strong>Editing {activeImageLabel}</strong>
-                    <small>{selectedImageLayer ? 'Imported image layer' : 'Card artwork'}</small>
-                  </span>
-                  {selectedImageLayer ? (
-                    <button type="button" onClick={() => setSelectedElement('artwork')}>Back to Artwork</button>
-                  ) : null}
+              <section className="studioContextCard capcutContextPanel">
+                <div className="contextPanelHeader">
+                  {studioSubtool ? <button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button> : <span/>}
+                  <strong>{studioSubtool ? studioSubtool[0].toUpperCase() + studioSubtool.slice(1) : 'Adjust'}</strong>
+                  <button type="button" onClick={() => setStudioSubtool('')}>✓</button>
                 </div>
-
-                <section className="presetSection">
-                  <h3 className="sectionLabel">PRESETS</h3>
-                  <div className="presetScroller">
-                    {Object.keys(ADJUSTMENT_PRESETS).map((name) => (
-                      <button type="button" key={name} disabled={!activeImageEditable} onClick={() => applyAdjustmentPreset(name)}>{name}</button>
-                    ))}
-                  </div>
-                </section>
-
-                <Group title="Adjustments">
-                  <SliderRow label="Exposure" value={activeImageSettings.exposure} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ exposure: value })} />
-                  <SliderRow label="Brightness" value={activeImageSettings.brightness} min={0.4} max={1.7} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ brightness: value })} />
-                  <SliderRow label="Contrast" value={activeImageSettings.contrast} min={0.45} max={1.8} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ contrast: value })} />
-                  <SliderRow label="Saturation" value={activeImageSettings.saturation} min={0} max={2.4} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ saturation: value })} />
-                  <SliderRow label="Highlights" value={activeImageSettings.highlights} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ highlights: value })} />
-                  <SliderRow label="Shadows" value={activeImageSettings.shadows} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ shadows: value })} />
-                  <SliderRow label="Temperature" value={activeImageSettings.temperature} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ temperature: value })} />
-                  <SliderRow label="Tint" value={activeImageSettings.tint} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ tint: value })} />
-                  <SliderRow label="Sharpness" value={activeImageSettings.sharpness} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ sharpness: value })} />
-                  <SliderRow label="Blur" value={activeImageSettings.blur} min={0} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ blur: value })} />
-                  <button type="button" className="settingsResetButton" disabled={!activeImageEditable} onClick={() => applyAdjustmentPreset('Original')}>Reset Adjustments</button>
-                </Group>
-              </>
+                {!studioSubtool ? (
+                  <>
+                    <div className="capcutSubtools">
+                      {[
+                        ['brightness','☀','Brightness'],['contrast','◐','Contrast'],['saturation','◉','Saturation'],
+                        ['temperature','♨','Temperature'],['sharpness','△','Sharpness'],['exposure','◑','Exposure'],
+                        ['highlights','◒','Highlights'],['shadows','◓','Shadows'],['tint','●','Tint'],['blur','✣','Blur']
+                      ].map(([key,icon,label]) => <button type="button" key={key} onClick={() => setStudioSubtool(key)}><span>{icon}</span><small>{label}</small></button>)}
+                    </div>
+                    <div className="presetScroller capcutPresetStrip">
+                      {Object.keys(ADJUSTMENT_PRESETS).map((name) => <button type="button" key={name} disabled={!activeImageEditable} onClick={() => applyAdjustmentPreset(name)}>{name}</button>)}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {studioSubtool === 'brightness' ? <SliderRow label="Brightness" value={activeImageSettings.brightness} min={0.4} max={1.7} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({brightness:value})}/> : null}
+                    {studioSubtool === 'contrast' ? <SliderRow label="Contrast" value={activeImageSettings.contrast} min={0.45} max={1.8} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({contrast:value})}/> : null}
+                    {studioSubtool === 'saturation' ? <SliderRow label="Saturation" value={activeImageSettings.saturation} min={0} max={2.4} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({saturation:value})}/> : null}
+                    {studioSubtool === 'temperature' ? <SliderRow label="Temperature" value={activeImageSettings.temperature} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({temperature:value})}/> : null}
+                    {studioSubtool === 'sharpness' ? <SliderRow label="Sharpness" value={activeImageSettings.sharpness} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({sharpness:value})}/> : null}
+                    {studioSubtool === 'exposure' ? <SliderRow label="Exposure" value={activeImageSettings.exposure} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({exposure:value})}/> : null}
+                    {studioSubtool === 'highlights' ? <SliderRow label="Highlights" value={activeImageSettings.highlights} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({highlights:value})}/> : null}
+                    {studioSubtool === 'shadows' ? <SliderRow label="Shadows" value={activeImageSettings.shadows} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({shadows:value})}/> : null}
+                    {studioSubtool === 'tint' ? <SliderRow label="Tint" value={activeImageSettings.tint} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({tint:value})}/> : null}
+                    {studioSubtool === 'blur' ? <SliderRow label="Blur" value={activeImageSettings.blur} min={0} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({blur:value})}/> : null}
+                    <button type="button" className="settingsResetButton" onClick={() => applyAdjustmentPreset('Original')}>Reset Adjustments</button>
+                  </>
+                )}
+              </section>
             ) : null}
 
             {studioTool === 'effects' ? (
-              <>
-                <div className="editingTargetBar">
-                  <span>
-                    <strong>Editing {activeImageLabel}</strong>
-                    <small>{selectedImageLayer ? 'Effects apply only to this imported layer' : 'Effects apply to card artwork'}</small>
-                  </span>
-                  {selectedImageLayer ? (
-                    <button type="button" onClick={() => setSelectedElement('artwork')}>Back to Artwork</button>
-                  ) : null}
+              <section className="studioContextCard capcutContextPanel">
+                <div className="contextPanelHeader">
+                  {studioSubtool ? <button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button> : <span/>}
+                  <strong>{studioSubtool ? studioSubtool[0].toUpperCase()+studioSubtool.slice(1) : 'Effects'}</strong>
+                  <button type="button" onClick={() => setStudioSubtool('')}>✓</button>
                 </div>
-
-                <Group title="Effects">
-                  <SliderRow label="Vignette intensity" value={activeImageSettings.vignette} min={0} max={0.8} step={0.01} disabled={!activeImageEditable} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patchImageTarget({ vignette: value })} />
-                  <SliderRow label="Grain" value={activeImageSettings.grain} min={0} max={0.22} step={0.005} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ grain: value })} />
-                  <SliderRow label="Gloss" value={activeImageSettings.gloss} min={0} max={0.8} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ gloss: value })} />
-                  <SliderRow label="Dark Overlay" value={activeImageSettings.overlay} min={0} max={0.75} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ overlay: value })} />
-                  <SliderRow label="Fade" value={activeImageSettings.fade} min={0} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ fade: value })} />
-                  <label className={'colorRow ' + (!activeImageEditable ? 'disabledRow' : '')}>
-                    <span>Color Tint</span>
-                    <input aria-label="Effect tint color" type="color" disabled={!activeImageEditable} value={activeImageSettings.effectTint || '#7b61ff'} onChange={(event) => patchImageTarget({ effectTint: event.target.value })} />
-                  </label>
-                  <SliderRow label="Tint Strength" value={activeImageSettings.effectTintStrength} min={0} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({ effectTintStrength: value })} />
-                  <button
-                    type="button"
-                    className="settingsResetButton"
-                    disabled={!activeImageEditable}
-                    onClick={() => patchImageTarget(
-                      selectedImageLayer
-                        ? { vignette: 0, grain: 0, gloss: 0, overlay: 0, fade: 0, effectTintStrength: 0 }
-                        : { overlay: 0, vignette: 0, gloss: 0, grain: 0, fade: 0, effectTintStrength: 0 }
-                    )}
-                  >
-                    Reset Effects
-                  </button>
-                </Group>
-              </>
+                {!studioSubtool ? (
+                  <div className="effectTileRail">
+                    <button type="button" onClick={() => patchImageTarget({vignette:0,grain:0,gloss:0,overlay:0,fade:0,effectTintStrength:0})}><i className="effectNone"/><small>None</small></button>
+                    {[['gloss','Gloss'],['grain','Grain'],['vignette','Vignette'],['fade','Film'],['overlay','Dark']].map(([key,label]) => <button type="button" key={key} onClick={() => setStudioSubtool(key)}><i className={'effectSwatch '+key}/><small>{label}</small></button>)}
+                  </div>
+                ) : (
+                  <>
+                    {studioSubtool === 'gloss' ? <SliderRow label="Gloss" value={activeImageSettings.gloss} min={0} max={0.8} step={0.01} onChange={(value)=>patchImageTarget({gloss:value})}/> : null}
+                    {studioSubtool === 'grain' ? <SliderRow label="Grain" value={activeImageSettings.grain} min={0} max={0.22} step={0.005} onChange={(value)=>patchImageTarget({grain:value})}/> : null}
+                    {studioSubtool === 'vignette' ? <SliderRow label="Vignette intensity" value={activeImageSettings.vignette} min={0} max={0.8} step={0.01} onChange={(value)=>patchImageTarget({vignette:value})}/> : null}
+                    {studioSubtool === 'fade' ? <SliderRow label="Fade" value={activeImageSettings.fade} min={0} max={1} step={0.01} onChange={(value)=>patchImageTarget({fade:value})}/> : null}
+                    {studioSubtool === 'overlay' ? <SliderRow label="Dark Overlay" value={activeImageSettings.overlay} min={0} max={0.75} step={0.01} onChange={(value)=>patchImageTarget({overlay:value})}/> : null}
+                  </>
+                )}
+              </section>
             ) : null}
 
             {studioTool === 'card' ? (
