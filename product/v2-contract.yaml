@@ -9,11 +9,14 @@ architecture:
     - Library
     - Export
   studio_tools:
-    - Crop
-    - Position
+    - Edit
+    - Text
+    - Add
     - Adjust
     - Effects
     - Card
+    - Layers
+    - Background
 
 required_files:
   - app/page.jsx
@@ -31,8 +34,6 @@ forbidden:
     tokens:
       - "Blitz"
       - "['browse', 'Browse']"
-      - "['edit', 'Edit']"
-      - "['layers', 'Layers']"
       - "Load More"
       - "onClick={() => download("
       - "sharePng("
@@ -237,7 +238,7 @@ features:
     file: app/page.jsx
     contains:
       - "Flat"
-      - "Physical"
+      - "Preview"
       - "physicalChipReflection"
   physical_motion_css:
     file: app/globals.css
