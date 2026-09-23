@@ -7137,9 +7137,9 @@ export default function Page() {
                 <div className="capcutSubtools">
                   <button type="button" onClick={() => setStudioSubtool('crop')}><IOSIcon name="crop" size={22}/><small>Crop</small></button>
                   <button type="button" onClick={() => setStudioSubtool('transform')}><IOSIcon name="position" size={22}/><small>Transform</small></button>
-                  <button type="button" onClick={() => patch({ rotate: normalizeFreeRotation(Number(design.rotate || 0) + 90) })}><span>↻</span><small>Rotate</small></button>
-                  <button type="button" onClick={() => patch({ flipX: !design.flipX })}><span>↔</span><small>Flip</small></button>
-                  <button type="button" onClick={() => patch({ zoom: 1, offsetX: 0, offsetY: 0, rotate: 0, flipX: false, sourceCrop: design.originalSourceCrop || null })}><IOSIcon name="reset" size={22}/><small>Reset</small></button>
+                  <button type="button" onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{rotation:normalizeFreeRotation(Number(selectedLayer.rotation||0)+90)}) : patch({ rotate: normalizeFreeRotation(Number(design.rotate || 0) + 90) })}><span>↻</span><small>Rotate</small></button>
+                  <button type="button" onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{flipX:!selectedLayer.flipX}) : patch({ flipX: !design.flipX })}><span>↔</span><small>Flip</small></button>
+                  <button type="button" onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{x:0.5,y:0.5,scale:1,rotation:0,flipX:false}) : patch({ zoom:1,x:0,y:0,rotate:0,flipX:false,sourceCrop:design.originalSourceCrop||null })}><IOSIcon name="reset" size={22}/><small>Reset</small></button>
                 </div>
               </section>
             ) : null}
