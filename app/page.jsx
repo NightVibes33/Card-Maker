@@ -4944,6 +4944,8 @@ export default function Page() {
       ]
     }));
     setSelectedElement(layerId);
+    setStudioTool('crop');
+    setStudioSubtool('transform');
     setMessage('Image layer added');
       });
     } finally {
