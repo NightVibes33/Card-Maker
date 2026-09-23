@@ -7179,9 +7179,18 @@ export default function Page() {
                 <div className="capcutLayerList">
                   <button type="button" className={selectedElement === 'artwork' ? 'selected' : ''} onClick={() => setSelectedElement('artwork')}><span>◉</span><strong>Artwork</strong><span>≡</span></button>
                   {visualLayerStack.map((entry) => (
-                    <button type="button" key={entry.id} className={selectedElement === entry.selection ? 'selected' : ''} onClick={() => { setSelectedElement(entry.selection); if (entry.selection === 'visa' || entry.selection === 'chip' || entry.selection === 'contactless' || entry.selection === 'card-text') setStudioTool('card'); }}>
-                      <span>{entry.hidden ? '○' : '◉'}</span><strong>{entry.name}</strong><span>≡</span>
-                    </button>
+                    <div className={'capcutLayerRow ' + (selectedElement === entry.selection ? 'selected' : '')} key={entry.id}>
+                      <button type="button" className="layerVisibilityButton" aria-label={(entry.hidden ? 'Show ' : 'Hide ') + entry.name} onClick={() => { if (!entry.builtin) updateLayer(entry.id, { hidden: !entry.hidden }); }}>
+                        <span>{entry.hidden ? '○' : '◉'}</span>
+                      </button>
+                      <button type="button" className="layerSelectButton" onClick={() => {
+                        setSelectedElement(entry.selection);
+                        if (entry.selection === 'visa' || entry.selection === 'chip' || entry.selection === 'contactless') { setStudioTool('card'); setStudioSubtool(entry.selection); }
+                        else if (entry.selection === 'card-text') { setStudioTool('card'); setStudioSubtool('number'); }
+                        else if (entry.type === 'text') { setStudioTool('text'); setStudioSubtool(''); }
+                      }}><strong>{entry.name}</strong></button>
+                      {!entry.builtin ? <span className="layerReorderButtons"><button type="button" aria-label={'Move '+entry.name+' up'} onClick={()=>moveLayer(entry.id,1)}>↑</button><button type="button" aria-label={'Move '+entry.name+' down'} onClick={()=>moveLayer(entry.id,-1)}>↓</button></span> : <span className="layerBuiltinMark">≡</span>}
+                    </div>
                   ))}
                 </div>
               </section>
