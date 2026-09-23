@@ -7102,6 +7102,8 @@ export default function Page() {
 
         {tab === 'studio' && (
           <div className="tabScreen studioScreen" role="tabpanel" id="panel-studio" aria-labelledby="tab-studio">
+            <input ref={uploadRef} type="file" accept="image/*" hidden onChange={uploadImage} />
+            <input ref={layerUploadRef} type="file" accept="image/*" hidden onChange={uploadLayerImage} />
             <div className="studioModeRow">
               <div className="studioToolBar" role="tablist" aria-label="Studio tools">
                 {STUDIO_TOOLS.map(([value, label]) => (
@@ -7187,9 +7189,10 @@ export default function Page() {
                 <div className="contextPanelHeader"><strong>Add</strong><button type="button" onClick={() => setStudioTool('crop')}>✓</button></div>
                 <div className="capcutSubtools">
                   <button type="button" onClick={addTextLayer}><span>T</span><small>Text</small></button>
-                  <button type="button" onClick={() => layerUploadRef.current?.click()}><IOSIcon name="photo" size={22}/><small>Image</small></button>
+                  <button type="button" disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={() => layerUploadRef.current?.click()}><IOSIcon name="photo" size={22}/><small>Image / Logo</small></button>
                   <button type="button" onClick={addShapeLayer}><span>□</span><small>Shape</small></button>
-                  <button type="button" onClick={() => layerUploadRef.current?.click()}><span>＋</span><small>Logo</small></button>
+                  <button type="button" onClick={addChipLayer}><span>▣</span><small>Chip Layer</small></button>
+                  <button type="button" onClick={addContactlessLayer}><span>)))</span><small>Contactless</small></button>
                 </div>
               </section>
             ) : null}
