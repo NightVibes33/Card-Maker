@@ -1339,12 +1339,18 @@ try {
 
   // Build a new design to exercise named-project persistence independently.
   await page.getByRole('button', { name: '+ Text', exact: true }).click();
+  const ensureFirstTextLayerSelected = async () => {
+    const row = page.getByRole('button', { name: /^Text text /i }).first();
+    await row.waitFor({ state: 'visible', timeout: 5000 });
+    if (!/selected/i.test(await row.getAttribute('aria-label') || '')) {
+      await row.click();
+    }
+    await page.getByLabel('Layer text').waitFor({ state: 'visible', timeout: 5000 });
+  };
+
   const newTextRow = page.getByRole('button', { name: /^Text text /i }).first();
   await newTextRow.waitFor({ state: 'visible', timeout: 5000 });
-  if (!/selected/i.test(await newTextRow.getAttribute('aria-label') || '')) {
-    await newTextRow.click();
-  }
-  await page.getByLabel('Layer text').waitFor({ state: 'visible', timeout: 5000 });
+  await ensureFirstTextLayerSelected();
   await page.getByLabel('Layer text').fill('AVATAR\nWA');
   assert.equal(await page.getByLabel('Layer text').inputValue(), 'AVATAR\nWA');
 
@@ -1359,7 +1365,7 @@ try {
 
   await page.getByRole('tab', { name: 'Studio', exact: true }).click();
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
-  await page.getByRole('button', { name: /^Text text /i }).first().click();
+  await ensureFirstTextLayerSelected();
   await page.getByLabel('Layer text').fill('MUTATED');
   assert.equal(await page.getByLabel('Layer text').inputValue(), 'MUTATED');
 
@@ -1368,7 +1374,7 @@ try {
   await savedProjectAgain.getByRole('button', { name: 'Open', exact: true }).click();
 
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
-  await page.getByRole('button', { name: /^Text text /i }).first().click();
+  await ensureFirstTextLayerSelected();
   assert.equal(
     await page.getByLabel('Layer text').inputValue(),
     'AVATAR\nWA',
@@ -1393,7 +1399,7 @@ try {
 
   await page.getByRole('tab', { name: 'Studio', exact: true }).click();
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
-  await page.getByRole('button', { name: /^Text text /i }).first().click();
+  await ensureFirstTextLayerSelected();
   await page.getByLabel('Layer text').fill('PRESET MUTATED');
 
   await page.getByRole('tab', { name: 'Library', exact: true }).click();
@@ -1408,7 +1414,7 @@ try {
   });
 
   await page.getByRole('tab', { name: 'Card', exact: true }).click();
-  await page.getByRole('button', { name: /^Text text /i }).first().click();
+  await ensureFirstTextLayerSelected();
   assert.equal(
     await page.getByLabel('Layer text').inputValue(),
     'AVATAR\nWA',
