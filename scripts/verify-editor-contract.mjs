@@ -112,7 +112,7 @@ const pageChecks = [
   [/function startFreshWorkingProject\(/, 'fresh project transitions centralize state replacement'],
   [/function applyImportedArtwork\([\s\S]{0,700}startFreshWorkingProject\(/, 'Library imports start a fresh working project'],
   [/onClick=\{\(\) => applyImportedArtwork\(asset\)\}/, 'Library import rows cannot bypass artwork replacement safety'],
-  [/className="studioFloatingBar"[\s\S]{0,520}className="studioEditorBack"[\s\S]{0,260}studioEditorTitle/, 'Studio exposes the contextual editor header with Back and title'],
+  [/className="studioFloatingBar"[\s\S]{0,220}className="studioEditorBack"[\s\S]{0,220}studioEditorTitle/, 'Studio exposes the contextual editor header with Back and title'],
   [/dbPutIfBelowLimit\('projects', project, MAX_SAVED_PROJECTS\)/, 'named project saves enforce capacity inside IndexedDB'],
   [/dbPutIfBelowLimit\('projects', copy, MAX_SAVED_PROJECTS\)/, 'project duplicates share the atomic IndexedDB capacity limit'],
   [/copyInserted = await dbPutIfBelowLimit\('projects', copy, MAX_SAVED_PROJECTS\)/, 'project duplication enforces the project cap atomically'],
