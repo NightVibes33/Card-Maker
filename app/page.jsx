@@ -7147,10 +7147,17 @@ export default function Page() {
             {studioTool === 'crop' && studioSubtool === 'transform' ? (
               <section className="studioContextCard capcutContextPanel">
                 <div className="contextPanelHeader"><button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button><strong>Transform</strong><button type="button" onClick={() => setStudioSubtool('')}>✓</button></div>
-                <SliderRow label="Scale" value={design.zoom} min={0.5} max={3} step={0.01} onChange={(value) => patch({ zoom: value })}/>
-                <SliderRow label="Horizontal" value={design.offsetX} min={-1} max={1} step={0.01} onChange={(value) => patch({ offsetX: value })}/>
-                <SliderRow label="Vertical" value={design.offsetY} min={-1} max={1} step={0.01} onChange={(value) => patch({ offsetY: value })}/>
-                <SliderRow label="Rotation" value={design.rotate} min={-180} max={180} step={1} suffix="°" onChange={(value) => patch({ rotate: value })}/>
+                {selectedLayer ? <>
+                  <SliderRow label="Scale" value={selectedLayer.scale || 1} min={0.2} max={4} step={0.01} onChange={(value) => updateLayer(selectedLayer.id,{scale:value})}/>
+                  <SliderRow label="Horizontal" value={selectedLayer.x ?? 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id,{x:value})}/>
+                  <SliderRow label="Vertical" value={selectedLayer.y ?? 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id,{y:value})}/>
+                  <SliderRow label="Rotation" value={selectedLayer.rotation || 0} min={-180} max={180} step={1} suffix="°" onChange={(value) => updateLayer(selectedLayer.id,{rotation:value})}/>
+                </> : <>
+                  <SliderRow label="Scale" value={design.zoom} min={0.5} max={3} step={0.01} onChange={(value) => patch({ zoom: value })}/>
+                  <SliderRow label="Horizontal" value={design.x} min={-1} max={1} step={0.01} onChange={(value) => patch({ x: value })}/>
+                  <SliderRow label="Vertical" value={design.y} min={-1} max={1} step={0.01} onChange={(value) => patch({ y: value })}/>
+                  <SliderRow label="Rotation" value={design.rotate} min={-180} max={180} step={1} suffix="°" onChange={(value) => patch({ rotate: value })}/>
+                </>}
               </section>
             ) : null}
 
