@@ -1494,7 +1494,9 @@ try {
   const exactDefaultState = {
     gradient: 0,
     fit: 'cover',
-    zoom: 1,
+    // Catalog cards intentionally carry the same 2.25% edge overscan used by
+    // CUCU previews so Studio opens with identical framing.
+    zoom: 1.045,
     x: 0,
     y: 0,
     rotate: 0,
