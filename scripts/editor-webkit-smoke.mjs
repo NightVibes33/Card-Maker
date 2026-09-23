@@ -1234,6 +1234,11 @@ try {
   await previewStyle.getByRole('button', { name: 'Flat', exact: true }).click();
   assert.equal(await editorCanvas.evaluate((node) => node.style.touchAction), 'none');
 
+  // The previous checks intentionally leave the imported image layer selected.
+  // Background replacement controls only mount when Artwork is the active
+  // editing target, so select it explicitly before entering Crop.
+  await page.getByRole('tab', { name: 'Card', exact: true }).click();
+  await page.getByRole('button', { name: /^Artwork background / }).click();
   await page.getByRole('tab', { name: 'Crop', exact: true }).click();
 
   const redCardPng = await sharp({
