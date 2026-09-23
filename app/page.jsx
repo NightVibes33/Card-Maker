@@ -7221,6 +7221,16 @@ export default function Page() {
                     <NumericField label="Contactless Y" value={design.contactlessY} min={0.03} max={0.97} onChange={(value) => patch({ contactlessY: value })} />
                     <NumericField label="Contactless Rotation" value={design.contactlessRotation || 0} min={-180} max={180} step={0.1} onChange={(value) => patch({ contactlessRotation: value })} suffix="°" />
                   </Group>
+                {selectedLayer ? <Group title="Selected Layer Precision">
+                  <NumericField label="Exact Layer X" value={selectedLayer.x??0.5} min={0} max={1} onChange={(value)=>updateLayer(selectedLayer.id,{x:value})}/>
+                  <NumericField label="Exact Layer Y" value={selectedLayer.y??0.5} min={0} max={1} onChange={(value)=>updateLayer(selectedLayer.id,{y:value})}/>
+                  <NumericField label="Exact Layer Scale" value={selectedLayer.scale??1} min={0.1} max={6} onChange={(value)=>updateLayer(selectedLayer.id,{scale:value})}/>
+                  <NumericField label="Exact Layer Rotation" value={selectedLayer.rotation??0} min={-180} max={180} step={0.1} suffix="°" onChange={(value)=>updateLayer(selectedLayer.id,{rotation:value})}/>
+                  <NumericField label="Exact Layer Opacity" value={selectedLayer.opacity??1} min={0} max={1} onChange={(value)=>updateLayer(selectedLayer.id,{opacity:value})}/>
+                  {selectedLayer.type==='text'?<><NumericField label="Exact Font Size" value={selectedLayer.fontSize??58} min={10} max={240} onChange={(value)=>updateLayer(selectedLayer.id,{fontSize:value})}/><NumericField label="Exact Font Weight" value={selectedLayer.weight??700} min={100} max={900} step={100} onChange={(value)=>updateLayer(selectedLayer.id,{weight:value})}/><NumericField label="Exact Letter Spacing" value={selectedLayer.letterSpacing??0} min={-4} max={30} onChange={(value)=>updateLayer(selectedLayer.id,{letterSpacing:value})}/><NumericField label="Exact Line Height" value={selectedLayer.lineHeight??1.18} min={0.8} max={2} onChange={(value)=>updateLayer(selectedLayer.id,{lineHeight:value})}/></>:null}
+                  {selectedLayer.type==='shape'?<><NumericField label="Exact Shape Width" value={selectedLayer.width??280} min={20} max={1200} onChange={(value)=>updateLayer(selectedLayer.id,{width:value})}/><NumericField label="Exact Shape Height" value={selectedLayer.height??120} min={20} max={800} onChange={(value)=>updateLayer(selectedLayer.id,{height:value})}/>{selectedLayer.shape!=='ellipse'?<NumericField label="Exact Corner Radius" value={selectedLayer.radius??28} min={0} max={Math.max(0,Math.floor(Math.min(Number(selectedLayer.width??280),Number(selectedLayer.height??120))/2))} onChange={(value)=>updateLayer(selectedLayer.id,{radius:value})}/>:null}</>:null}
+                  {selectedLayer.type==='image'?<NumericField label="Exact Image Width" value={selectedLayer.width??640} min={20} max={1800} onChange={(value)=>updateLayer(selectedLayer.id,{width:value})}/>:null}
+                </Group> : null}
               </section>
             ) : null}
 
