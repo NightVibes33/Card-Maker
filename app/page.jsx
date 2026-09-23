@@ -7487,313 +7487,56 @@ export default function Page() {
             ) : null}
 
             {studioTool === 'card' ? (
-              <>
-                <section className="presetSection">
-                  <h3 className="sectionLabel">CARD PRESETS</h3>
-                  <div className="presetScroller">
-                    {Object.keys(CARD_PRESETS).map((name) => (
-                      <button type="button" key={name} onClick={() => applyCardPreset(name)}>{name}</button>
-                    ))}
-                  </div>
-                </section>
-
-                <Group title="Card Hardware">
-                  <SwitchRow label="EMV Chip" detail="Tap the chip on the card to position it directly" value={design.chip} onChange={(value) => patch({ chip: value })} />
-                  {design.chip ? (
-                    <div className="nestedControls">
-                      <div className="tonePicker" role="radiogroup" aria-label="Chip finish">
-                        {['gold', 'silver', 'black', 'rose'].map((tone) => (
-                          <button type="button" role="radio" aria-checked={design.chipTone === tone} key={tone} className={design.chipTone === tone ? 'selected' : ''} onClick={() => patch({ chipTone: tone })}>
-                            <i className={'chipTone ' + tone} aria-hidden="true" />
-                            <span>{tone[0].toUpperCase() + tone.slice(1)}</span>
-                          </button>
-                        ))}
-                      </div>
+              <section className="studioContextCard capcutContextPanel">
+                <div className="contextPanelHeader">
+                  {studioSubtool ? <button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button> : <span/>}
+                  <strong>{studioSubtool ? ({chip:'Chip',contactless:'Contactless',visa:'VISA',number:'Number',name:'Name',expiry:'Expiry'}[studioSubtool] || 'Card') : 'Card'}</strong>
+                  <button type="button" onClick={() => setStudioSubtool('')}>✓</button>
+                </div>
+                {!studioSubtool ? (
+                  <>
+                    <div className="capcutSubtools">
+                      <button type="button" onClick={() => { setSelectedElement('chip'); setStudioSubtool('chip'); }}><span>▣</span><small>Chip</small></button>
+                      <button type="button" onClick={() => { setSelectedElement('contactless'); setStudioSubtool('contactless'); }}><span>)))</span><small>Contactless</small></button>
+                      <button type="button" onClick={() => { setSelectedElement('visa'); setStudioSubtool('visa'); }}><span className="visaToolGlyph">VISA</span><small>VISA</small></button>
+                      <button type="button" onClick={() => setStudioSubtool('number')}><span>123</span><small>Number</small></button>
+                      <button type="button" onClick={() => setStudioSubtool('name')}><span>A</span><small>Name</small></button>
+                      <button type="button" onClick={() => setStudioSubtool('expiry')}><span>▦</span><small>Expiry</small></button>
                     </div>
-                  ) : null}
-                  <SwitchRow label="Contactless" detail="Tap the symbol on the card to position it directly" value={design.contactless} onChange={(value) => patch({ contactless: value })} />
-                  <SwitchRow label="VISA" detail="Reflective card mark · tap to move, pinch to scale and rotate" value={design.visa} onChange={(value) => patch({ visa: value })} />
-                  {design.visa ? (
-                    <div className="nestedControls">
-                      <div className="tonePicker" role="radiogroup" aria-label="VISA finish">
-                        {['silver', 'white', 'black'].map((finish) => (
-                          <button type="button" role="radio" aria-checked={design.visaFinish === finish} key={finish} className={design.visaFinish === finish ? 'selected' : ''} onClick={() => patch({ visaFinish: finish })}>
-                            <span>{finish === 'silver' ? 'White Gloss' : finish[0].toUpperCase() + finish.slice(1)}</span>
-                          </button>
-                        ))}
-                      </div>
-                      <SliderRow label="VISA Gloss" value={design.visaGloss} min={0} max={1} step={0.01} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ visaGloss: value })} />
-                      <SliderRow label="VISA Reflection" value={design.visaReflection} min={0} max={1} step={0.01} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ visaReflection: value })} />
-                      <SliderRow label="VISA Opacity" value={design.visaOpacity} min={0.1} max={1} step={0.01} formatValue={(value) => Math.round(value * 100) + '%'} onChange={(value) => patch({ visaOpacity: value })} />
-                      <SliderRow label="VISA Scale" value={design.visaScale} min={0.45} max={2.2} step={0.01} onChange={(value) => patch({ visaScale: value })} />
-                      <SliderRow label="VISA Rotation" value={design.visaRotation} min={-180} max={180} step={1} suffix="°" onChange={(value) => patch({ visaRotation: value })} />
-                      <button type="button" className="settingsResetButton" onClick={() => patch({ visaX: DEFAULTS.visaX, visaY: DEFAULTS.visaY, visaScale: DEFAULTS.visaScale, visaRotation: 0, visaOpacity: 1, visaFinish: 'silver', visaGloss: DEFAULTS.visaGloss, visaReflection: DEFAULTS.visaReflection })}>Reset VISA</button>
-                    </div>
-                  ) : null}
-                </Group>
-
-                <Group title="Card Text">
-                  <SwitchRow label="Masked Number" value={design.number} onChange={(value) => patch({ number: value })} />
-                  {design.number ? <input className="iosTextField" aria-label="Masked card number" value={design.numberText} onChange={(event) => patch({ numberText: singleLineCardText(event.target.value, 32) })} /> : null}
-                  <SwitchRow label="Card Holder" value={design.holder} onChange={(value) => patch({ holder: value })} />
-                  {design.holder ? <input className="iosTextField" aria-label="Card holder" value={design.holderText} onChange={(event) => patch({ holderText: singleLineCardText(event.target.value, 28) })} /> : null}
-                  <SwitchRow label="Expiry" value={design.expiry} onChange={(value) => patch({ expiry: value })} />
-                  {design.expiry ? <input className="iosTextField" aria-label="Expiry date" value={design.expiryText} onChange={(event) => patch({ expiryText: singleLineCardText(event.target.value, 8) })} /> : null}
-                  <SwitchRow label="Top Badge" value={design.badge} onChange={(value) => patch({ badge: value })} />
-                  {design.badge ? <input className="iosTextField" aria-label="Top badge text" value={design.badgeText} onChange={(event) => patch({ badgeText: singleLineCardText(event.target.value, 18) })} /> : null}
-                  <label className="colorRow">
-                    <span>Text Color</span>
-                    <input aria-label="Text color" type="color" value={design.textColor} onChange={(event) => patch({ textColor: event.target.value })} />
-                  </label>
-                  <SwitchRow
-                    label="Text Shadow"
-                    detail="Applies to the built-in number, holder, expiry, and badge text"
-                    value={Boolean(design.shadow)}
-                    onChange={(value) => patch({ shadow: value })}
-                  />
-                </Group>
-
-<Group title="Layers" footer="Image, text, and shape layers are embedded into the final AirCard PNG.">
-                  <div className="layerAddRow">
-                    <button type="button" onClick={addTextLayer}>+ Text</button>
-                    <button type="button" disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={() => layerUploadRef.current?.click()}>+ Image / Logo</button>
-                    <button type="button" onClick={addShapeLayer}>+ Shape</button>
-                    <button type="button" onClick={addChipLayer}>+ Chip</button>
-                    <button type="button" onClick={addContactlessLayer}>+ Contactless</button>
-                  </div>
-                  <input ref={layerUploadRef} type="file" accept="image/*" hidden onChange={uploadLayerImage} />
-
-                  <button
-                    type="button"
-                    aria-label={'Artwork background ' + (selectedElement === 'artwork' ? 'selected' : 'edit')}
-                    className={'layerRow artworkLayerRow ' + (selectedElement === 'artwork' ? 'selected' : '')}
-                    onClick={() => {
-                      setSelectedElement('artwork');
-                      setMessage('Artwork selected');
-                    }}
-                  >
-                    <span><strong>Artwork</strong><small>background · bottom</small></span>
-                    <span>{selectedElement === 'artwork' ? 'Selected' : 'Edit'}</span>
-                  </button>
-
-                  <div className="layerStackHeader">
-                    <span>Layer Stack</span>
-                    <small>Top → Bottom</small>
-                  </div>
-
-                  {visualLayerStack.map((entry, index) => (
-                    <button
-                      type="button"
-                      key={entry.id}
-                      aria-label={
-                        entry.name + ' ' + entry.type + ' ' +
-                        (entry.action === 'card-text'
-                          ? (selectedElement === 'card-text' ? 'selected' : 'edit')
-                          : entry.hidden
-                            ? 'hidden'
-                            : entry.locked
-                              ? 'locked'
-                              : selectedElement === entry.selection
-                                ? 'selected'
-                                : entry.builtin
-                                  ? 'built-in'
-                                  : 'edit')
-                      }
-                      className={
-                        'layerRow ' +
-                        (
-                          (
-                            entry.action === 'card-text'
-                              ? selectedElement === 'card-text'
-                              : selectedElement === entry.selection
-                          )
-                            ? 'selected'
-                            : ''
-                        )
-                      }
-                      onClick={() => {
-                        if (entry.action === 'card-text') {
-                          setSelectedElement('card-text');
-                          setStudioTool('card');
-                          setMessage('Card text controls ready');
-                          return;
-                        }
-                        if (!entry.builtin && selectedElement === entry.selection) {
-                          setSelectedElement('artwork');
-                          setMessage('Artwork selected');
-                          return;
-                        }
-                        setSelectedElement(entry.selection);
-                        setMessage(entry.name + ' selected');
-                      }}
-                    >
-                      <span>
-                        <strong>{entry.name}</strong>
-                        <small>{entry.type}{entry.hidden ? ' · hidden' : ''}{index === 0 ? ' · top' : ''}</small>
-                      </span>
-                      <span>
-                        {entry.action === 'card-text'
-                          ? (selectedElement === 'card-text' ? 'Selected' : 'Edit Text')
-                          : entry.hidden
-                            ? 'Hidden'
-                            : entry.locked
-                              ? 'Locked'
-                              : selectedElement === entry.selection
-                                ? 'Selected'
-                                : entry.builtin
-                                  ? 'Built-in'
-                                  : 'Edit'}
-                      </span>
-                    </button>
-                  ))}
-                </Group>
-
-                {selectedLayer ? (
-                  <Group title="Layer Settings">
-                    <button
-                      type="button"
-                      className="doneLayerButton"
-                      onClick={() => {
-                        setSelectedElement('artwork');
-                        setMessage('Artwork selected');
-                      }}
-                    >
-                      Done Editing Layer
-                    </button>
-                    {selectedLayer.locked ? (
-                      <div className="lockedLayerNotice" role="status">Locked · unlock this layer to edit its content or transform.</div>
-                    ) : null}
-                    <fieldset className="layerEditorFieldset" disabled={Boolean(selectedLayer.locked)}>
-                    {selectedLayer.type === 'text' ? (
-                      <>
-                        <textarea
-                          className="iosTextField iosTextArea"
-                          aria-label="Layer text"
-                          rows={3}
-                          value={selectedLayer.text ?? ''}
-                          onChange={(event) => updateLayer(selectedLayer.id, {
-                            text: splitGraphemes(event.target.value).slice(0, 500).join('')
-                          })}
-                        />
-                        <label className="selectRow">
-                          <span>Font</span>
-                          <select aria-label="Text layer font" value={selectedLayer.fontFamily || 'system'} onChange={(event) => updateLayer(selectedLayer.id, { fontFamily: event.target.value })}>
-                            <option value="system">System</option>
-                            <option value="rounded">Rounded</option>
-                            <option value="serif">Serif</option>
-                            <option value="mono">Monospace</option>
-                          </select>
-                        </label>
-                        <div className="textAlignRow" role="group" aria-label="Text alignment">
-                          {['left', 'center', 'right'].map((align) => (
-                            <button type="button" key={align} aria-pressed={(selectedLayer.align || 'center') === align} className={(selectedLayer.align || 'center') === align ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { align })}>
-                              {align[0].toUpperCase() + align.slice(1)}
-                            </button>
-                          ))}
-                        </div>
-                        <SliderRow label="Font Size" value={selectedLayer.fontSize || 58} min={10} max={240} step={1} onChange={(value) => updateLayer(selectedLayer.id, { fontSize: value })} />
-                        <SliderRow label="Weight" value={selectedLayer.weight || 700} min={100} max={900} step={100} onChange={(value) => updateLayer(selectedLayer.id, { weight: value })} />
-                        <SliderRow label="Letter Spacing" value={selectedLayer.letterSpacing ?? 0} min={-4} max={30} step={1} onChange={(value) => updateLayer(selectedLayer.id, { letterSpacing: value })} />
-                        <SliderRow label="Line Height" value={selectedLayer.lineHeight ?? 1.18} min={0.8} max={2} step={0.01} formatValue={(value) => value.toFixed(2) + '×'} onChange={(value) => updateLayer(selectedLayer.id, { lineHeight: value })} />
-                        <label className="colorRow"><span>Color</span><input type="color" value={selectedLayer.color || '#ffffff'} onChange={(event) => updateLayer(selectedLayer.id, { color: event.target.value })} /></label>
-                        <SwitchRow label="Text Shadow" value={Boolean(selectedLayer.shadow)} onChange={(value) => updateLayer(selectedLayer.id, { shadow: value })} />
-                      </>
-                    ) : null}
-                    {selectedLayer.type === 'shape' ? (
-                      <>
-                        <div className="segmentedControl compact" role="group" aria-label="Shape type">
-                          <button type="button" aria-pressed={selectedLayer.shape !== 'ellipse'} className={selectedLayer.shape !== 'ellipse' ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { shape: 'rectangle' })}>Rectangle</button>
-                          <button type="button" aria-pressed={selectedLayer.shape === 'ellipse'} className={selectedLayer.shape === 'ellipse' ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { shape: 'ellipse' })}>Ellipse</button>
-                        </div>
-                        <SliderRow label="Width" value={selectedLayer.width ?? 280} min={20} max={1200} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
-                        <SliderRow label="Height" value={selectedLayer.height ?? 120} min={20} max={800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { height: value })} />
-                        {selectedLayer.shape !== 'ellipse' ? (
-                          <SliderRow
-                            label="Corner Radius"
-                            value={selectedLayer.radius ?? 28}
-                            min={0}
-                            max={Math.max(0, Math.floor(Math.min(Number(selectedLayer.width ?? 280), Number(selectedLayer.height ?? 120)) / 2))}
-                            step={1}
-                            onChange={(value) => updateLayer(selectedLayer.id, { radius: value })}
-                          />
-                        ) : null}
-                        <label className="colorRow"><span>Color</span><input type="color" value={selectedLayer.color || '#ffffff'} onChange={(event) => updateLayer(selectedLayer.id, { color: event.target.value })} /></label>
-                      </>
-                    ) : null}
-                    {selectedLayer.type === 'image' ? (
-                      <SliderRow label="Image Width" value={selectedLayer.width ?? 640} min={20} max={1800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
-                    ) : null}
-                    {selectedLayer.type === 'chip' ? (
-                      <div className="tonePicker" role="radiogroup" aria-label="Custom chip finish">
-                        {['gold', 'silver', 'black', 'rose'].map((tone) => (
-                          <button type="button" role="radio" aria-checked={(selectedLayer.tone || 'gold') === tone} key={tone} className={(selectedLayer.tone || 'gold') === tone ? 'selected' : ''} onClick={() => updateLayer(selectedLayer.id, { tone })}>
-                            <i className={'chipTone ' + tone} aria-hidden="true" />
-                            <span>{tone[0].toUpperCase() + tone.slice(1)}</span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                    {selectedLayer.type === 'contactless' ? (
-                      <label className="colorRow"><span>Contactless Color</span><input type="color" value={selectedLayer.color || '#ffffff'} onChange={(event) => updateLayer(selectedLayer.id, { color: event.target.value })} /></label>
-                    ) : null}
-                    <SliderRow label="Layer X" value={selectedLayer.x ?? 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id, { x: value })} />
-                    <SliderRow label="Layer Y" value={selectedLayer.y ?? 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id, { y: value })} />
-                    <SliderRow label="Layer Scale" value={selectedLayer.scale ?? 1} min={0.1} max={6} step={0.01} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
-                    <SliderRow label="Layer Rotation" value={selectedLayer.rotation ?? 0} min={-180} max={180} step={1} suffix="°" onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} />
-                    <SliderRow label="Opacity" value={selectedLayer.opacity ?? 1} min={0} max={1} step={0.01} onChange={(value) => updateLayer(selectedLayer.id, { opacity: value })} />
-                    {expertMode ? (
-                      <div className="layerExpertValues">
-                        <NumericField label="Exact Layer X" value={selectedLayer.x ?? 0.5} min={0} max={1} onChange={(value) => updateLayer(selectedLayer.id, { x: value })} />
-                        <NumericField label="Exact Layer Y" value={selectedLayer.y ?? 0.5} min={0} max={1} onChange={(value) => updateLayer(selectedLayer.id, { y: value })} />
-                        <NumericField label="Exact Layer Scale" value={selectedLayer.scale ?? 1} min={0.1} max={6} onChange={(value) => updateLayer(selectedLayer.id, { scale: value })} />
-                        <NumericField label="Exact Layer Rotation" value={selectedLayer.rotation ?? 0} min={-180} max={180} step={0.1} onChange={(value) => updateLayer(selectedLayer.id, { rotation: value })} suffix="°" />
-                        <NumericField label="Exact Layer Opacity" value={selectedLayer.opacity ?? 1} min={0} max={1} onChange={(value) => updateLayer(selectedLayer.id, { opacity: value })} />
-                        {selectedLayer.type === 'text' ? (
-                          <>
-                            <NumericField label="Exact Font Size" value={selectedLayer.fontSize || 58} min={10} max={240} step={1} onChange={(value) => updateLayer(selectedLayer.id, { fontSize: value })} />
-                            <NumericField label="Exact Font Weight" value={selectedLayer.weight || 700} min={100} max={900} step={100} onChange={(value) => updateLayer(selectedLayer.id, { weight: value })} />
-                            <NumericField label="Exact Letter Spacing" value={selectedLayer.letterSpacing ?? 0} min={-4} max={30} step={0.1} onChange={(value) => updateLayer(selectedLayer.id, { letterSpacing: value })} />
-                            <NumericField label="Exact Line Height" value={selectedLayer.lineHeight ?? 1.18} min={0.8} max={2} step={0.01} onChange={(value) => updateLayer(selectedLayer.id, { lineHeight: value })} suffix="×" />
-                          </>
-                        ) : null}
-                        {selectedLayer.type === 'shape' ? (
-                          <>
-                            <NumericField label="Exact Shape Width" value={selectedLayer.width ?? 280} min={20} max={1200} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
-                            <NumericField label="Exact Shape Height" value={selectedLayer.height ?? 120} min={20} max={800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { height: value })} />
-                            {selectedLayer.shape !== 'ellipse' ? (
-                              <NumericField
-                                label="Exact Corner Radius"
-                                value={selectedLayer.radius ?? 28}
-                                min={0}
-                                max={Math.max(0, Math.min(Number(selectedLayer.width ?? 280), Number(selectedLayer.height ?? 120)) / 2)}
-                                step={1}
-                                onChange={(value) => updateLayer(selectedLayer.id, { radius: value })}
-                              />
-                            ) : null}
-                          </>
-                        ) : null}
-                        {selectedLayer.type === 'image' ? (
-                          <NumericField label="Exact Image Width" value={selectedLayer.width ?? 640} min={20} max={1800} step={1} onChange={(value) => updateLayer(selectedLayer.id, { width: value })} />
-                        ) : null}
-                      </div>
-                    ) : null}
-                    </fieldset>
-                    <SwitchRow
-                      label="Show Layer"
-                      detail={selectedLayer.hidden ? 'Hidden from preview and export' : 'Visible in preview and export'}
-                      value={!Boolean(selectedLayer.hidden)}
-                      onChange={(value) => updateLayer(selectedLayer.id, { hidden: !value })}
-                    />
-                    <SwitchRow label="Lock Layer" value={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id, { locked: value })} />
-                    <div className="layerActionGrid">
-                      <button type="button" disabled={Boolean(selectedLayer.locked)} onClick={() => moveLayer(selectedLayer.id, 1)}>Bring Forward</button>
-                      <button type="button" disabled={Boolean(selectedLayer.locked)} onClick={() => moveLayer(selectedLayer.id, -1)}>Send Back</button>
-                      <button type="button" onClick={() => duplicateLayer(selectedLayer.id)}>Duplicate</button>
-                      <button type="button" disabled={Boolean(selectedLayer.locked)} className="destructive" onClick={() => deleteLayer(selectedLayer.id)}>Delete</button>
-                    </div>
-                  </Group>
+                    <div className="presetScroller capcutPresetStrip">{Object.keys(CARD_PRESETS).map((name)=><button type="button" key={name} onClick={()=>applyCardPreset(name)}>{name}</button>)}</div>
+                  </>
                 ) : null}
-              </>
+                {studioSubtool === 'chip' ? (
+                  <>
+                    <SwitchRow label="EMV Chip" value={design.chip} onChange={(value)=>patch({chip:value})}/>
+                    {design.chip ? <><div className="tonePicker">{['gold','silver','black','rose'].map((tone)=><button type="button" key={tone} className={design.chipTone===tone?'selected':''} onClick={()=>patch({chipTone:tone})}><i className={'chipTone '+tone}/><span>{tone[0].toUpperCase()+tone.slice(1)}</span></button>)}</div>
+                    <SliderRow label="Chip Scale" value={design.chipScale} min={0.55} max={1.8} step={0.01} onChange={(value)=>patch({chipScale:value})}/>
+                    <SliderRow label="Chip Rotation" value={design.chipRotation} min={-180} max={180} step={1} suffix="°" onChange={(value)=>patch({chipRotation:value})}/></> : null}
+                  </>
+                ) : null}
+                {studioSubtool === 'contactless' ? (
+                  <>
+                    <SwitchRow label="Contactless" value={design.contactless} onChange={(value)=>patch({contactless:value})}/>
+                    {design.contactless ? <><SliderRow label="Contactless Scale" value={design.contactlessScale} min={0.45} max={2.2} step={0.01} onChange={(value)=>patch({contactlessScale:value})}/>
+                    <SliderRow label="Contactless Rotation" value={design.contactlessRotation} min={-180} max={180} step={1} suffix="°" onChange={(value)=>patch({contactlessRotation:value})}/></> : null}
+                  </>
+                ) : null}
+                {studioSubtool === 'visa' ? (
+                  <>
+                    <SwitchRow label="VISA" value={design.visa} onChange={(value)=>patch({visa:value})}/>
+                    {design.visa ? <><div className="tonePicker" role="radiogroup" aria-label="VISA finish">{['silver','white','black'].map((finish)=><button type="button" key={finish} role="radio" aria-checked={design.visaFinish===finish} className={design.visaFinish===finish?'selected':''} onClick={()=>patch({visaFinish:finish})}><span>{finish==='silver'?'White Gloss':finish[0].toUpperCase()+finish.slice(1)}</span></button>)}</div>
+                    <SliderRow label="VISA Gloss" value={design.visaGloss} min={0} max={1} step={0.01} onChange={(value)=>patch({visaGloss:value})}/>
+                    <SliderRow label="VISA Reflection" value={design.visaReflection} min={0} max={1} step={0.01} onChange={(value)=>patch({visaReflection:value})}/>
+                    <SliderRow label="VISA Opacity" value={design.visaOpacity} min={0.1} max={1} step={0.01} onChange={(value)=>patch({visaOpacity:value})}/>
+                    <SliderRow label="VISA Scale" value={design.visaScale} min={0.45} max={2.2} step={0.01} onChange={(value)=>patch({visaScale:value})}/>
+                    <SliderRow label="VISA Rotation" value={design.visaRotation} min={-180} max={180} step={1} suffix="°" onChange={(value)=>patch({visaRotation:value})}/>
+                    <button type="button" className="settingsResetButton" onClick={()=>patch({visaX:DEFAULTS.visaX,visaY:DEFAULTS.visaY,visaScale:DEFAULTS.visaScale,visaRotation:0,visaOpacity:1,visaFinish:'silver',visaGloss:DEFAULTS.visaGloss,visaReflection:DEFAULTS.visaReflection})}>Reset VISA</button></> : null}
+                  </>
+                ) : null}
+                {studioSubtool === 'number' ? <><SwitchRow label="Masked Number" value={design.number} onChange={(value)=>patch({number:value})}/>{design.number?<input className="iosTextField capcutCardInput" aria-label="Masked card number" value={design.numberText} onChange={(e)=>patch({numberText:singleLineCardText(e.target.value,32)})}/>:null}</> : null}
+                {studioSubtool === 'name' ? <><SwitchRow label="Card Holder" value={design.holder} onChange={(value)=>patch({holder:value})}/>{design.holder?<input className="iosTextField capcutCardInput" aria-label="Card holder" value={design.holderText} onChange={(e)=>patch({holderText:singleLineCardText(e.target.value,28)})}/>:null}</> : null}
+                {studioSubtool === 'expiry' ? <><SwitchRow label="Expiry" value={design.expiry} onChange={(value)=>patch({expiry:value})}/>{design.expiry?<input className="iosTextField capcutCardInput" aria-label="Expiry date" value={design.expiryText} onChange={(e)=>patch({expiryText:singleLineCardText(e.target.value,8)})}/>:null}</> : null}
+              </section>
             ) : null}
           </div>
         )}
