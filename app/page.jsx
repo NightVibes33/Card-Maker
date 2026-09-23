@@ -6901,21 +6901,24 @@ export default function Page() {
               </>
             ) : null}
 
-            <StoreCatalog
-              storeName="Card Library"
-              categoryLabel={cucuCategoryLabel}
-              items={cucuItems}
-              total={cucuTotal}
-              loading={cucuLoading}
-              error={catalogError}
-              onRetry={() => loadCucu(Math.max(1, cucuPage || 1), cucuPage === 0, cucuCategory, query)}
-              onPick={useArtwork}
-              favoriteIds={favoriteIds}
-              onFavorite={toggleFavorite}
-              onMenu={setMenuItem}
-            />
-
-            <div ref={loadMoreRef} className="infiniteSentinel" aria-hidden="true" />
+            {query || cucuCategory !== 'all' ? (
+              <>
+                <StoreCatalog
+                  storeName="Card Library"
+                  categoryLabel={cucuCategoryLabel}
+                  items={cucuItems}
+                  total={cucuTotal}
+                  loading={cucuLoading}
+                  error={catalogError}
+                  onRetry={() => loadCucu(Math.max(1, cucuPage || 1), cucuPage === 0, cucuCategory, query)}
+                  onPick={useArtwork}
+                  favoriteIds={favoriteIds}
+                  onFavorite={toggleFavorite}
+                  onMenu={setMenuItem}
+                />
+                <div ref={loadMoreRef} className="infiniteSentinel" aria-hidden="true" />
+              </>
+            ) : null}
 
             <div className="discoverImportRow">
               <button
