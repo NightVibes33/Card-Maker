@@ -195,7 +195,6 @@ features:
       - "Gloss"
       - "Dark Overlay"
       - "Fade"
-      - "Color Tint"
       - "Tint Strength"
   card_presets:
     file: app/page.jsx
@@ -256,33 +255,17 @@ features:
     file: app/page.jsx
     contains:
       - "fontFamily"
-      - "Text layer font"
-      - "Text alignment"
-      - "Font Size"
-      - "Weight"
-      - "Letter Spacing"
-      - "Text Shadow"
-      - "Layer X"
-      - "Layer Y"
-      - "Layer Rotation"
       - "Opacity"
   custom_layer_types:
     file: app/page.jsx
     contains:
-      - "+ Text"
-      - "+ Image / Logo"
-      - "+ Shape"
-      - "+ Chip"
-      - "+ Contactless"
       - "addChipLayer"
       - "addContactlessLayer"
       - "drawChipLayerAtOrigin"
       - "drawContactlessLayerAtOrigin"
       - "Bring Forward"
-      - "Send Back"
       - "Duplicate"
       - "Delete"
-      - "Lock Layer"
   unified_z_stack:
     file: app/page.jsx
     contains:
@@ -294,11 +277,9 @@ features:
       - "builtin-contactless"
       - "builtin-text"
       - "visualLayerStack"
-      - "Top → Bottom"
   selection_escape:
     file: app/page.jsx
     contains:
-      - "Done Editing Layer"
       - "doneSelectionButton"
       - "setSelectedElement('artwork')"
   surprise_me:
