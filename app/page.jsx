@@ -7152,6 +7152,7 @@ export default function Page() {
                   <button type="button" onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{rotation:normalizeFreeRotation(Number(selectedLayer.rotation||0)+90)}) : patch({ rotate: normalizeFreeRotation(Number(design.rotate || 0) + 90) })}><span>↻</span><small>Rotate</small></button>
                   <button type="button" onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{flipX:!selectedLayer.flipX}) : patch({ flipX: !design.flipX })}><span>↔</span><small>Flip</small></button>
                   <button type="button" onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{x:0.5,y:0.5,scale:1,rotation:0,flipX:false}) : patch({ zoom:1,x:0,y:0,rotate:0,flipX:false,sourceCrop:design.originalSourceCrop||null })}><IOSIcon name="reset" size={22}/><small>Reset</small></button>
+                  {expertMode ? <button type="button" onClick={() => setStudioSubtool('precision')}><span>123</span><small>Precision</small></button> : null}
                 </div>
               </section>
             ) : null}
@@ -7178,6 +7179,46 @@ export default function Page() {
                   <SliderRow label="Vertical" value={design.y} min={-1} max={1} step={0.01} onChange={(value) => patch({ y: value })}/>
                   <SliderRow label="Rotation" value={design.rotate} min={-180} max={180} step={1} suffix="°" onChange={(value) => patch({ rotate: value })}/>
                 </>}
+              </section>
+            ) : null}
+
+            {studioTool === 'crop' && studioSubtool === 'precision' && expertMode ? (
+              <section className="studioContextCard capcutContextPanel">
+                <div className="contextPanelHeader"><button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button><strong>Precision</strong><button type="button" onClick={() => setStudioSubtool('')}>✓</button></div>
+                <Group title="Precision" footer="Exact numerical access to every global transform, adjustment, effect, and card-hardware parameter.">
+                    <NumericField label="Zoom" value={design.zoom} min={0.5} max={5} onChange={(value) => patch({ zoom: value })} />
+                    <NumericField label="Artwork X" value={design.x} min={-1.5} max={1.5} onChange={(value) => patch({ x: value })} />
+                    <NumericField label="Artwork Y" value={design.y} min={-1.5} max={1.5} onChange={(value) => patch({ y: value })} />
+                    <NumericField label="Artwork Rotation" value={design.rotate} min={-180} max={180} step={0.1} onChange={(value) => patch({ rotate: value })} suffix="°" />
+                    <NumericField label="Crop Left" value={design.sourceCrop?.x || 0} min={0} max={0.9} onChange={(value) => updateCropEdge('left', value)} />
+                    <NumericField label="Crop Right" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.x - design.sourceCrop.w) : 0} min={0} max={0.9} onChange={(value) => updateCropEdge('right', value)} />
+                    <NumericField label="Crop Top" value={design.sourceCrop?.y || 0} min={0} max={0.9} onChange={(value) => updateCropEdge('top', value)} />
+                    <NumericField label="Crop Bottom" value={design.sourceCrop ? Math.max(0, 1 - design.sourceCrop.y - design.sourceCrop.h) : 0} min={0} max={0.9} onChange={(value) => updateCropEdge('bottom', value)} />
+                    <NumericField label="Exposure" value={design.exposure} min={-1} max={1} onChange={(value) => patch({ exposure: value })} />
+                    <NumericField label="Brightness" value={design.brightness} min={0.4} max={1.7} onChange={(value) => patch({ brightness: value })} />
+                    <NumericField label="Contrast" value={design.contrast} min={0.45} max={1.8} onChange={(value) => patch({ contrast: value })} />
+                    <NumericField label="Saturation" value={design.saturation} min={0} max={2.4} onChange={(value) => patch({ saturation: value })} />
+                    <NumericField label="Highlights" value={design.highlights} min={-1} max={1} onChange={(value) => patch({ highlights: value })} />
+                    <NumericField label="Shadows" value={design.shadows} min={-1} max={1} onChange={(value) => patch({ shadows: value })} />
+                    <NumericField label="Temperature" value={design.temperature} min={-1} max={1} onChange={(value) => patch({ temperature: value })} />
+                    <NumericField label="Tint" value={design.tint} min={-1} max={1} onChange={(value) => patch({ tint: value })} />
+                    <NumericField label="Sharpness" value={design.sharpness} min={-1} max={1} onChange={(value) => patch({ sharpness: value })} />
+                    <NumericField label="Blur" value={design.blur} min={0} max={1} onChange={(value) => patch({ blur: value })} />
+                    <NumericField label="Vignette" value={design.vignette} min={0} max={0.8} onChange={(value) => patch({ vignette: value })} />
+                    <NumericField label="Grain" value={design.grain} min={0} max={0.22} onChange={(value) => patch({ grain: value })} />
+                    <NumericField label="Gloss" value={design.gloss} min={0} max={0.8} onChange={(value) => patch({ gloss: value })} />
+                    <NumericField label="Dark Overlay" value={design.overlay} min={0} max={0.75} onChange={(value) => patch({ overlay: value })} />
+                    <NumericField label="Fade" value={design.fade} min={0} max={1} onChange={(value) => patch({ fade: value })} />
+                    <NumericField label="Effect Tint Strength" value={design.effectTintStrength} min={0} max={1} onChange={(value) => patch({ effectTintStrength: value })} />
+                    <NumericField label="Chip Scale" value={design.chipScale} min={0.5} max={2} onChange={(value) => patch({ chipScale: value })} />
+                    <NumericField label="Chip X" value={design.chipX} min={0} max={0.82} onChange={(value) => patch({ chipX: value })} />
+                    <NumericField label="Chip Y" value={design.chipY} min={0} max={0.8} onChange={(value) => patch({ chipY: value })} />
+                    <NumericField label="Chip Rotation" value={design.chipRotation} min={-45} max={45} step={0.1} onChange={(value) => patch({ chipRotation: value })} suffix="°" />
+                    <NumericField label="Contactless Scale" value={design.contactlessScale} min={0.4} max={2.2} onChange={(value) => patch({ contactlessScale: value })} />
+                    <NumericField label="Contactless X" value={design.contactlessX} min={0.03} max={0.97} onChange={(value) => patch({ contactlessX: value })} />
+                    <NumericField label="Contactless Y" value={design.contactlessY} min={0.03} max={0.97} onChange={(value) => patch({ contactlessY: value })} />
+                    <NumericField label="Contactless Rotation" value={design.contactlessRotation || 0} min={-180} max={180} step={0.1} onChange={(value) => patch({ contactlessRotation: value })} suffix="°" />
+                  </Group>
               </section>
             ) : null}
 
