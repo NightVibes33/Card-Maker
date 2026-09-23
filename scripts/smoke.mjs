@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { IMAGE_PROXY_VERSION } from '../app/lib/imagePolicy.js';
 
 const base = process.env.SMOKE_BASE || 'http://127.0.0.1:3000';
 
@@ -107,9 +108,9 @@ async function checkCatalog() {
     item.assetMode !== 'direct-card-art' ||
     !item.image?.startsWith('/api/image?') ||
     !item.thumbnail?.startsWith('/api/image?') ||
-    !item.image.includes('v=2') ||
+    !item.image.includes('v=' + IMAGE_PROXY_VERSION) ||
     !item.thumbnail.includes('w=560') ||
-    !item.thumbnail.includes('v=2') ||
+    !item.thumbnail.includes('v=' + IMAGE_PROXY_VERSION) ||
     !Array.isArray(item.inspectUrls) ||
     item.inspectUrls.length < 1 ||
     !item.inspectUrls.every((url) => url.startsWith('/api/cucu/inspect?'))
@@ -161,12 +162,12 @@ async function checkAnimeDeskMat() {
       item.source !== 'AnimeDeskMat' ||
       item.mediaType !== 'premade-card-skin' ||
       item.assetMode !== 'direct-card-art' ||
-      assets.length !== 1 ||
+      assets.length < 1 ||
       !item.image?.startsWith('/api/image?') ||
       !item.thumbnail?.includes('w=560') ||
       !Array.isArray(item.inspectUrls) ||
-      item.inspectUrls.length !== 1 ||
-      !item.inspectUrls[0].startsWith('/api/cucu/inspect?')
+      item.inspectUrls.length < 1 ||
+      !item.inspectUrls.every((url) => url.startsWith('/api/cucu/inspect?'))
     ) return true;
 
     let filename = '';

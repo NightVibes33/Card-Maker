@@ -14,6 +14,7 @@ import {
   makeId
 } from './lib/storage';
 import { IMAGE_PROXY_VERSION, parseAllowedRemoteImageUrl } from './lib/imagePolicy';
+import { adjustedImage } from './lib/pixelAdjust';
 
 const OUT_W = 1536;
 const OUT_H = 969;
@@ -112,7 +113,6 @@ const GRADIENTS = [
 // selected card keeps the exact framing the user tapped in the Library.
 const CATALOG_ARTWORK_OVERSCAN = 0.0225;
 const CATALOG_ARTWORK_EDITOR_ZOOM = 1 + CATALOG_ARTWORK_OVERSCAN * 2;
-const MAX_DECODED_CATALOG_PREVIEWS = 24;
 
 const DEFAULTS = {
   background: '',
@@ -1615,28 +1615,6 @@ function proxyImageWidth(src = '', width = 1600) {
   return '/api/image?' + normalized.toString();
 }
 
-const decodedCatalogImageCache = new Map();
-
-function rememberDecodedCatalogImage(src, image) {
-  if (!src || !image?.complete || !Number(image.naturalWidth) || !Number(image.naturalHeight)) return;
-  decodedCatalogImageCache.delete(src);
-  decodedCatalogImageCache.set(src, image);
-
-  while (decodedCatalogImageCache.size > MAX_DECODED_CATALOG_PREVIEWS) {
-    const oldestKey = decodedCatalogImageCache.keys().next().value;
-    if (!oldestKey) break;
-    decodedCatalogImageCache.delete(oldestKey);
-  }
-}
-
-function decodedCatalogImageForItem(item) {
-  const src = proxyImageWidth(item?.thumbnail || item?.image, 560);
-  if (!src) return null;
-  const image = decodedCatalogImageCache.get(src) || null;
-  if (!image?.complete || !Number(image.naturalWidth) || !Number(image.naturalHeight)) return null;
-  return image;
-}
-
 // Library/Home previews must use the same framing rule as Studio:
 // source crop first, then a centered "cover" into the physical card ratio.
 // The previous preview path stretched sourceCrop directly to the frame, which
@@ -1699,7 +1677,6 @@ function CatalogArtwork({ item, alt, useThumbnail = true }) {
           alt={alt}
           loading="lazy"
           decoding="async"
-          onLoad={(event) => rememberDecodedCatalogImage(src, event.currentTarget)}
           onError={() => setFailed(true)}
           style={{
             // crop coordinates are in source-image space. The old math used
@@ -1717,7 +1694,6 @@ function CatalogArtwork({ item, alt, useThumbnail = true }) {
           alt={alt}
           loading="lazy"
           decoding="async"
-          onLoad={(event) => rememberDecodedCatalogImage(src, event.currentTarget)}
           onError={() => setFailed(true)}
         />
       )}
@@ -2867,7 +2843,6 @@ export default function Page() {
   const fullPreviewCanvasRef = useRef(null);
   const uploadRef = useRef(null);
   const uploadIntentRef = useRef('replace-artwork');
-  const pendingBackgroundPreviewRef = useRef(null);
   const layerUploadRef = useRef(null);
   const presetImportRef = useRef(null);
   const loadMoreRef = useRef(null);
@@ -3598,14 +3573,6 @@ export default function Page() {
     let objectUrl = '';
     let cancelled = false;
     const backgroundKey = design.background || '';
-    const pendingPreview = pendingBackgroundPreviewRef.current;
-    const previewImage =
-      pendingPreview?.key === backgroundKey &&
-      pendingPreview.image?.complete &&
-      Number(pendingPreview.image.naturalWidth) > 0
-        ? pendingPreview.image
-        : null;
-    pendingBackgroundPreviewRef.current = null;
 
     async function loadBackground() {
       if (!backgroundKey) {
@@ -3615,19 +3582,10 @@ export default function Page() {
         return;
       }
 
-      if (previewImage) {
-        // Keep the already-decoded Library artwork on screen while the 3072px
-        // source upgrades silently in the background. There is never a blank
-        // "Loading artwork" frame after a user taps a visible Library card.
-        setImage(previewImage);
-        setLoadedBackgroundKey(backgroundKey);
-        setBackgroundLoadError('');
-      } else {
-        setImage(null);
-        setLoadedBackgroundKey('');
-        setBackgroundLoadError('');
-        setMessage('Loading artwork…');
-      }
+      setImage(null);
+      setLoadedBackgroundKey('');
+      setBackgroundLoadError('');
+      setMessage('Loading artwork…');
 
       let src = backgroundKey;
 
@@ -3637,7 +3595,6 @@ export default function Page() {
           const asset = await dbGet('imports', id);
           if (cancelled) return;
           if (!asset?.blob) {
-            if (previewImage) return;
             setImage(null);
             setLoadedBackgroundKey('');
             setBackgroundLoadError('Imported artwork is missing.');
@@ -3658,15 +3615,6 @@ export default function Page() {
         );
       } catch {
         if (cancelled) return;
-        if (previewImage) {
-          // The visible decoded preview is a safe display fallback. Keep it
-          // instead of flashing an empty card if the high-resolution upgrade
-          // is temporarily unavailable.
-          setImage(previewImage);
-          setLoadedBackgroundKey(backgroundKey);
-          setBackgroundLoadError('');
-          return;
-        }
         setImage(null);
         setLoadedBackgroundKey('');
         setBackgroundLoadError('Artwork could not load.');
@@ -3860,16 +3808,10 @@ export default function Page() {
         height: ih,
         rotation: renderDesign.rotate
       };
-      const exposureFactor = artworkOriginal ? 1 : Math.pow(2, Number(renderDesign.exposure ?? 0));
-      const brightness = artworkOriginal ? 1 : clamp(renderDesign.brightness * exposureFactor, 0.2, 3);
-      const saturation = artworkOriginal ? 1 : clamp(renderDesign.saturation, 0, 3);
-      const sharpBoost = artworkOriginal ? 0 : Math.max(0, Number(renderDesign.sharpness || 0));
-      const contrast = artworkOriginal
-        ? 1
-        : clamp(renderDesign.contrast + sharpBoost * 0.22, 0.3, 2.5);
-      const blur = artworkOriginal
-        ? 0
-        : Math.max(0, renderDesign.blur + Math.max(0, -Number(renderDesign.sharpness || 0)) * 0.09);
+      const artworkSource = artworkOriginal
+        ? image
+        : adjustedImage(image, { x: sx, y: sy, w: sw, h: sh }, renderDesign,
+          Math.max(1, Math.abs(iw) * renderPixelScale), Math.max(1, Math.abs(ih) * renderPixelScale), renderPixelScale);
 
       ctx.save();
       ctx.translate(x + iw / 2, y + ih / 2);
@@ -3878,12 +3820,8 @@ export default function Page() {
       ctx.beginPath();
       ctx.rect(-iw / 2, -ih / 2, iw, ih);
       ctx.clip();
-      ctx.filter =
-        'brightness(' + brightness + ')' +
-        ' saturate(' + saturation + ')' +
-        ' contrast(' + contrast + ')' +
-        ' blur(' + blur * 7 * renderPixelScale + 'px)';
-      ctx.drawImage(image, sx, sy, sw, sh, -iw / 2, -ih / 2, iw, ih);
+      if (artworkOriginal) ctx.drawImage(image, sx, sy, sw, sh, -iw / 2, -ih / 2, iw, ih);
+      else ctx.drawImage(artworkSource, -iw / 2, -ih / 2, iw, ih);
       ctx.restore();
 
       if (!artworkOriginal) {
@@ -4185,27 +4123,17 @@ export default function Page() {
           const ratio = sw / Math.max(1, sh);
           const w = clamp(Number(layer.width ?? 640), 20, 1800);
           const h = w / Math.max(0.1, ratio);
-          const exposureFactor = layerOriginal ? 1 : Math.pow(2, Number(settings.exposure || 0));
-          const brightness = layerOriginal ? 1 : clamp(Number(settings.brightness || 1) * exposureFactor, 0.2, 3);
-          const saturation = layerOriginal ? 1 : clamp(Number(settings.saturation ?? 1), 0, 3);
-          const sharpBoost = layerOriginal ? 0 : Math.max(0, Number(settings.sharpness ?? 0));
-          const contrast = layerOriginal
-            ? 1
-            : clamp(Number(settings.contrast || 1) + sharpBoost * 0.22, 0.3, 2.5);
-          const blur = layerOriginal
-            ? 0
-            : Math.max(0, Number(settings.blur ?? 0) + Math.max(0, -Number(settings.sharpness ?? 0)) * 0.09);
+          const adjustedLayerSource = layerOriginal
+            ? layerImage
+            : adjustedImage(layerImage, { x: sx, y: sy, w: sw, h: sh }, settings,
+              Math.max(1, w * scale * renderPixelScale), Math.max(1, h * scale * renderPixelScale), renderPixelScale);
 
           ctx.save();
           ctx.beginPath();
           ctx.rect(-w / 2, -h / 2, w, h);
           ctx.clip();
-          ctx.filter =
-            'brightness(' + brightness + ')' +
-            ' saturate(' + saturation + ')' +
-            ' contrast(' + contrast + ')' +
-            ' blur(' + blur * 7 * renderPixelScale + 'px)';
-          ctx.drawImage(layerImage, sx, sy, sw, sh, -w / 2, -h / 2, w, h);
+          if (layerOriginal) ctx.drawImage(layerImage, sx, sy, sw, sh, -w / 2, -h / 2, w, h);
+          else ctx.drawImage(adjustedLayerSource, -w / 2, -h / 2, w, h);
           ctx.restore();
 
           if (!layerOriginal) {
@@ -4657,8 +4585,7 @@ export default function Page() {
 
   function startFreshWorkingProject(nextDesign, {
     studioTool = 'crop',
-    statusMessage = 'New card ready',
-    backgroundPreviewImage = null
+    statusMessage = 'New card ready'
   } = {}) {
     finishActiveGesture();
     invalidatePendingImageImport();
@@ -4670,26 +4597,14 @@ export default function Page() {
       next.background === designRef.current.background &&
       loadedBackgroundKey === next.background &&
       image;
-    const suppliedPreview =
-      backgroundPreviewImage?.complete &&
-      Number(backgroundPreviewImage.naturalWidth) > 0 &&
-      Number(backgroundPreviewImage.naturalHeight) > 0
-        ? backgroundPreviewImage
-        : null;
-    const decodedPreview = sameBackground ? image : suppliedPreview;
-    pendingBackgroundPreviewRef.current =
-      decodedPreview && !sameBackground
-        ? { key: next.background, image: decodedPreview }
-        : null;
+    const decodedPreview = sameBackground ? image : null;
 
     historyGroupRef.current = { key: '', at: 0 };
     undoRef.current = [];
     redoRef.current = [];
     setHistoryVersion((value) => value + 1);
 
-    // A fresh project never inherits unrelated decoded artwork. A Library
-    // selection may explicitly hand off the already-visible decoded thumbnail
-    // so Studio can paint the chosen card on its very first frame.
+    // A fresh project never inherits unrelated decoded artwork or a catalog thumbnail.
     setImage(decodedPreview);
     setLoadedBackgroundKey(decodedPreview ? next.background : '');
     setBackgroundLoadError('');
@@ -4746,8 +4661,6 @@ export default function Page() {
       return false;
     }
 
-    const decodedPreview = decodedCatalogImageForItem(item);
-
     startFreshWorkingProject(createDefaultProjectDesign({
       background: workingImage,
       backgroundLabel: item.title,
@@ -4756,8 +4669,7 @@ export default function Page() {
       zoom: CATALOG_ARTWORK_EDITOR_ZOOM
     }), {
       studioTool: 'crop',
-      statusMessage: 'New project created from ' + item.title,
-      backgroundPreviewImage: decodedPreview
+      statusMessage: 'New project created from ' + item.title
     });
 
     rememberArtwork(item);
@@ -6852,6 +6764,13 @@ export default function Page() {
     if (value === 'text') {
       const textLayer = (designRef.current.customLayers || []).find((layer) => layer.type === 'text' && !layer.hidden);
       if (textLayer) setSelectedElement(textLayer.id);
+    } else if (value === 'adjust' || value === 'effects') {
+      const layers = designRef.current.customLayers || [];
+      const selectedImage = layers.find((layer) => layer.id === selectedElement && layer.type === 'image' && !layer.hidden);
+      const topImage = normalizeLayerOrder(designRef.current).slice().reverse()
+        .map((id) => layers.find((layer) => layer.id === id))
+        .find((layer) => layer?.type === 'image' && !layer.hidden && layer.src);
+      setSelectedElement(selectedImage?.id || topImage?.id || 'artwork');
     } else if (value === 'layers') {
       setMessage('Layer stack');
     } else if (value === 'background') {
@@ -7638,6 +7557,7 @@ export default function Page() {
                   <strong>Adjust</strong>
                   <button type="button" onClick={() => setStudioSubtool('')}>✓</button>
                 </div>
+                <div className="editingTargetBar"><span><strong>Editing {activeImageLabel}</strong><small>Adjustments affect this image only</small></span>{selectedImageLayer || (design.customLayers || []).some((layer) => layer.type === 'image' && !layer.hidden) ? <button type="button" onClick={() => setSelectedElement(selectedImageLayer ? 'artwork' : ((design.customLayers || []).find((layer) => layer.type === 'image' && !layer.hidden)?.id || 'artwork'))}>{selectedImageLayer ? 'Artwork' : 'Image Layer'}</button> : null}</div>
                 <>
                     <div className="capcutSubtools">
                       {[
@@ -7673,7 +7593,7 @@ export default function Page() {
                   <strong>Effects</strong>
                   <button type="button" onClick={() => setStudioSubtool('')}>✓</button>
                 </div>
-                {selectedImageLayer ? <small className="contextTargetNote">Effects apply only to this imported layer</small> : null}
+                <div className="editingTargetBar"><span><strong>Editing {activeImageLabel}</strong><small>Effects affect this image only</small></span>{selectedImageLayer || (design.customLayers || []).some((layer) => layer.type === 'image' && !layer.hidden) ? <button type="button" onClick={() => setSelectedElement(selectedImageLayer ? 'artwork' : ((design.customLayers || []).find((layer) => layer.type === 'image' && !layer.hidden)?.id || 'artwork'))}>{selectedImageLayer ? 'Artwork' : 'Image Layer'}</button> : null}</div>
                 <div className="effectTileRail">
                     <button type="button" disabled={!activeImageEditable} onClick={() => patchImageTarget({vignette:0,grain:0,gloss:0,overlay:0,fade:0,effectTintStrength:0})}><i className="effectNone"/><small>None</small></button>
                     {[['gloss','Gloss'],['grain','Grain'],['vignette','Vignette'],['fade','Film'],['overlay','Dark'],['tintfx','Tint']].map(([key,label]) => <button type="button" key={key} className={studioSubtool===key?'active':''} onClick={() => setStudioSubtool(key)}><i className={'effectSwatch '+key}>{activeEffectThumbnail ? <img src={activeEffectThumbnail} alt=""/> : null}</i><small>{label}</small></button>)}

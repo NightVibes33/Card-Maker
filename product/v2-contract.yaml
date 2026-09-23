@@ -415,7 +415,7 @@ features:
       - "activeImageEditable"
       - "activeImageLabel"
       - "adjustments: { ...IMAGE_LAYER_DEFAULTS }"
-      - "Effects apply only to this imported layer"
+      - "Effects affect this image only"
       - "Layer Crop Left"
       - "Reset Layer Crop"
       - "Reset Layer Position"

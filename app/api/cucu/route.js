@@ -90,7 +90,11 @@ function assetScore(raw, image = {}) {
   }
 
   const width = Number(image?.width || 0);
-  if (width >= 1000) score += 4;
+  const height = Number(image?.height || 0);
+  // Prefer the largest version of the same flat design. Keep artwork/mockup
+  // classification stronger than the resolution bonus.
+  if (width > 0 && height > 0) score += Math.min(18, Math.round(Math.log2(Math.max(1, width * height) / 200000) * 4));
+  else if (width >= 1000) score += 4;
   else if (width >= 700) score += 2;
 
   return score;

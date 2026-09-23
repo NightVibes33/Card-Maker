@@ -44,8 +44,8 @@ jobs:
           exit 1
       - name: Smoke test real search and images
         run: node scripts/smoke.mjs
-      - name: Smoke test mobile WebKit editor
-        run: node scripts/editor-webkit-smoke.mjs
+      - name: Smoke test mobile WebKit editor adjustments
+        run: node scripts/editor-functional-smoke.mjs
       - name: Show server log on failure
         if: failure()
         run: cat /tmp/card-maker.log || true

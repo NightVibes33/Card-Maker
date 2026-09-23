@@ -55,6 +55,20 @@ function plainFullCoverAsset(raw) {
   return src;
 }
 
+function originalFullCoverAsset(src) {
+  try {
+    const url = new URL(src);
+    // Shopify theme URLs often insert a size suffix before the extension.
+    // The inspector verifies the unsuffixed asset before the sized fallback.
+    const originalPath = url.pathname.replace(/_\d+x\d*(?:@\d+x)?(?=\.(?:png|webp|jpe?g)$)/i, '');
+    if (originalPath === url.pathname) return '';
+    url.pathname = originalPath;
+    return plainFullCoverAsset(url.toString());
+  } catch {
+    return '';
+  }
+}
+
 async function fetchWithTimeout(url, options = {}, timeout = 15000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
@@ -240,12 +254,16 @@ function flattenProduct(product) {
       ? image
       : image?.src || image?.url || '';
     const src = plainFullCoverAsset(raw);
-    if (!src || seen.has(src)) continue;
-    seen.add(src);
-    candidates.push({
-      src,
-      alt: cleanText(typeof image === 'string' ? '' : image?.alt || '')
-    });
+    if (!src) continue;
+    for (const candidate of [originalFullCoverAsset(src), src]) {
+      if (!candidate || seen.has(candidate)) continue;
+      seen.add(candidate);
+      candidates.push({
+        src: candidate,
+        alt: cleanText(typeof image === 'string' ? '' : image?.alt || ''),
+        pixels: Number(image?.width || 0) * Number(image?.height || 0)
+      });
+    }
   }
 
   const featuredRaw =
@@ -253,8 +271,12 @@ function flattenProduct(product) {
       ? product.featured_image
       : product?.featured_image?.src || product?.featured_image?.url || '';
   const featured = plainFullCoverAsset(featuredRaw);
-  if (featured && !seen.has(featured)) {
-    candidates.push({ src: featured, alt: '' });
+  if (featured) {
+    for (const candidate of [originalFullCoverAsset(featured), featured]) {
+      if (!candidate || seen.has(candidate)) continue;
+      seen.add(candidate);
+      candidates.push({ src: candidate, alt: '', pixels: Number(product?.featured_image?.width || 0) * Number(product?.featured_image?.height || 0) });
+    }
   }
 
   if (!candidates.length) return null;
@@ -262,6 +284,7 @@ function flattenProduct(product) {
   // Feed AnimeDeskMat through the exact CUCU candidate/inspector contract.
   // Do not inject provider-specific crop geometry here; the shared inspector is
   // the single authority for both providers.
+  candidates.sort((a, b) => b.pixels - a.pixels);
   const asset = candidates[0];
   const title = cleanText(product?.title || handle.replace(/[-_]+/g, ' '));
   const tags = Array.isArray(product?.tags) ? product.tags : [];
@@ -272,9 +295,7 @@ function flattenProduct(product) {
     subtitle: 'AnimeDeskMat',
     image: imageProxy(asset.src),
     thumbnail: imageProxy(asset.src, 560),
-    inspectUrls: [
-      '/api/cucu/inspect?url=' + encodeURIComponent(asset.src)
-    ],
+    inspectUrls: candidates.slice(0, 3).map((candidate) => '/api/cucu/inspect?url=' + encodeURIComponent(candidate.src)),
     candidateImages: candidates.map((candidate) => imageProxy(candidate.src)),
     directAssetUrls: candidates.map((candidate) => candidate.src),
     source: 'AnimeDeskMat',
