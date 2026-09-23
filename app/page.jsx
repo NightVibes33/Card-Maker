@@ -2752,6 +2752,8 @@ function imageLayerSourceKeyForDesign(value) {
 export default function Page() {
   const [tab, setTab] = useState('discover');
   const [studioTool, setStudioTool] = useState('crop');
+  const [studioSubtool, setStudioSubtool] = useState('');
+  const [studioMenuOpen, setStudioMenuOpen] = useState(false);
 
   // Each bottom-tab screen is a fresh navigation destination. Reset the
   // document and any app-level scroll container after the destination mounts.
@@ -6738,6 +6740,8 @@ export default function Page() {
 
   const activateStudioTool = useCallback((value) => {
     setStudioTool(value);
+    setStudioSubtool('');
+    setStudioMenuOpen(false);
     if (value === 'text') {
       const textLayer = (designRef.current.customLayers || []).find((layer) => layer.type === 'text' && !layer.hidden);
       if (textLayer) setSelectedElement(textLayer.id);
@@ -7112,6 +7116,29 @@ export default function Page() {
               </div>
             </div>
 
+            {studioTool === 'crop' && !studioSubtool ? (
+              <section className="studioContextCard capcutContextPanel capcutRootPanel">
+                <div className="contextPanelHeader"><strong>Edit</strong><span className="contextDone">✓</span></div>
+                <div className="capcutSubtools">
+                  <button type="button" onClick={() => setStudioSubtool('crop')}><IOSIcon name="crop" size={22}/><small>Crop</small></button>
+                  <button type="button" onClick={() => setStudioSubtool('transform')}><IOSIcon name="position" size={22}/><small>Transform</small></button>
+                  <button type="button" onClick={() => patch({ rotate: normalizeFreeRotation(Number(design.rotate || 0) + 90) })}><span>↻</span><small>Rotate</small></button>
+                  <button type="button" onClick={() => patch({ flipX: !design.flipX })}><span>↔</span><small>Flip</small></button>
+                  <button type="button" onClick={() => patch({ zoom: 1, offsetX: 0, offsetY: 0, rotate: 0, flipX: false, sourceCrop: design.originalSourceCrop || null })}><IOSIcon name="reset" size={22}/><small>Reset</small></button>
+                </div>
+              </section>
+            ) : null}
+
+            {studioTool === 'crop' && studioSubtool === 'transform' ? (
+              <section className="studioContextCard capcutContextPanel">
+                <div className="contextPanelHeader"><button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button><strong>Transform</strong><button type="button" onClick={() => setStudioSubtool('')}>✓</button></div>
+                <SliderRow label="Scale" value={design.zoom} min={0.5} max={3} step={0.01} onChange={(value) => patch({ zoom: value })}/>
+                <SliderRow label="Horizontal" value={design.offsetX} min={-1} max={1} step={0.01} onChange={(value) => patch({ offsetX: value })}/>
+                <SliderRow label="Vertical" value={design.offsetY} min={-1} max={1} step={0.01} onChange={(value) => patch({ offsetY: value })}/>
+                <SliderRow label="Rotation" value={design.rotate} min={-180} max={180} step={1} suffix="°" onChange={(value) => patch({ rotate: value })}/>
+              </section>
+            ) : null}
+
             {studioTool === 'text' ? (
               <section className="studioContextCard capcutContextPanel">
                 <div className="contextPanelHeader"><strong>Text</strong><button type="button" onClick={() => setStudioTool('crop')}>✓</button></div>
@@ -7172,7 +7199,9 @@ export default function Page() {
               </section>
             ) : null}
 
-            {studioTool === 'crop' ? (
+            {studioTool === 'crop' && studioSubtool === 'crop' ? (
+              <section className="studioContextCard capcutContextPanel">
+                <div className="contextPanelHeader"><button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button><strong>Crop</strong><button type="button" onClick={() => setStudioSubtool('')}>✓</button></div>
               <Group title="Crop">
                 <div className="editingTargetBar">
                   <span>
@@ -7280,6 +7309,7 @@ export default function Page() {
                   </>
                 )}
               </Group>
+              </section>
             ) : null}
 
             {studioTool === 'position' ? (
