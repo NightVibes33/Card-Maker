@@ -1339,6 +1339,12 @@ try {
 
   // Build a new design to exercise named-project persistence independently.
   await page.getByRole('button', { name: '+ Text', exact: true }).click();
+  const newTextRow = page.getByRole('button', { name: /^Text text /i }).first();
+  await newTextRow.waitFor({ state: 'visible', timeout: 5000 });
+  if (!/selected/i.test(await newTextRow.getAttribute('aria-label') || '')) {
+    await newTextRow.click();
+  }
+  await page.getByLabel('Layer text').waitFor({ state: 'visible', timeout: 5000 });
   await page.getByLabel('Layer text').fill('AVATAR\nWA');
   assert.equal(await page.getByLabel('Layer text').inputValue(), 'AVATAR\nWA');
 
