@@ -6860,7 +6860,9 @@ export default function Page() {
           <div className="studioOverflowWrap">
             <button type="button" className="beforeAfterButton studioOverflowButton" aria-label="More Studio actions" aria-expanded={studioMenuOpen} onClick={() => setStudioMenuOpen((open) => !open)}>•••</button>
             {studioMenuOpen ? <div className="studioOverflowMenu">
+              <button type="button" onClick={() => { reset(); setStudioMenuOpen(false); }}>New Card</button>
               <button type="button" onClick={() => { setGuidesEnabled((value) => !value); setStudioMenuOpen(false); }}>{guidesEnabled ? 'Hide Guides' : 'Show Guides'}</button>
+              <button type="button" onClick={() => { setExpertMode((value) => !value); setStudioMenuOpen(false); }}>{expertMode ? 'Disable Precision' : 'Enable Precision'}</button>
               <button type="button" disabled={!activeImageRenderable || !renderAssetsReady} onPointerDown={() => setShowOriginal(true)} onPointerUp={() => setShowOriginal(false)} onPointerCancel={() => setShowOriginal(false)}>Hold for Before</button>
               <button type="button" onClick={() => { setSelectedElement('artwork'); setStudioTool('layers'); setStudioSubtool(''); setStudioMenuOpen(false); }}>Layers</button>
             </div> : null}
