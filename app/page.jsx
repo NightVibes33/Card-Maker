@@ -6846,25 +6846,18 @@ export default function Page() {
             Done
           </button>
         ) : null}
-        <button
-          type="button"
-          className="beforeAfterButton"
-          disabled={!activeImageRenderable || !renderAssetsReady}
-          onPointerDown={() => setShowOriginal(true)}
-          onPointerUp={() => setShowOriginal(false)}
-          onPointerCancel={() => setShowOriginal(false)}
-          onPointerLeave={() => setShowOriginal(false)}
-          onKeyDown={(event) => {
-            if (event.key === ' ' || event.key === 'Enter') setShowOriginal(true);
-          }}
-          onKeyUp={(event) => {
-            if (event.key === ' ' || event.key === 'Enter') setShowOriginal(false);
-          }}
-          onBlur={() => setShowOriginal(false)}
-        >
-          <IOSIcon name="compare" size={16} />
-          <span>{tab === 'studio' ? '•••' : (showOriginal ? 'After' : 'Before / After')}</span>
-        </button>
+        {tab === 'studio' ? (
+          <div className="studioOverflowWrap">
+            <button type="button" className="beforeAfterButton studioOverflowButton" aria-label="More Studio actions" aria-expanded={studioMenuOpen} onClick={() => setStudioMenuOpen((open) => !open)}>•••</button>
+            {studioMenuOpen ? <div className="studioOverflowMenu">
+              <button type="button" onClick={() => { setGuidesEnabled((value) => !value); setStudioMenuOpen(false); }}>{guidesEnabled ? 'Hide Guides' : 'Show Guides'}</button>
+              <button type="button" disabled={!activeImageRenderable || !renderAssetsReady} onPointerDown={() => setShowOriginal(true)} onPointerUp={() => setShowOriginal(false)} onPointerCancel={() => setShowOriginal(false)}>Hold for Before</button>
+              <button type="button" onClick={() => { setSelectedElement('artwork'); setStudioTool('layers'); setStudioSubtool(''); setStudioMenuOpen(false); }}>Layers</button>
+            </div> : null}
+          </div>
+        ) : (
+          <button type="button" className="beforeAfterButton" disabled={!activeImageRenderable || !renderAssetsReady} onPointerDown={() => setShowOriginal(true)} onPointerUp={() => setShowOriginal(false)} onPointerCancel={() => setShowOriginal(false)} onPointerLeave={() => setShowOriginal(false)}><IOSIcon name="compare" size={16}/><span>{showOriginal ? 'After' : 'Before / After'}</span></button>
+        )}
       </div>
 
       <div className={'cardFrame ' + (previewMode === 'physical' ? 'physicalCard' : '')}>
