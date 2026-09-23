@@ -1253,12 +1253,13 @@ try {
     }
   }).png().toBuffer();
 
+  const backgroundImageInput = page
+    .locator('#panel-studio input[type="file"][accept="image/*"]')
+    .first();
+  await backgroundImageInput.waitFor({ state: 'attached', timeout: 5000 });
+
   const replaceBackground = async (name, buffer) => {
-    const [chooser] = await Promise.all([
-      page.waitForEvent('filechooser', { timeout: 10000 }),
-      page.getByRole('button', { name: /Replace Artwork/ }).click()
-    ]);
-    await chooser.setFiles({ name, mimeType: 'image/png', buffer });
+    await backgroundImageInput.setInputFiles({ name, mimeType: 'image/png', buffer });
     await page.getByText('Imported image ready to crop', { exact: true }).waitFor({
       state: 'visible',
       timeout: 15000
@@ -1267,6 +1268,10 @@ try {
       state: 'visible',
       timeout: 15000
     });
+    await page.waitForFunction(() => {
+      const input = document.querySelector('#panel-studio input[type="file"][accept="image/*"]');
+      return Boolean(input && input.value === '');
+    }, null, { timeout: 5000 });
   };
 
   const sampleBackgroundCorner = async () => editorCanvas.evaluate((node) => {
