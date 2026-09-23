@@ -7206,7 +7206,7 @@ export default function Page() {
                         else if (entry.selection === 'card-text') { setStudioTool('card'); setStudioSubtool('number'); }
                         else if (entry.type === 'text') { setStudioTool('text'); setStudioSubtool(''); }
                       }}><strong>{entry.name}</strong></button>
-                      {!entry.builtin ? <span className="layerReorderButtons"><button type="button" aria-label={'Move '+entry.name+' up'} onClick={()=>moveLayer(entry.id,1)}>↑</button><button type="button" aria-label={'Move '+entry.name+' down'} onClick={()=>moveLayer(entry.id,-1)}>↓</button></span> : <span className="layerBuiltinMark">≡</span>}
+                      <span className="layerReorderButtons"><button type="button" aria-label={'Move '+entry.name+' up'} onClick={()=>moveLayer(entry.id,1)}>↑</button><button type="button" aria-label={'Move '+entry.name+' down'} onClick={()=>moveLayer(entry.id,-1)}>↓</button></span>
                     </div>
                   ))}
                   <div className="capcutLayerRow">
