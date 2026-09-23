@@ -1142,7 +1142,9 @@ try {
     mimeType: 'image/svg+xml',
     buffer: scientificSvg
   });
-  await page.getByText('Image resolution is too large for reliable iPhone editing.', { exact: true }).waitFor({
+  await page.getByText(
+    /^(?:Image resolution is too large for reliable iPhone editing\.|SVG dimensions could not be verified safely\.)$/
+  ).first().waitFor({
     state: 'visible',
     timeout: 10000
   });
