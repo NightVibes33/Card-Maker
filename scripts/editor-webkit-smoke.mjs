@@ -1106,6 +1106,12 @@ try {
   // Studio/Artwork and must not be required simultaneously.
   const layerImageInput = page.locator('.layerAddRow + input[type="file"][accept="image/*"]').first();
   await layerImageInput.waitFor({ state: 'attached', timeout: 5000 });
+  const waitForLayerImageInputReset = async () => {
+    await page.waitForFunction(() => {
+      const input = document.querySelector('.layerAddRow + input[type="file"][accept="image/*"]');
+      return Boolean(input && input.value === '');
+    }, null, { timeout: 5000 });
+  };
 
   const oversizedSvg = Buffer.from(
     '<svg xmlns="http://www.w3.org/2000/svg" width="20000" height="20000"><rect width="100%" height="100%" fill="black"/></svg>'
@@ -1126,6 +1132,7 @@ try {
     0,
     'oversized vector art must be rejected before creating a layer'
   );
+  await waitForLayerImageInputReset();
 
   const scientificSvg = Buffer.from(
     '<svg xmlns="http://www.w3.org/2000/svg" width="1e5pt" height="1e5pt"><rect width="100%" height="100%" fill="black"/></svg>'
@@ -1144,6 +1151,7 @@ try {
     0,
     'scientific-notation SVG dimensions with absolute units must be rejected before decode'
   );
+  await waitForLayerImageInputReset();
 
   const unsafeSvg = Buffer.from(
     '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><image href="https://example.com/remote.png" width="120" height="80"/></svg>'
@@ -1162,6 +1170,7 @@ try {
     0,
     'unsafe SVG must not create an image layer'
   );
+  await waitForLayerImageInputReset();
 
   const escapedCssSvg = Buffer.from(
     '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><style>.x{fill:u\\72l(https://example.com/remote.png)}</style><rect class="x" width="120" height="80"/></svg>'
@@ -1180,6 +1189,7 @@ try {
     0,
     'CSS-escaped remote SVG references must not create an image layer'
   );
+  await waitForLayerImageInputReset();
 
   const tinyPng = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mNk+M9QzwAEYBxVSFUAAGMABf4C/WQAAAAASUVORK5CYII=',
