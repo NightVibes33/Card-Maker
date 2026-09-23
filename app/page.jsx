@@ -1506,43 +1506,8 @@ function decodedCatalogImageForItem(item) {
   return image;
 }
 
-// Library/Home previews must use the same framing rule as Studio:
-// source crop first, then a centered "cover" into the physical card ratio.
-// The previous preview path stretched sourceCrop directly to the frame, which
-// exposed AnimeDeskMat's white 1200x1200 product canvas even though Studio
-// looked correct after opening the same card.
-function catalogCoverCrop(item) {
-  const crop = normalizeCrop(item?.sourceCrop, 0.01);
-  if (!crop) return null;
-
-  const cropRatio = Number(item?.mediaAspectRatio);
-  if (!Number.isFinite(cropRatio) || cropRatio <= 0) return crop;
-
-  if (cropRatio > CARD_RATIO + 1e-6) {
-    const width = crop.w * (CARD_RATIO / cropRatio);
-    return normalizeCrop({
-      x: crop.x + (crop.w - width) / 2,
-      y: crop.y,
-      w: width,
-      h: crop.h
-    }, 0.01) || crop;
-  }
-
-  if (cropRatio < CARD_RATIO - 1e-6) {
-    const height = crop.h * (cropRatio / CARD_RATIO);
-    return normalizeCrop({
-      x: crop.x,
-      y: crop.y + (crop.h - height) / 2,
-      w: crop.w,
-      h: height
-    }, 0.01) || crop;
-  }
-
-  return crop;
-}
-
 function CatalogArtwork({ item, alt, useThumbnail = true }) {
-  const crop = catalogCoverCrop(item);
+  const crop = item?.sourceCrop;
   const src = useThumbnail
     ? proxyImageWidth(item.thumbnail || item.image, 560)
     : proxyImageWidth(item.image, 1600);
@@ -2501,30 +2466,22 @@ function inspectSearchImage(img, preferDirectAsset = false) {
 async function chooseCleanProductMedia(item) {
   const inspectUrls = Array.isArray(item.inspectUrls) ? item.inspectUrls.slice(0, 3) : [];
 
-  // CUCU products use server-side, edge-cached pixel analysis. This keeps
-  // Discover thumbnail-only and makes crop/usability metadata reusable across users.
+  // Catalog products use the shared server-side, edge-cached pixel inspector.
+  // CUCU and AnimeDeskMat follow this exact path after provider source selection.
   for (const inspectUrl of inspectUrls) {
     try {
       const response = await fetch(inspectUrl);
       const meta = await response.json();
       if (!response.ok || !meta?.usable || !meta?.full || !meta?.thumbnail) continue;
 
-      const providerCrop = normalizeCrop(item.sourceCrop, 0.01);
-      const inspectedCrop = normalizeCrop(meta.crop, 0.01);
       return {
         ...item,
         image: meta.full,
         thumbnail: meta.thumbnail,
         visualQuality: 'server-preprocessed',
         visualScore: Number(meta.quality?.variance || 0),
-        // Preserve an authoritative provider crop when inspection returns no
-        // crop. AnimeDeskMat publishes its card art inside a known white square
-        // canvas, so dropping that crop recreates the white-border regression.
-        sourceCrop: inspectedCrop || providerCrop || null,
-        mediaAspectRatio:
-          (inspectedCrop ? Number(meta.ratio) : Number(item.mediaAspectRatio)) ||
-          Number(meta.ratio) ||
-          null
+        sourceCrop: meta.crop || null,
+        mediaAspectRatio: meta.ratio || item.mediaAspectRatio || null
       };
     } catch {}
   }
