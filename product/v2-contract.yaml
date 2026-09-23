@@ -249,12 +249,12 @@ features:
     contains:
       - ".studioFloatingBar"
       - ".tabBar"
-      - "backdrop-filter:saturate(180%) blur(28px)"
+      - "backdrop-filter"
   complete_text_layers:
     file: app/page.jsx
     contains:
       - "fontFamily"
-      - "Opacity"
+      - "opacity"
   custom_layer_types:
     file: app/page.jsx
     contains:
