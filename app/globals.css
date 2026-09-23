@@ -2242,3 +2242,10 @@ button:disabled{opacity:.38}
 .backgroundRecentRail{display:flex;gap:9px;overflow-x:auto;padding:0 14px 14px}
 .backgroundRecentRail button{flex:0 0 58px;width:58px;height:74px;border:0;border-radius:10px;overflow:hidden;background:#25282e;color:#fff;padding:0}
 .backgroundRecentRail img{width:100%;height:100%;object-fit:cover}
+
+.isStudioEditor .studioFloatingBar .savePill,.isStudioEditor .studioFloatingBar .doneSelectionButton{display:none}
+.studioOverflowWrap{position:relative}
+.studioOverflowButton{min-width:36px;font-size:18px;letter-spacing:2px}
+.studioOverflowMenu{position:absolute;right:0;top:42px;z-index:90;width:170px;padding:6px;border-radius:14px;background:rgba(30,30,34,.96);border:1px solid rgba(255,255,255,.1);box-shadow:0 12px 34px rgba(0,0,0,.45)}
+.studioOverflowMenu button{display:block;width:100%;min-height:42px;padding:0 10px;border:0;border-bottom:1px solid rgba(255,255,255,.07);background:transparent;color:#fff;text-align:left}
+.studioOverflowMenu button:last-child{border-bottom:0}
