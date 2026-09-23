@@ -41,7 +41,7 @@ function importMetadata(value = {}) {
 }
 const ART_CACHE = 'card-studio-art-v5';
 const ART_CACHE_LIMIT = 40;
-const THUMB_CACHE = 'card-studio-thumb-v3';
+const THUMB_CACHE = 'card-studio-thumb-v4';
 // The combined catalog is larger than the old 160-entry LRU. Keep enough
 // thumbnail slots for the complete AnimeDeskMat collection plus CUCU browsing
 // so catalog artwork can remain available after it has been cached on-device.
