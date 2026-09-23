@@ -2512,7 +2512,6 @@ async function chooseCleanProductMedia(item) {
       const meta = await response.json();
       if (!response.ok || !meta?.usable || !meta?.full || !meta?.thumbnail) continue;
 
-      const providerCrop = normalizeCrop(item.sourceCrop, 0.01);
       const inspectedCrop = normalizeCrop(meta.crop, 0.01);
       return {
         ...item,
@@ -2520,14 +2519,9 @@ async function chooseCleanProductMedia(item) {
         thumbnail: meta.thumbnail,
         visualQuality: 'server-preprocessed',
         visualScore: Number(meta.quality?.variance || 0),
-        // Preserve an authoritative provider crop when inspection returns no
-        // crop. AnimeDeskMat publishes its card art inside a known white square
-        // canvas, so dropping that crop recreates the white-border regression.
-        sourceCrop: inspectedCrop || providerCrop || null,
-        mediaAspectRatio:
-          (inspectedCrop ? Number(meta.ratio) : Number(item.mediaAspectRatio)) ||
-          Number(meta.ratio) ||
-          null
+        // CUCU and AnimeDeskMat intentionally share one crop authority.
+        sourceCrop: inspectedCrop || null,
+        mediaAspectRatio: Number(meta.ratio) || null
       };
     } catch {}
   }
