@@ -4707,7 +4707,7 @@ export default function Page() {
       originalSourceCrop: item.sourceCrop || null,
       zoom: CATALOG_ARTWORK_EDITOR_ZOOM
     }), {
-      studioTool: 'position',
+      studioTool: 'crop',
       statusMessage: 'New project created from ' + item.title,
       backgroundPreviewImage: decodedPreview
     });
@@ -7233,7 +7233,7 @@ export default function Page() {
                 </div>:null}
                 {studioSubtool==='color'?<><div className="backgroundSwatches">{['#000000','#ffffff','#1c1c1e','#3a3a3c','#ff375f','#0a84ff','#30d158'].map(v=><button type="button" key={v} aria-label={'Background '+v} style={{background:v}} onClick={()=>patch({background:'',backgroundColor:v})}/>)}</div></>:null}
                 {studioSubtool==='gradient'?<div className="presetScroller capcutPresetStrip">{GRADIENTS.map(g=><button type="button" key={g.id} onClick={()=>patch({background:'',backgroundColor:'',gradient:g.id})}>{g.name||g.id}</button>)}</div>:null}
-                {studioSubtool==='image'?<><button type="button" className="capcutPrimaryTile" onClick={()=>{uploadIntentRef.current='replace-artwork';uploadRef.current?.click()}}>+ Choose Image</button><div className="backgroundRecentRail">{recent.slice(0,8).map((item,i)=><button type="button" key={item.id||item.image||i} onClick={()=>item.image&&loadPreset(item)}>{item.image?<img src={item.image} alt=""/>:<span>Image</span>}</button>)}</div></>:null}
+                {studioSubtool==='image'?<><button type="button" className="capcutPrimaryTile" onClick={()=>{uploadIntentRef.current='replace-artwork';uploadRef.current?.click()}}>+ Choose Image</button><div className="backgroundRecentRail">{recent.slice(0,8).map((item,i)=><button type="button" key={item.id||item.image||i} onClick={()=>item.image&&useArtwork(item)}>{item.image?<img src={item.image} alt=""/>:<span>Image</span>}</button>)}</div></>:null}
                 {studioSubtool==='blur'?<SliderRow label="Blur" value={design.blur} min={0} max={1} step={0.01} onChange={(v)=>patch({blur:v})}/>:null}
               </section>
             ) : null}
