@@ -4656,7 +4656,7 @@ export default function Page() {
   }
 
   function startFreshWorkingProject(nextDesign, {
-    studioTool = 'position',
+    studioTool = 'crop',
     statusMessage = 'New card ready',
     backgroundPreviewImage = null
   } = {}) {
@@ -4705,6 +4705,7 @@ export default function Page() {
     setGuidesEnabled(false);
     setActiveGuides({ x: null, y: null });
     setStudioTool(studioTool);
+    setStudioSubtool('');
     setProjectName('');
     setSaveStatus(hydrated && autosaveReady ? 'Saving…' : 'Saved');
     setTab('studio');
@@ -4803,6 +4804,7 @@ export default function Page() {
       flipX: false
     });
     setSelectedElement('artwork');
+    setStudioSubtool('');
     setMessage((asset.name || 'Imported image') + ' replaced card artwork');
     return true;
   }
@@ -4827,6 +4829,7 @@ export default function Page() {
       flipX: false
     });
     setSelectedElement('artwork');
+    setStudioSubtool('');
     rememberArtwork(item);
     cacheArtwork(workingImage);
     setMessage('Card artwork replaced');
@@ -4923,6 +4926,7 @@ export default function Page() {
       setSelectedElement('artwork');
       setShowOriginal(false);
       setStudioTool('crop');
+      setStudioSubtool('');
       setTab('studio');
       setMessage('Artwork replaced · existing card settings kept');
     }
@@ -6950,7 +6954,7 @@ export default function Page() {
             {studioMenuOpen ? <div className="studioOverflowMenu">
               <button type="button" onClick={() => { reset(); setStudioMenuOpen(false); }}>New Card</button>
               <button type="button" onClick={() => { setGuidesEnabled((value) => !value); setStudioMenuOpen(false); }}>{guidesEnabled ? 'Hide Guides' : 'Show Guides'}</button>
-              <button type="button" onClick={() => { setExpertMode((value) => !value); setStudioMenuOpen(false); }}>{expertMode ? 'Disable Precision' : 'Enable Precision'}</button>
+              <button type="button" onClick={() => { if (expertMode && studioTool === 'crop' && studioSubtool === 'precision') setStudioSubtool(''); setExpertMode((value) => !value); setStudioMenuOpen(false); }}>{expertMode ? 'Disable Precision' : 'Enable Precision'}</button>
               <button type="button" disabled={!activeImageRenderable || !renderAssetsReady} onPointerDown={() => setShowOriginal(true)} onPointerUp={() => setShowOriginal(false)} onPointerCancel={() => setShowOriginal(false)}>Hold for Before</button>
               <button type="button" onClick={() => { setSelectedElement('artwork'); setStudioTool('layers'); setStudioSubtool(''); setStudioMenuOpen(false); }}>Layers</button>
               <button type="button" onClick={() => { setSelectedElement('artwork'); setStudioTool('background'); setStudioSubtool(''); setStudioMenuOpen(false); }}>Background</button>
@@ -7240,9 +7244,9 @@ export default function Page() {
                 <div className="capcutSubtools">
                   <button type="button" className="active" onClick={() => setStudioSubtool('crop')}><IOSIcon name="crop" size={22}/><small>Crop</small></button>
                   <button type="button" onClick={() => setStudioSubtool('transform')}><IOSIcon name="position" size={22}/><small>Transform</small></button>
-                  <button type="button" onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{rotation:normalizeFreeRotation(Number(selectedLayer.rotation||0)+90)}) : patch({ rotate: normalizeFreeRotation(Number(design.rotate || 0) + 90) })}><IOSIcon name="rotate" size={22}/><small>Rotate</small></button>
-                  <button type="button" onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{flipX:!selectedLayer.flipX}) : patch({ flipX: !design.flipX })}><IOSIcon name="flip" size={22}/><small>Flip</small></button>
-                  <button type="button" onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{x:0.5,y:0.5,scale:1,rotation:0,flipX:false}) : patch({ zoom:1,x:0,y:0,rotate:0,flipX:false,sourceCrop:design.originalSourceCrop||null })}><IOSIcon name="reset" size={22}/><small>Reset</small></button>
+                  <button type="button" disabled={Boolean(selectedLayer?.locked)} onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{rotation:normalizeFreeRotation(Number(selectedLayer.rotation||0)+90)}) : patch({ rotate: normalizeFreeRotation(Number(design.rotate || 0) + 90) })}><IOSIcon name="rotate" size={22}/><small>Rotate</small></button>
+                  <button type="button" disabled={Boolean(selectedLayer?.locked)} onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{flipX:!selectedLayer.flipX}) : patch({ flipX: !design.flipX })}><IOSIcon name="flip" size={22}/><small>Flip</small></button>
+                  <button type="button" disabled={Boolean(selectedLayer?.locked)} onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{x:0.5,y:0.5,scale:1,rotation:0,flipX:false}) : patch({ zoom:1,x:0,y:0,rotate:0,flipX:false,sourceCrop:design.originalSourceCrop||null })}><IOSIcon name="reset" size={22}/><small>Reset</small></button>
                   {expertMode ? <button type="button" onClick={() => setStudioSubtool('precision')}><span>123</span><small>Precision</small></button> : null}
                 </div>
               </section>
@@ -7252,18 +7256,20 @@ export default function Page() {
               <section className="studioContextCard capcutContextPanel">
                 <div className="contextPanelHeader"><button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button><strong>Transform</strong><button type="button" onClick={() => setStudioSubtool('')}>✓</button></div>
                 {selectedLayer ? <>
-                  <SliderRow label="Scale" value={selectedLayer.scale || 1} min={0.2} max={4} step={0.01} onChange={(value) => updateLayer(selectedLayer.id,{scale:value})}/>
-                  <SliderRow label="Horizontal" value={selectedLayer.x ?? 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id,{x:value})}/>
-                  <SliderRow label="Vertical" value={selectedLayer.y ?? 0.5} min={0} max={1} step={0.005} onChange={(value) => updateLayer(selectedLayer.id,{y:value})}/>
+                  <fieldset disabled={Boolean(selectedLayer.locked)} style={{border:0,padding:0,margin:0,minWidth:0}}>
+                  <SliderRow label="Scale" value={selectedLayer.scale || 1} min={0.2} max={4} step={0.01} disabled={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id,{scale:value})}/>
+                  <SliderRow label="Horizontal" value={selectedLayer.x ?? 0.5} min={0} max={1} step={0.005} disabled={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id,{x:value})}/>
+                  <SliderRow label="Vertical" value={selectedLayer.y ?? 0.5} min={0} max={1} step={0.005} disabled={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id,{y:value})}/>
                   <SliderRow label="Rotation" value={selectedLayer.rotation || 0} min={-180} max={180} step={1} suffix="°" disabled={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id,{rotation:value})}/>
                   {selectedLayer.type === 'image' ? <><SliderRow label="Image Width" value={selectedLayer.width ?? 640} min={20} max={1800} step={1} disabled={Boolean(selectedLayer.locked)} onChange={(value)=>updateLayer(selectedLayer.id,{width:value})}/><SwitchRow label="Flip Image" value={Boolean(selectedLayer.flipX)} onChange={(value)=>updateLayer(selectedLayer.id,{flipX:value})}/></> : null}
                   {selectedLayer.type === 'shape' ? <><div className="segmentedControl capcutSegmented"><button type="button" className={selectedLayer.shape!=='ellipse'?'selected':''} onClick={()=>updateLayer(selectedLayer.id,{shape:'rectangle'})}>Rectangle</button><button type="button" className={selectedLayer.shape==='ellipse'?'selected':''} onClick={()=>updateLayer(selectedLayer.id,{shape:'ellipse'})}>Ellipse</button></div><SliderRow label="Width" value={selectedLayer.width??280} min={20} max={1200} step={1} onChange={(value)=>updateLayer(selectedLayer.id,{width:value})}/><SliderRow label="Height" value={selectedLayer.height??120} min={20} max={800} step={1} onChange={(value)=>updateLayer(selectedLayer.id,{height:value})}/>{selectedLayer.shape!=='ellipse'?<SliderRow label="Corner Radius" value={selectedLayer.radius??28} min={0} max={Math.max(0,Math.floor(Math.min(Number(selectedLayer.width??280),Number(selectedLayer.height??120))/2))} step={1} onChange={(value)=>updateLayer(selectedLayer.id,{radius:value})}/>:null}<label className="colorRow"><span>Shape Color</span><input type="color" value={selectedLayer.color||'#ffffff'} onChange={(e)=>updateLayer(selectedLayer.id,{color:e.target.value})}/></label></> : null}
                   {selectedLayer.type === 'chip' ? <div className="tonePicker">{['gold','silver','black','rose'].map((tone)=><button type="button" key={tone} className={selectedLayer.tone===tone?'selected':''} onClick={()=>updateLayer(selectedLayer.id,{tone})}><i className={'chipTone '+tone}/><span>{tone}</span></button>)}</div> : null}
                   {selectedLayer.type === 'contactless' ? <label className="colorRow"><span>Contactless Color</span><input type="color" value={selectedLayer.color||'#ffffff'} onChange={(e)=>updateLayer(selectedLayer.id,{color:e.target.value})}/></label> : null}
-                  <SliderRow label="Opacity" value={selectedLayer.opacity ?? 1} min={0} max={1} step={0.01} onChange={(value)=>updateLayer(selectedLayer.id,{opacity:value})}/>
+                  <SliderRow label="Opacity" value={selectedLayer.opacity ?? 1} min={0} max={1} step={0.01} disabled={Boolean(selectedLayer.locked)} onChange={(value)=>updateLayer(selectedLayer.id,{opacity:value})}/>
+                  </fieldset>
                   <SwitchRow label="Show Layer" value={!selectedLayer.hidden} onChange={(value)=>updateLayer(selectedLayer.id,{hidden:!value})}/>
                   <SwitchRow label="Lock Layer" value={Boolean(selectedLayer.locked)} onChange={(value)=>updateLayer(selectedLayer.id,{locked:value})}/>
-                  <div className="layerActionGrid"><button type="button" onClick={()=>duplicateLayer(selectedLayer.id)}>Duplicate</button><button type="button" onClick={()=>deleteLayer(selectedLayer.id)}>Delete</button></div>
+                  <div className="layerActionGrid"><button type="button" onClick={()=>duplicateLayer(selectedLayer.id)}>Duplicate</button><button type="button" disabled={Boolean(selectedLayer.locked)} onClick={()=>deleteLayer(selectedLayer.id)}>Delete</button></div>
                 </> : <>
                   <SliderRow label="Scale" value={design.zoom} min={0.5} max={3} step={0.01} onChange={(value) => patch({ zoom: value })}/>
                   <SliderRow label="Horizontal" value={design.x} min={-1} max={1} step={0.01} onChange={(value) => patch({ x: value })}/>
@@ -7327,16 +7333,18 @@ export default function Page() {
               <section className="studioContextCard capcutContextPanel">
                 <div className="contextPanelHeader">{studioSubtool ? <button type="button" className="contextBack" onClick={()=>setStudioSubtool('')}>‹</button> : <span/>}<strong>{studioSubtool ? ({font:'Font',style:'Style',color:'Color',shadow:'Shadow',spacing:'Spacing',align:'Align',layer:'Layer'}[studioSubtool] || 'Text') : 'Text'}</strong><button type="button" onClick={()=>{setStudioSubtool('');setStudioTool('crop')}}>✓</button></div>
                 {selectedLayer?.type === 'text' ? <>
-                  {!studioSubtool ? <><textarea className="capcutTextInput iosTextArea" rows={3} value={selectedLayer.text||''} aria-label="Layer text" onChange={(e)=>updateLayer(selectedLayer.id,{text:splitGraphemes(e.target.value).slice(0,500).join('')})}/><div className="capcutSubtools">
+                  {!studioSubtool ? <><textarea className="capcutTextInput iosTextArea" rows={3} disabled={Boolean(selectedLayer.locked)} value={selectedLayer.text||''} aria-label="Layer text" onChange={(e)=>updateLayer(selectedLayer.id,{text:splitGraphemes(e.target.value).slice(0,500).join('')})}/><div className="capcutSubtools">
                     {['font','style','color','shadow','spacing','align','layer'].map((key)=><button type="button" key={key} onClick={()=>setStudioSubtool(key)}><span className={key==='color'?'textColorToolIcon':''} style={key==='color'?{'--selected-text-color':selectedLayer.color||'#ffffff'}:undefined}>{{font:'Aa',style:'B',color:'',shadow:'◔',spacing:'≡',align:'☰',layer:'≡'}[key]}</span><small>{key[0].toUpperCase()+key.slice(1)}</small></button>)}
                   </div></> : null}
+                  <fieldset disabled={Boolean(selectedLayer.locked)} style={{border:0,padding:0,margin:0,minWidth:0}}>
                   {studioSubtool==='font'?<><div className="segmentedControl capcutSegmented">{[['system','System'],['rounded','Rounded'],['serif','Serif'],['mono','Mono']].map(([v,l])=><button type="button" key={v} className={selectedLayer.fontFamily===v?'selected':''} onClick={()=>updateLayer(selectedLayer.id,{fontFamily:v})}>{l}</button>)}</div><SliderRow label="Size" value={selectedLayer.fontSize||58} min={10} max={240} step={1} onChange={(v)=>updateLayer(selectedLayer.id,{fontSize:v})}/></>:null}
                   {studioSubtool==='style'?<><div className="capcutSubtools"><button type="button" className={Number(selectedLayer.weight||700)>=700?'active':''} onClick={()=>updateLayer(selectedLayer.id,{weight:Number(selectedLayer.weight||700)>=700?400:800})}><span>B</span><small>Bold</small></button></div><SliderRow label="Weight" value={selectedLayer.weight||700} min={100} max={900} step={100} onChange={(v)=>updateLayer(selectedLayer.id,{weight:v})}/></>:null}
                   {studioSubtool==='color'?<><div className="backgroundSwatches">{['#ffffff','#000000','#ff375f','#ff9f0a','#ffd60a','#30d158','#64d2ff','#0a84ff','#5e5ce6','#bf5af2'].map((v)=><button type="button" key={v} aria-label={'Text color '+v} style={{background:v}} onClick={()=>updateLayer(selectedLayer.id,{color:v})}/>)}</div><label className="capcutColorPicker"><input aria-label="Custom text color" type="color" value={selectedLayer.color||'#ffffff'} onChange={(e)=>updateLayer(selectedLayer.id,{color:e.target.value})}/><span>Custom · {selectedLayer.color||'#ffffff'}</span></label></>:null}
                   {studioSubtool==='shadow'?<SwitchRow label="Shadow" value={Boolean(selectedLayer.shadow)} onChange={(v)=>updateLayer(selectedLayer.id,{shadow:v})}/>:null}
                   {studioSubtool==='spacing'?<><SliderRow label="Letter Spacing" value={selectedLayer.letterSpacing||0} min={-4} max={30} step={0.1} onChange={(v)=>updateLayer(selectedLayer.id,{letterSpacing:v})}/><SliderRow label="Line Height" value={selectedLayer.lineHeight||1.18} min={0.7} max={2.4} step={0.01} onChange={(v)=>updateLayer(selectedLayer.id,{lineHeight:v})}/></>:null}
                   {studioSubtool==='align'?<div className="segmentedControl capcutSegmented">{['left','center','right'].map(v=><button type="button" key={v} className={selectedLayer.align===v?'selected':''} onClick={()=>updateLayer(selectedLayer.id,{align:v})}>{v}</button>)}</div>:null}
-                  {studioSubtool==='layer'?<><SliderRow label="Opacity" value={selectedLayer.opacity??1} min={0} max={1} step={0.01} onChange={(v)=>updateLayer(selectedLayer.id,{opacity:v})}/><SwitchRow label="Show Layer" value={!selectedLayer.hidden} onChange={(v)=>updateLayer(selectedLayer.id,{hidden:!v})}/><SwitchRow label="Lock Layer" value={Boolean(selectedLayer.locked)} onChange={(v)=>updateLayer(selectedLayer.id,{locked:v})}/><div className="layerActionGrid"><button type="button" onClick={()=>duplicateLayer(selectedLayer.id)}>Duplicate</button><button type="button" onClick={()=>deleteLayer(selectedLayer.id)}>Delete</button></div></>:null}
+                  </fieldset>
+                  {studioSubtool==='layer'?<><SliderRow label="Opacity" value={selectedLayer.opacity??1} min={0} max={1} step={0.01} disabled={Boolean(selectedLayer.locked)} onChange={(v)=>updateLayer(selectedLayer.id,{opacity:v})}/><SwitchRow label="Show Layer" value={!selectedLayer.hidden} onChange={(v)=>updateLayer(selectedLayer.id,{hidden:!v})}/><SwitchRow label="Lock Layer" value={Boolean(selectedLayer.locked)} onChange={(v)=>updateLayer(selectedLayer.id,{locked:v})}/><div className="layerActionGrid"><button type="button" onClick={()=>duplicateLayer(selectedLayer.id)}>Duplicate</button><button type="button" disabled={Boolean(selectedLayer.locked)} onClick={()=>deleteLayer(selectedLayer.id)}>Delete</button></div></>:null}
                 </> : <button type="button" className="capcutPrimaryTile" onClick={addTextLayer}>+ Add Text</button>}
               </section>
             ) : null}
@@ -7667,16 +7675,15 @@ export default function Page() {
                 </div>
                 {selectedImageLayer ? <small className="contextTargetNote">Effects apply only to this imported layer</small> : null}
                 <div className="effectTileRail">
-                    <button type="button" onClick={() => patchImageTarget({vignette:0,grain:0,gloss:0,overlay:0,fade:0,effectTintStrength:0})}><i className="effectNone"/><small>None</small></button>
+                    <button type="button" disabled={!activeImageEditable} onClick={() => patchImageTarget({vignette:0,grain:0,gloss:0,overlay:0,fade:0,effectTintStrength:0})}><i className="effectNone"/><small>None</small></button>
                     {[['gloss','Gloss'],['grain','Grain'],['vignette','Vignette'],['fade','Film'],['overlay','Dark'],['tintfx','Tint']].map(([key,label]) => <button type="button" key={key} className={studioSubtool===key?'active':''} onClick={() => setStudioSubtool(key)}><i className={'effectSwatch '+key}>{activeEffectThumbnail ? <img src={activeEffectThumbnail} alt=""/> : null}</i><small>{label}</small></button>)}
                 </div>
                 {studioSubtool ? <>
-                    {studioSubtool === 'gloss' ? <SliderRow label="Gloss" value={activeImageSettings.gloss} min={0} max={0.8} step={0.01} onChange={(value)=>patchImageTarget({gloss:value})}/> : null}
-                    {studioSubtool === 'grain' ? <SliderRow label="Grain" value={activeImageSettings.grain} min={0} max={0.22} step={0.005} onChange={(value)=>patchImageTarget({grain:value})}/> : null}
-                    {studioSubtool === 'vignette' ? <SliderRow label="Vignette intensity" value={activeImageSettings.vignette} min={0} max={0.8} step={0.01} onChange={(value)=>patchImageTarget({vignette:value})}/> : null}
-                    {studioSubtool === 'fade' ? <SliderRow label="Fade" value={activeImageSettings.fade} min={0} max={1} step={0.01} onChange={(value)=>patchImageTarget({fade:value})}/> : null}
-                    {studioSubtool === 'overlay' ? <SliderRow label="Dark Overlay" value={activeImageSettings.overlay} min={0} max={0.75} step={0.01} onChange={(value)=>patchImageTarget({overlay:value})}/> : null}
-                    {studioSubtool === 'tint' ? <><label className="capcutColorPicker"><input aria-label="Effect tint color" type="color" disabled={!activeImageEditable} value={activeImageSettings.effectTint||'#7b61ff'} onChange={(e)=>patchImageTarget({effectTint:e.target.value})}/><span>{activeImageSettings.effectTint||'#7b61ff'}</span></label><div className="studioColorSwatches">{['#7b61ff','#ff2d55','#ff9500','#ffcc00','#34c759','#00c7be','#007aff','#ffffff','#000000'].map(v=><button type="button" key={v} aria-label={'Effect tint '+v} style={{background:v}} onClick={()=>patchImageTarget({effectTint:v})}/>)}</div><SliderRow label="Tint Strength" value={activeImageSettings.effectTintStrength} min={0} max={1} step={0.01} disabled={!activeImageEditable} onChange={(v)=>patchImageTarget({effectTintStrength:v})}/></> : null}
+                    {studioSubtool === 'gloss' ? <SliderRow label="Gloss" value={activeImageSettings.gloss} min={0} max={0.8} step={0.01} disabled={!activeImageEditable} onChange={(value)=>patchImageTarget({gloss:value})}/> : null}
+                    {studioSubtool === 'grain' ? <SliderRow label="Grain" value={activeImageSettings.grain} min={0} max={0.22} step={0.005} disabled={!activeImageEditable} onChange={(value)=>patchImageTarget({grain:value})}/> : null}
+                    {studioSubtool === 'vignette' ? <SliderRow label="Vignette intensity" value={activeImageSettings.vignette} min={0} max={0.8} step={0.01} disabled={!activeImageEditable} onChange={(value)=>patchImageTarget({vignette:value})}/> : null}
+                    {studioSubtool === 'fade' ? <SliderRow label="Fade" value={activeImageSettings.fade} min={0} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value)=>patchImageTarget({fade:value})}/> : null}
+                    {studioSubtool === 'overlay' ? <SliderRow label="Dark Overlay" value={activeImageSettings.overlay} min={0} max={0.75} step={0.01} disabled={!activeImageEditable} onChange={(value)=>patchImageTarget({overlay:value})}/> : null}
                     {studioSubtool === 'tintfx' ? <><label className="capcutColorPicker"><input aria-label="Effect tint color" type="color" disabled={!activeImageEditable} value={activeImageSettings.effectTint || '#7b61ff'} onChange={(event)=>patchImageTarget({effectTint:event.target.value})}/><span>Custom · {activeImageSettings.effectTint || '#7b61ff'}</span></label><div className="studioColorSwatches">{['#7b61ff','#ff2d55','#ff9500','#ffcc00','#34c759','#00c7be','#007aff','#ffffff','#000000'].map(v=><button type="button" key={v} disabled={!activeImageEditable} aria-label={'Effect tint '+v} style={{background:v}} onClick={()=>patchImageTarget({effectTint:v})}/>)}</div><SliderRow label="Tint Strength" value={activeImageSettings.effectTintStrength} min={0} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value)=>patchImageTarget({effectTintStrength:value})}/></> : null}
                 </> : null}
               </section>
@@ -7885,7 +7892,7 @@ export default function Page() {
                 <span><strong>New Card</strong><small>Start with a clean card. Unsaved work is discarded; saved projects stay in Library.</small></span>
                 <IOSIcon name="reset" size={18} />
               </button>
-              <SwitchRow label="Expert Mode" detail="Show precise numeric editing controls" value={expertMode} onChange={setExpertMode} />
+              <SwitchRow label="Expert Mode" detail="Show precise numeric editing controls" value={expertMode} onChange={(value) => { if (!value && studioTool === 'crop' && studioSubtool === 'precision') setStudioSubtool(''); setExpertMode(value); }} />
               <button type="button" className="actionRow" onClick={() => setInstallHelp(true)}>
                 <span><strong>Install Card Studio</strong><small>Add the PWA to your iPhone Home Screen</small></span>
                 <IOSIcon name="chevron" size={17} />
