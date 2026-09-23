@@ -120,6 +120,7 @@ const DEFAULTS = {
   sourceCrop: null,
   originalSourceCrop: null,
   gradient: 0,
+  backgroundColor: '',
   fit: 'cover',
   zoom: 1,
   x: 0,
@@ -3757,8 +3758,9 @@ export default function Page() {
   const renderCard = useCallback((ctx, width, height, options = {}) => {
     if (!ctx) return;
     const renderDesign = options.design || design;
-    const renderGradient =
-      GRADIENTS.find((item) => item.id === renderDesign.gradient) || GRADIENTS[0];
+    const renderGradient = renderDesign.backgroundColor
+      ? { a: renderDesign.backgroundColor, b: renderDesign.backgroundColor, c: renderDesign.backgroundColor }
+      : (GRADIENTS.find((item) => item.id === renderDesign.gradient) || GRADIENTS[0]);
     const renderImageLayerSourceKey = imageLayerSourceKeyForDesign(renderDesign);
     const originalTarget = options.originalTarget || (options.original ? 'all' : null);
     const artworkOriginal = originalTarget === 'all' || originalTarget === 'artwork';
@@ -7225,8 +7227,8 @@ export default function Page() {
                   <button type="button" onClick={()=>setStudioSubtool('image')}><IOSIcon name="photo" size={22}/><small>Image</small></button>
                   <button type="button" onClick={()=>setStudioSubtool('blur')}><span>✣</span><small>Blur</small></button>
                 </div>:null}
-                {studioSubtool==='color'?<><div className="backgroundSwatches">{['#000000','#ffffff','#1c1c1e','#3a3a3c','#ff375f','#0a84ff','#30d158'].map(v=><button type="button" key={v} aria-label={'Background '+v} style={{background:v}} onClick={()=>patch({background:'',gradient:'solid',solidColor:v})}/>)}</div></>:null}
-                {studioSubtool==='gradient'?<div className="presetScroller capcutPresetStrip">{GRADIENTS.map(g=><button type="button" key={g.id} onClick={()=>patch({background:'',gradient:g.id})}>{g.name||g.id}</button>)}</div>:null}
+                {studioSubtool==='color'?<><div className="backgroundSwatches">{['#000000','#ffffff','#1c1c1e','#3a3a3c','#ff375f','#0a84ff','#30d158'].map(v=><button type="button" key={v} aria-label={'Background '+v} style={{background:v}} onClick={()=>patch({background:'',backgroundColor:v})}/>)}</div></>:null}
+                {studioSubtool==='gradient'?<div className="presetScroller capcutPresetStrip">{GRADIENTS.map(g=><button type="button" key={g.id} onClick={()=>patch({background:'',backgroundColor:'',gradient:g.id})}>{g.name||g.id}</button>)}</div>:null}
                 {studioSubtool==='image'?<><button type="button" className="capcutPrimaryTile" onClick={()=>{uploadIntentRef.current='replace-artwork';uploadRef.current?.click()}}>+ Choose Image</button><div className="backgroundRecentRail">{recent.slice(0,8).map((item,i)=><button type="button" key={item.id||item.image||i} onClick={()=>item.image&&loadPreset(item)}>{item.image?<img src={item.image} alt=""/>:<span>Image</span>}</button>)}</div></>:null}
                 {studioSubtool==='blur'?<SliderRow label="Blur" value={design.blur} min={0} max={1} step={0.01} onChange={(v)=>patch({blur:v})}/>:null}
               </section>
