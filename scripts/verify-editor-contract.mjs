@@ -20,6 +20,8 @@ const imagePolicy = read('app/lib/imagePolicy.js');
 
 const pageChecks = [
   [/function normalizeDesignState\(/, 'restored designs are normalized'],
+  [/next\.backgroundColor = raw\.backgroundColor \? normalizeHexColor\(raw\.backgroundColor, DEFAULTS\.backgroundColor\) : '';/, 'chosen background colors survive draft and project normalization'],
+  [/function replaceWithImportedArtwork\(asset\) \{[\s\S]{0,850}patch\(\{[\s\S]{0,120}background: 'idb:\/\/imports\/' \+ asset\.id/, 'selecting a saved import in Studio replaces artwork without clearing the card'],
   [/function normalizeImportArtworkSource\(/, 'persisted import artwork IDs are validated canonically'],
   [/rawUrl\.length > 2200/, 'persisted proxy targets are length bounded'],
   [/const normalized = new URLSearchParams\(\)/, 'persisted proxy URLs are rebuilt from supported parameters only'],
@@ -281,7 +283,7 @@ requireMatch(storage, /db\.onclose = \(\) => \{[\s\S]{0,100}dbPromise = null;/, 
 requireMatch(storage, /const snapshot = await withDbRetry\(/, 'import metadata hydration uses the transient IndexedDB retry path');
 requireMatch(storage, /parsed\.pathname !== '\/api\/image'/, 'offline artwork cache only accepts the local image proxy');
 requireMatch(storage, /parseAllowedRemoteImageUrl\(upstream\)/, 'offline artwork cache validates the upstream image host');
-requireMatch(imagePolicy, /export const IMAGE_PROXY_VERSION = '2';/, 'image proxy URLs have an explicit cache generation');
+requireMatch(imagePolicy, /export const IMAGE_PROXY_VERSION = '[1-9][0-9]*';/, 'image proxy URLs have an explicit cache generation');
 requireMatch(page, /normalized\.set\('v', IMAGE_PROXY_VERSION\)/, 'client proxy URLs use the current cache generation');
 requireMatch(inspectRoute, /IMAGE_PROXY_VERSION/, 'inspected artwork URLs use the current cache generation');
 requireMatch(storage, /await cache\.delete\(url\);[\s\S]{0,120}await cache\.put\(url, existing\.clone\(\)\)/, 'explicit offline saves refresh cache eviction priority');
@@ -370,7 +372,7 @@ const proxySecurityChecks = [
   [imageRoute, /Processed image too large/, 'oversized normalized proxy output fails closed'],
   [imageRoute, /import sharp from 'sharp'/, 'image proxy can resize non-CDN artwork server-side'],
   [imageRoute, /limitInputPixels: MAX_DECODED_IMAGE_PIXELS/, 'proxy decoding has a pixel safety bound'],
-  [imageRoute, /const shouldNormalize = width >= 160;/, 'every requested proxy width is enforced server-side'],
+  [imageRoute, /const shouldNormalize = width >= 160 \|\| Boolean\(cropRect\);/, 'every requested proxy width is enforced server-side'],
   [imageRoute, /\.resize\(\{[\s\S]*width,[\s\S]*withoutEnlargement: true/s, 'proxy width requests are enforced server-side'],
   [imageRoute, /responseType = 'image\/webp'/, 'normalized proxy images return a deterministic web format'],
   [inspectRoute, /redirect:\s*'manual'/, 'artwork inspector validates redirects before following them'],

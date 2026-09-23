@@ -2277,6 +2277,12 @@ button:disabled{opacity:.38}
 .isStudioEditor .layerVisibilityButton{display:grid;place-items:center}
 .isStudioEditor .layerSelectButton{padding:0 4px}
 .isStudioEditor .layerReorderButtons button{display:grid;place-items:center}
+.isStudioEditor .capcutSubtools button>svg{flex:none;width:46px;height:46px;padding:12px;border-radius:50%;background:#272a30;box-shadow:inset 0 0 0 .5px rgba(255,255,255,.08);color:#f3f4f6}
+.isStudioEditor .capcutSubtools button:active>svg{background:#30343b}
+.isStudioEditor .studioImportedArtwork{display:grid;gap:6px;padding:10px 14px}
+.isStudioEditor .studioImportedArtwork>strong{font-size:12px;color:#c4c7cf}
+.isStudioEditor .studioImportedArtwork button{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 10px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:#24262b;color:#f3f4f6;text-align:left}
+.isStudioEditor .studioImportedArtwork button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:430px){.isStudioEditor .studioToolBar{padding-left:8px;padding-right:8px}.isStudioEditor .studioToolBar button{flex-basis:60px}}
 
 .studioColorSwatches{display:flex;gap:10px;overflow-x:auto;padding:10px 14px 16px}
@@ -2287,3 +2293,32 @@ button:disabled{opacity:.38}
 
 .backgroundImportActions{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:12px 14px}
 .backgroundImportActions .capcutPrimaryTile{min-height:64px;display:flex;align-items:center;justify-content:center;gap:7px}
+
+/* Six primary tools stay in the reference positions; secondary panels live in More. */
+.isStudioEditor .studioToolBar{width:100%;overflow:visible;justify-content:space-between;gap:2px;padding:6px 2px 8px}
+.isStudioEditor .studioToolBar button,.isStudioEditor .studioToolBar button.active{flex:1 1 0;min-width:0;min-height:68px;padding:8px 1px 5px;border-radius:12px!important}
+.isStudioEditor .studioToolBar button.active{background:linear-gradient(180deg,#16447a,#102841)!important;box-shadow:inset 0 0 0 1px #358de0,0 5px 14px rgba(0,90,200,.22)!important}
+.isStudioEditor .studioToolIcon,.isStudioEditor .studioToolBar button.active .studioToolIcon{width:29px;height:30px;background:transparent;box-shadow:none;color:#f3f4f6}
+.isStudioEditor .studioToolBar button.active .studioToolIcon{color:#fff}
+.isStudioEditor .studioToolLabel{font-size:10px;line-height:12px}
+.isStudioEditor .capcutRootPanel .capcutSubtools button.active{border-radius:13px;background:linear-gradient(180deg,#174579,#112b46);box-shadow:inset 0 0 0 1px #328bdc,0 6px 14px rgba(0,90,200,.2)}
+.isStudioEditor .capcutRootPanel .capcutSubtools button.active>svg{background:transparent;box-shadow:none}
+.isStudioEditor .capcutSubtools .textColorToolIcon{background:var(--selected-text-color);box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+.isStudioEditor .capcutChipPresets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:14px 14px 4px}
+.isStudioEditor .capcutChipPresets button{display:grid;place-items:center;min-height:57px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:#25272d}
+.isStudioEditor .capcutChipPresets button.selected{border-color:#348fe3;box-shadow:0 0 0 1px #348fe3,inset 0 0 18px rgba(10,132,255,.24)}
+.isStudioEditor .capcutChipPresets .chipTone{width:46px;height:34px;border-radius:5px}
+.isStudioEditor .capcutSubtools button.active>span,.isStudioEditor .capcutSubtools button.active>svg{background:#0c4a81;box-shadow:inset 0 0 0 1px #328bdc}
+.isStudioEditor .capcutRootPanel .capcutSubtools button.active>svg{background:transparent;box-shadow:none}
+.isStudioEditor .effectTileRail button.active i{box-shadow:0 0 0 2px #328bdc,0 0 13px rgba(10,132,255,.4)}
+.isStudioEditor .effectTileRail button.active small{color:#fff}
+.isStudioEditor .effectTileRail .tintfx{background:linear-gradient(135deg,#ff375f,#bf5af2 48%,#0a84ff)}
+.isStudioEditor .effectTileRail i{position:relative;overflow:hidden}
+.isStudioEditor .effectTileRail i img{display:block;width:100%;height:100%;object-fit:cover}
+.isStudioEditor .effectTileRail .gloss img{filter:contrast(1.15) brightness(1.18)}
+.isStudioEditor .effectTileRail .grain img{filter:contrast(1.12) grayscale(.1)}
+.isStudioEditor .effectTileRail .vignette img{filter:brightness(.8)}
+.isStudioEditor .effectTileRail .fade img{filter:sepia(.28) contrast(.82)}
+.isStudioEditor .effectTileRail .overlay img{filter:brightness(.53)}
+.isStudioEditor .effectTileRail .tintfx img{filter:sepia(.3) hue-rotate(260deg)}
+@media(max-width:430px){.isStudioEditor .studioToolBar button{flex:1 1 0;min-width:0}.isStudioEditor .studioToolBar button.active{flex:1 1 0}}

@@ -210,9 +210,7 @@ const STUDIO_TOOLS = [
   ['add', 'Add'],
   ['adjust', 'Adjust'],
   ['effects', 'Effects'],
-  ['card', 'Card'],
-  ['layers', 'Layers'],
-  ['background', 'Background']
+  ['card', 'Card']
 ];
 
 const IMAGE_LAYER_DEFAULTS = {
@@ -606,6 +604,7 @@ function normalizeDesignState(value) {
   next.sourceCrop = normalizeCrop(raw.sourceCrop, 0.1);
   next.originalSourceCrop = normalizeCrop(raw.originalSourceCrop, 0.1);
   next.gradient = Math.round(finiteClamp(raw.gradient, DEFAULTS.gradient, 0, GRADIENTS.length - 1));
+  next.backgroundColor = raw.backgroundColor ? normalizeHexColor(raw.backgroundColor, DEFAULTS.backgroundColor) : '';
   next.fit = raw.fit === 'contain' ? 'contain' : 'cover';
   next.zoom = finiteClamp(raw.zoom, DEFAULTS.zoom, 0.5, 5);
   next.x = finiteClamp(raw.x, DEFAULTS.x, -1.5, 1.5);
@@ -1147,6 +1146,48 @@ function IOSIcon({ name, size = 24 }) {
   }
   if (name === 'crop') {
     return <svg {...common}><path d="M7 3v14a2 2 0 0 0 2 2h12"/><path d="M3 7h14a2 2 0 0 1 2 2v12"/></svg>;
+  }
+  if (name === 'scissors') {
+    return <svg {...common}><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="6.5" cy="6.5" r="2.5"/><path d="M8.5 8.5 19 19M8.5 15.5 19 5"/></svg>;
+  }
+  if (name === 'rotate') {
+    return <svg {...common}><path d="M19 10a7 7 0 1 1-3-5.7"/><path d="M16 2v4h4"/></svg>;
+  }
+  if (name === 'flip') {
+    return <svg {...common}><path d="M12 3v18M4 6l6 6-6 6V6ZM20 6l-6 6 6 6V6Z"/></svg>;
+  }
+  if (name === 'shape') {
+    return <svg {...common}><rect x="4" y="4" width="16" height="16" rx="3"/></svg>;
+  }
+  if (name === 'color') {
+    return <svg {...common}><circle cx="12" cy="12" r="7"/></svg>;
+  }
+  if (name === 'gradient') {
+    return <svg {...common}><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M5 19 19 5"/></svg>;
+  }
+  if (name === 'blur') {
+    return <svg {...common}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg>;
+  }
+  if (name === 'brightness') {
+    return <svg {...common}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg>;
+  }
+  if (name === 'contrast') {
+    return <svg {...common}><circle cx="12" cy="12" r="8"/><path d="M12 4v16"/><path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor" stroke="none"/></svg>;
+  }
+  if (name === 'saturation') {
+    return <svg {...common}><path d="M12 3c-2.8 4.1-7 8.5-7 12a7 7 0 0 0 14 0c0-3.5-4.2-7.9-7-12Z"/></svg>;
+  }
+  if (name === 'temperature') {
+    return <svg {...common}><path d="M10 14V5a2 2 0 0 1 4 0v9a4 4 0 1 1-4 0Z"/><path d="M12 9v8"/></svg>;
+  }
+  if (name === 'sharpness') {
+    return <svg {...common}><path d="m12 4 8 15H4L12 4Z"/></svg>;
+  }
+  if (name === 'chip') {
+    return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M9 5v14M15 5v14M3 10h6M15 10h6M3 15h6M15 15h6"/></svg>;
+  }
+  if (name === 'contactless') {
+    return <svg {...common}><path d="M5 9a5 5 0 0 1 0 6M9 6a9 9 0 0 1 0 12M13 3a13 13 0 0 1 0 18"/><circle cx="3" cy="12" r="1" fill="currentColor" stroke="none"/></svg>;
   }
   if (name === 'position') {
     return <svg {...common}><path d="M12 3v18M3 12h18"/><path d="m9 6 3-3 3 3M18 9l3 3-3 3M15 18l-3 3-3-3M6 15l-3-3 3-3"/></svg>;
@@ -4737,6 +4778,55 @@ export default function Page() {
     return true;
   }
 
+  function replaceWithImportedArtwork(asset) {
+    if (!asset?.id) return false;
+    if (cleanupInFlightRef.current) {
+      setMessage('Finish cleaning imported images before changing artwork.');
+      return false;
+    }
+    patch({
+      background: 'idb://imports/' + asset.id,
+      backgroundLabel: safeDisplayText(asset.name, 'Imported image', 160),
+      backgroundColor: '',
+      sourceCrop: null,
+      originalSourceCrop: null,
+      zoom: 1,
+      x: 0,
+      y: 0,
+      rotate: 0,
+      flipX: false
+    });
+    setSelectedElement('artwork');
+    setMessage((asset.name || 'Imported image') + ' replaced card artwork');
+    return true;
+  }
+
+  function replaceWithRecentArtwork(item) {
+    if (cleanupInFlightRef.current) return false;
+    const workingImage = proxyImageWidth(item?.image, 3072);
+    if (!workingImage) {
+      setMessage('This artwork source is unavailable or unsupported.');
+      return false;
+    }
+    patch({
+      background: workingImage,
+      backgroundLabel: safeDisplayText(item.title, 'Card artwork', 120),
+      backgroundColor: '',
+      sourceCrop: item.sourceCrop || null,
+      originalSourceCrop: item.sourceCrop || null,
+      zoom: CATALOG_ARTWORK_EDITOR_ZOOM,
+      x: 0,
+      y: 0,
+      rotate: 0,
+      flipX: false
+    });
+    setSelectedElement('artwork');
+    rememberArtwork(item);
+    cacheArtwork(workingImage);
+    setMessage('Card artwork replaced');
+    return true;
+  }
+
   async function uploadImage(event) {
     const input = event.currentTarget;
     const file = input.files?.[0];
@@ -6752,6 +6842,9 @@ export default function Page() {
   const activeImageLabel = selectedImageLayer
     ? (selectedImageLayer.name || 'Image Layer')
     : 'Artwork';
+  const activeEffectThumbnail = selectedImageLayer
+    ? layerImages[selectedImageLayer.id]?.src
+    : image?.src;
 
   const activateStudioTool = useCallback((value) => {
     setStudioTool(value);
@@ -6865,6 +6958,7 @@ export default function Page() {
               <button type="button" onClick={() => { setExpertMode((value) => !value); setStudioMenuOpen(false); }}>{expertMode ? 'Disable Precision' : 'Enable Precision'}</button>
               <button type="button" disabled={!activeImageRenderable || !renderAssetsReady} onPointerDown={() => setShowOriginal(true)} onPointerUp={() => setShowOriginal(false)} onPointerCancel={() => setShowOriginal(false)}>Hold for Before</button>
               <button type="button" onClick={() => { setSelectedElement('artwork'); setStudioTool('layers'); setStudioSubtool(''); setStudioMenuOpen(false); }}>Layers</button>
+              <button type="button" onClick={() => { setSelectedElement('artwork'); setStudioTool('background'); setStudioSubtool(''); setStudioMenuOpen(false); }}>Background</button>
             </div> : null}
           </div>
         ) : (
@@ -7130,7 +7224,7 @@ export default function Page() {
                     )}
                     onClick={() => activateStudioTool(value)}
                   >
-                    <span className="studioToolIcon"><IOSIcon name={value} size={22} /></span>
+                    <span className="studioToolIcon"><IOSIcon name={value === 'crop' ? 'scissors' : value} size={22} /></span>
                     <span className="studioToolLabel">{label}</span>
                   </button>
                 ))}
@@ -7149,10 +7243,10 @@ export default function Page() {
               <section className="studioContextCard capcutContextPanel capcutRootPanel">
                 <div className="contextPanelHeader"><strong>Edit</strong><span className="contextDone">✓</span></div>
                 <div className="capcutSubtools">
-                  <button type="button" onClick={() => setStudioSubtool('crop')}><IOSIcon name="crop" size={22}/><small>Crop</small></button>
+                  <button type="button" className="active" onClick={() => setStudioSubtool('crop')}><IOSIcon name="crop" size={22}/><small>Crop</small></button>
                   <button type="button" onClick={() => setStudioSubtool('transform')}><IOSIcon name="position" size={22}/><small>Transform</small></button>
-                  <button type="button" onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{rotation:normalizeFreeRotation(Number(selectedLayer.rotation||0)+90)}) : patch({ rotate: normalizeFreeRotation(Number(design.rotate || 0) + 90) })}><span>↻</span><small>Rotate</small></button>
-                  <button type="button" onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{flipX:!selectedLayer.flipX}) : patch({ flipX: !design.flipX })}><span>↔</span><small>Flip</small></button>
+                  <button type="button" onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{rotation:normalizeFreeRotation(Number(selectedLayer.rotation||0)+90)}) : patch({ rotate: normalizeFreeRotation(Number(design.rotate || 0) + 90) })}><IOSIcon name="rotate" size={22}/><small>Rotate</small></button>
+                  <button type="button" onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{flipX:!selectedLayer.flipX}) : patch({ flipX: !design.flipX })}><IOSIcon name="flip" size={22}/><small>Flip</small></button>
                   <button type="button" onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{x:0.5,y:0.5,scale:1,rotation:0,flipX:false}) : patch({ zoom:1,x:0,y:0,rotate:0,flipX:false,sourceCrop:design.originalSourceCrop||null })}><IOSIcon name="reset" size={22}/><small>Reset</small></button>
                   {expertMode ? <button type="button" onClick={() => setStudioSubtool('precision')}><span>123</span><small>Precision</small></button> : null}
                 </div>
@@ -7239,7 +7333,7 @@ export default function Page() {
                 <div className="contextPanelHeader">{studioSubtool ? <button type="button" className="contextBack" onClick={()=>setStudioSubtool('')}>‹</button> : <span/>}<strong>{studioSubtool ? ({font:'Font',style:'Style',color:'Color',shadow:'Shadow',spacing:'Spacing',align:'Align',layer:'Layer'}[studioSubtool] || 'Text') : 'Text'}</strong><button type="button" onClick={()=>{setStudioSubtool('');setStudioTool('crop')}}>✓</button></div>
                 {selectedLayer?.type === 'text' ? <>
                   {!studioSubtool ? <><textarea className="capcutTextInput iosTextArea" rows={3} value={selectedLayer.text||''} aria-label="Layer text" onChange={(e)=>updateLayer(selectedLayer.id,{text:splitGraphemes(e.target.value).slice(0,500).join('')})}/><div className="capcutSubtools">
-                    {['font','style','color','shadow','spacing','align','layer'].map((key)=><button type="button" key={key} onClick={()=>setStudioSubtool(key)}><span>{{font:'Aa',style:'B',color:'●',shadow:'◔',spacing:'≡',align:'☰',layer:'≡'}[key]}</span><small>{key[0].toUpperCase()+key.slice(1)}</small></button>)}
+                    {['font','style','color','shadow','spacing','align','layer'].map((key)=><button type="button" key={key} onClick={()=>setStudioSubtool(key)}><span className={key==='color'?'textColorToolIcon':''} style={key==='color'?{'--selected-text-color':selectedLayer.color||'#ffffff'}:undefined}>{{font:'Aa',style:'B',color:'',shadow:'◔',spacing:'≡',align:'☰',layer:'≡'}[key]}</span><small>{key[0].toUpperCase()+key.slice(1)}</small></button>)}
                   </div></> : null}
                   {studioSubtool==='font'?<><div className="segmentedControl capcutSegmented">{[['system','System'],['rounded','Rounded'],['serif','Serif'],['mono','Mono']].map(([v,l])=><button type="button" key={v} className={selectedLayer.fontFamily===v?'selected':''} onClick={()=>updateLayer(selectedLayer.id,{fontFamily:v})}>{l}</button>)}</div><SliderRow label="Size" value={selectedLayer.fontSize||58} min={10} max={240} step={1} onChange={(v)=>updateLayer(selectedLayer.id,{fontSize:v})}/></>:null}
                   {studioSubtool==='style'?<><div className="capcutSubtools"><button type="button" className={Number(selectedLayer.weight||700)>=700?'active':''} onClick={()=>updateLayer(selectedLayer.id,{weight:Number(selectedLayer.weight||700)>=700?400:800})}><span>B</span><small>Bold</small></button></div><SliderRow label="Weight" value={selectedLayer.weight||700} min={100} max={900} step={100} onChange={(v)=>updateLayer(selectedLayer.id,{weight:v})}/></>:null}
@@ -7258,9 +7352,9 @@ export default function Page() {
                 <div className="capcutSubtools">
                   <button type="button" onClick={addTextLayer}><span>T</span><small>Text</small></button>
                   <button type="button" disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={() => layerUploadRef.current?.click()}><IOSIcon name="photo" size={22}/><small>Image / Logo</small></button>
-                  <button type="button" onClick={addShapeLayer}><span>□</span><small>Shape</small></button>
-                  <button type="button" onClick={addChipLayer}><span>▣</span><small>Chip Layer</small></button>
-                  <button type="button" onClick={addContactlessLayer}><span>)))</span><small>Contactless</small></button>
+                  <button type="button" onClick={addShapeLayer}><IOSIcon name="shape" size={22}/><small>Shape</small></button>
+                  <button type="button" onClick={addChipLayer}><IOSIcon name="chip" size={22}/><small>Chip Layer</small></button>
+                  <button type="button" onClick={addContactlessLayer}><IOSIcon name="contactless" size={22}/><small>Contactless</small></button>
                 </div>
               </section>
             ) : null}
@@ -7298,14 +7392,14 @@ export default function Page() {
               <section className="studioContextCard capcutContextPanel">
                 <div className="contextPanelHeader">{studioSubtool ? <button type="button" className="contextBack" onClick={()=>setStudioSubtool('')}>‹</button>:<span/>}<strong>{studioSubtool ? studioSubtool[0].toUpperCase()+studioSubtool.slice(1) : 'Background'}</strong><button type="button" onClick={()=>{setStudioSubtool('');setStudioTool('crop')}}>✓</button></div>
                 {!studioSubtool ? <div className="capcutSubtools">
-                  <button type="button" onClick={()=>setStudioSubtool('color')}><span>○</span><small>Color</small></button>
-                  <button type="button" onClick={()=>setStudioSubtool('gradient')}><span>◩</span><small>Gradient</small></button>
+                  <button type="button" onClick={()=>setStudioSubtool('color')}><IOSIcon name="color" size={22}/><small>Color</small></button>
+                  <button type="button" onClick={()=>setStudioSubtool('gradient')}><IOSIcon name="gradient" size={22}/><small>Gradient</small></button>
                   <button type="button" onClick={()=>setStudioSubtool('image')}><IOSIcon name="photo" size={22}/><small>Image</small></button>
-                  <button type="button" onClick={()=>setStudioSubtool('blur')}><span>✣</span><small>Blur</small></button>
+                  <button type="button" onClick={()=>setStudioSubtool('blur')}><IOSIcon name="blur" size={22}/><small>Blur</small></button>
                 </div>:null}
                 {studioSubtool==='color'?<><div className="backgroundSwatches">{['#000000','#ffffff','#1c1c1e','#3a3a3c','#ff375f','#ff9f0a','#ffd60a','#30d158','#64d2ff','#0a84ff','#5e5ce6','#bf5af2'].map(v=><button type="button" key={v} aria-label={'Background '+v} style={{background:v}} onClick={()=>patch({background:'',backgroundColor:v,gradient:''})}/>)}</div><label className="capcutColorPicker"><input aria-label="Custom background color" type="color" value={design.backgroundColor||'#000000'} onChange={(e)=>patch({background:'',backgroundColor:e.target.value,gradient:''})}/><span>Custom · {design.backgroundColor||'#000000'}</span></label></>:null}
                 {studioSubtool==='gradient'?<div className="presetScroller capcutPresetStrip">{GRADIENTS.map(g=><button type="button" key={g.id} onClick={()=>patch({background:'',backgroundColor:'',gradient:g.id})}>{g.name||g.id}</button>)}</div>:null}
-                {studioSubtool==='image'?<><div className="backgroundImportActions"><button type="button" className="capcutPrimaryTile" disabled={imageImportInProgress||presetTransferInProgress||cleanupInProgress} onClick={()=>{uploadIntentRef.current='replace-artwork';uploadRef.current?.click()}}><IOSIcon name="photo" size={20}/> Replace Artwork</button><button type="button" className="capcutPrimaryTile" disabled={imageImportInProgress||presetTransferInProgress||cleanupInProgress} onClick={()=>layerUploadRef.current?.click()}><IOSIcon name="photo" size={20}/> Add Image / Logo</button></div><div className="backgroundRecentRail">{recent.slice(0,8).map((item,i)=><button type="button" key={item.id||item.image||i} onClick={()=>item.image&&useArtwork(item)}>{item.image?<img src={item.image} alt=""/>:<span>Image</span>}</button>)}</div></>:null}
+                {studioSubtool==='image'?<><div className="backgroundImportActions"><button type="button" className="capcutPrimaryTile" disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={()=>{uploadIntentRef.current='replace-artwork';uploadRef.current?.click()}}><IOSIcon name="photo" size={20}/> Replace Artwork</button><button type="button" className="capcutPrimaryTile" disabled={imageImportInProgress||presetTransferInProgress||cleanupInProgress} onClick={()=>layerUploadRef.current?.click()}><IOSIcon name="photo" size={20}/> Add Image / Logo</button></div>{imports.length ? <div className="studioImportedArtwork"><strong>My Imports</strong>{imports.slice(0,12).map(asset=><button type="button" key={asset.id} disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={()=>replaceWithImportedArtwork(asset)}><IOSIcon name="photo" size={18}/><span>{asset.name}</span></button>)}</div> : null}<div className="backgroundRecentRail">{recent.slice(0,8).map((item,i)=><button type="button" key={item.id||item.image||i} onClick={()=>item.image&&replaceWithRecentArtwork(item)}>{item.image?<img src={item.image} alt=""/>:<span>Image</span>}</button>)}</div></>:null}
                 {studioSubtool==='blur'?<SliderRow label="Blur" value={design.blur} min={0} max={1} step={0.01} onChange={(v)=>patch({blur:v})}/>:null}
               </section>
             ) : null}
@@ -7539,24 +7633,21 @@ export default function Page() {
               <section className="studioContextCard capcutContextPanel">
                 <div className="contextPanelHeader">
                   {studioSubtool ? <button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button> : <span/>}
-                  <strong>{studioSubtool ? studioSubtool[0].toUpperCase() + studioSubtool.slice(1) : 'Adjust'}</strong>
+                  <strong>Adjust</strong>
                   <button type="button" onClick={() => setStudioSubtool('')}>✓</button>
                 </div>
-                {!studioSubtool ? (
-                  <>
+                <>
                     <div className="capcutSubtools">
                       {[
                         ['brightness','☀','Brightness'],['contrast','◐','Contrast'],['saturation','◉','Saturation'],
                         ['temperature','♨','Temperature'],['sharpness','△','Sharpness'],['exposure','◑','Exposure'],
                         ['highlights','◒','Highlights'],['shadows','◓','Shadows'],['tint','●','Tint'],['blur','✣','Blur']
-                      ].map(([key,icon,label]) => <button type="button" key={key} onClick={() => setStudioSubtool(key)}><span>{icon}</span><small>{label}</small></button>)}
+                      ].map(([key,icon,label]) => <button type="button" className={studioSubtool===key?'active':''} key={key} onClick={() => setStudioSubtool(key)}>{['brightness','contrast','saturation','temperature','sharpness','blur'].includes(key) ? <IOSIcon name={key} size={22}/> : <span>{icon}</span>}<small>{label}</small></button>)}
                     </div>
-                    <div className="presetScroller capcutPresetStrip">
+                    {!studioSubtool ? <div className="presetScroller capcutPresetStrip">
                       {Object.keys(ADJUSTMENT_PRESETS).map((name) => <button type="button" key={name} disabled={!activeImageEditable} onClick={() => applyAdjustmentPreset(name)}>{name}</button>)}
-                    </div>
-                  </>
-                ) : (
-                  <>
+                    </div> : null}
+                  {studioSubtool ? <>
                     {studioSubtool === 'brightness' ? <SliderRow label="Brightness" value={activeImageSettings.brightness} min={0.4} max={1.7} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({brightness:value})}/> : null}
                     {studioSubtool === 'contrast' ? <SliderRow label="Contrast" value={activeImageSettings.contrast} min={0.45} max={1.8} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({contrast:value})}/> : null}
                     {studioSubtool === 'saturation' ? <SliderRow label="Saturation" value={activeImageSettings.saturation} min={0} max={2.4} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({saturation:value})}/> : null}
@@ -7568,8 +7659,8 @@ export default function Page() {
                     {studioSubtool === 'tint' ? <SliderRow label="Tint" value={activeImageSettings.tint} min={-1} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({tint:value})}/> : null}
                     {studioSubtool === 'blur' ? <SliderRow label="Blur" value={activeImageSettings.blur} min={0} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value) => patchImageTarget({blur:value})}/> : null}
                     <button type="button" className="settingsResetButton" onClick={() => applyAdjustmentPreset('Original')}>Reset Adjustments</button>
-                  </>
-                )}
+                  </> : null}
+                </>
               </section>
             ) : null}
 
@@ -7577,26 +7668,23 @@ export default function Page() {
               <section className="studioContextCard capcutContextPanel">
                 <div className="contextPanelHeader">
                   {studioSubtool ? <button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button> : <span/>}
-                  <strong>{studioSubtool ? studioSubtool[0].toUpperCase()+studioSubtool.slice(1) : 'Effects'}</strong>
+                  <strong>Effects</strong>
                   <button type="button" onClick={() => setStudioSubtool('')}>✓</button>
                 </div>
                 {selectedImageLayer ? <small className="contextTargetNote">Effects apply only to this imported layer</small> : null}
-                {!studioSubtool ? (
-                  <div className="effectTileRail">
+                <div className="effectTileRail">
                     <button type="button" onClick={() => patchImageTarget({vignette:0,grain:0,gloss:0,overlay:0,fade:0,effectTintStrength:0})}><i className="effectNone"/><small>None</small></button>
-                    {[['gloss','Gloss'],['grain','Grain'],['vignette','Vignette'],['fade','Film'],['overlay','Dark'],['tintfx','Tint']].map(([key,label]) => <button type="button" key={key} onClick={() => setStudioSubtool(key)}><i className={'effectSwatch '+key}/><small>{label}</small></button>)}
-                  </div>
-                ) : (
-                  <>
+                    {[['gloss','Gloss'],['grain','Grain'],['vignette','Vignette'],['fade','Film'],['overlay','Dark'],['tintfx','Tint']].map(([key,label]) => <button type="button" key={key} className={studioSubtool===key?'active':''} onClick={() => setStudioSubtool(key)}><i className={'effectSwatch '+key}>{activeEffectThumbnail ? <img src={activeEffectThumbnail} alt=""/> : null}</i><small>{label}</small></button>)}
+                </div>
+                {studioSubtool ? <>
                     {studioSubtool === 'gloss' ? <SliderRow label="Gloss" value={activeImageSettings.gloss} min={0} max={0.8} step={0.01} onChange={(value)=>patchImageTarget({gloss:value})}/> : null}
                     {studioSubtool === 'grain' ? <SliderRow label="Grain" value={activeImageSettings.grain} min={0} max={0.22} step={0.005} onChange={(value)=>patchImageTarget({grain:value})}/> : null}
                     {studioSubtool === 'vignette' ? <SliderRow label="Vignette intensity" value={activeImageSettings.vignette} min={0} max={0.8} step={0.01} onChange={(value)=>patchImageTarget({vignette:value})}/> : null}
                     {studioSubtool === 'fade' ? <SliderRow label="Fade" value={activeImageSettings.fade} min={0} max={1} step={0.01} onChange={(value)=>patchImageTarget({fade:value})}/> : null}
                     {studioSubtool === 'overlay' ? <SliderRow label="Dark Overlay" value={activeImageSettings.overlay} min={0} max={0.75} step={0.01} onChange={(value)=>patchImageTarget({overlay:value})}/> : null}
                     {studioSubtool === 'tint' ? <><label className="capcutColorPicker"><input aria-label="Effect tint color" type="color" disabled={!activeImageEditable} value={activeImageSettings.effectTint||'#7b61ff'} onChange={(e)=>patchImageTarget({effectTint:e.target.value})}/><span>{activeImageSettings.effectTint||'#7b61ff'}</span></label><div className="studioColorSwatches">{['#7b61ff','#ff2d55','#ff9500','#ffcc00','#34c759','#00c7be','#007aff','#ffffff','#000000'].map(v=><button type="button" key={v} aria-label={'Effect tint '+v} style={{background:v}} onClick={()=>patchImageTarget({effectTint:v})}/>)}</div><SliderRow label="Tint Strength" value={activeImageSettings.effectTintStrength} min={0} max={1} step={0.01} disabled={!activeImageEditable} onChange={(v)=>patchImageTarget({effectTintStrength:v})}/></> : null}
-                    {studioSubtool === 'tintfx' ? <><label className="colorRow"><span>Color Tint</span><input aria-label="Effect tint color" type="color" disabled={!activeImageEditable} value={activeImageSettings.effectTint || '#7b61ff'} onChange={(event)=>patchImageTarget({effectTint:event.target.value})}/></label><SliderRow label="Tint Strength" value={activeImageSettings.effectTintStrength} min={0} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value)=>patchImageTarget({effectTintStrength:value})}/></> : null}
-                  </>
-                )}
+                    {studioSubtool === 'tintfx' ? <><label className="capcutColorPicker"><input aria-label="Effect tint color" type="color" disabled={!activeImageEditable} value={activeImageSettings.effectTint || '#7b61ff'} onChange={(event)=>patchImageTarget({effectTint:event.target.value})}/><span>Custom · {activeImageSettings.effectTint || '#7b61ff'}</span></label><div className="studioColorSwatches">{['#7b61ff','#ff2d55','#ff9500','#ffcc00','#34c759','#00c7be','#007aff','#ffffff','#000000'].map(v=><button type="button" key={v} disabled={!activeImageEditable} aria-label={'Effect tint '+v} style={{background:v}} onClick={()=>patchImageTarget({effectTint:v})}/>)}</div><SliderRow label="Tint Strength" value={activeImageSettings.effectTintStrength} min={0} max={1} step={0.01} disabled={!activeImageEditable} onChange={(value)=>patchImageTarget({effectTintStrength:value})}/></> : null}
+                </> : null}
               </section>
             ) : null}
 
@@ -7609,9 +7697,12 @@ export default function Page() {
                 </div>
                 {!studioSubtool ? (
                   <>
+                    <div className="capcutChipPresets" role="radiogroup" aria-label="Chip finish">
+                      {['gold','silver','black','rose'].map(tone=><button type="button" role="radio" aria-label={tone+' chip'} aria-checked={design.chipTone===tone} className={design.chipTone===tone?'selected':''} key={tone} onClick={()=>patch({chip:true,chipTone:tone})}><i className={'chipTone '+tone}/></button>)}
+                    </div>
                     <div className="capcutSubtools">
-                      <button type="button" onClick={() => { setSelectedElement('chip'); setStudioSubtool('chip'); }}><span>▣</span><small>Chip</small></button>
-                      <button type="button" onClick={() => { setSelectedElement('contactless'); setStudioSubtool('contactless'); }}><span>)))</span><small>Contactless</small></button>
+                      <button type="button" onClick={() => { setSelectedElement('chip'); setStudioSubtool('chip'); }}><IOSIcon name="chip" size={22}/><small>Chip</small></button>
+                      <button type="button" onClick={() => { setSelectedElement('contactless'); setStudioSubtool('contactless'); }}><IOSIcon name="contactless" size={22}/><small>Contactless</small></button>
                       <button type="button" onClick={() => { setSelectedElement('visa'); setStudioSubtool('visa'); }}><span className="visaToolGlyph">VISA</span><small>VISA</small></button>
                       <button type="button" onClick={() => setStudioSubtool('number')}><span>123</span><small>Number</small></button>
                       <button type="button" onClick={() => setStudioSubtool('name')}><span>A</span><small>Name</small></button>
