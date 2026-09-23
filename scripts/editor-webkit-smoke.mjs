@@ -523,7 +523,9 @@ try {
     node.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await page.waitForFunction(() => {
-    const input = document.querySelector('input[aria-label="Contactless Color"]');
+    const input = [...document.querySelectorAll('input[type="color"]')].find(
+      (node) => node.closest('label')?.textContent?.includes('Contactless Color')
+    );
     return input?.value === '#4455ff';
   });
   await page.waitForTimeout(500);
