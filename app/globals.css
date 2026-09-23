@@ -2188,3 +2188,35 @@ button:disabled{opacity:.38}
 @supports(height:100dvh){
   .isStudioEditor .studioScreen{min-height:calc(100dvh - 60px - var(--safe-bottom))}
 }
+
+.contextBack{width:34px!important;height:34px!important;font-size:28px!important;line-height:1!important}
+.contextDone{color:#5ac8fa;font-size:20px}
+.capcutRootPanel,.capcutContextPanel{animation:studioPanelIn .16s ease-out}
+@keyframes studioPanelIn{from{opacity:.5;transform:translateX(8px)}to{opacity:1;transform:none}}
+.effectTileRail{display:flex;gap:10px;overflow-x:auto;padding:14px;scrollbar-width:none}
+.effectTileRail::-webkit-scrollbar{display:none}
+.effectTileRail button{flex:0 0 72px;border:0;background:transparent;color:#fff;padding:0;display:flex;flex-direction:column;gap:7px;align-items:center}
+.effectTileRail i{width:68px;height:68px;border-radius:12px;display:block;background:linear-gradient(135deg,#2b2d33,#0d0e11);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.12)}
+.effectTileRail .effectNone{background:#17191d}
+.effectTileRail .gloss{background:linear-gradient(145deg,#222 0 40%,#eee 48%,#444 58%,#111 100%)}
+.effectTileRail .grain{background:radial-gradient(circle at 20% 30%,#aaa 0 1px,transparent 1.5px),radial-gradient(circle at 70% 65%,#777 0 1px,transparent 1.5px),#292929;background-size:8px 8px,11px 11px}
+.effectTileRail .vignette{background:radial-gradient(circle,#666,#111 72%)}
+.effectTileRail .fade{background:linear-gradient(145deg,#8b796b,#34302d)}
+.effectTileRail .overlay{background:linear-gradient(145deg,#444,#050505)}
+.effectTileRail small{font-size:10px;color:#d5d6da}
+.capcutPresetStrip{padding:0 14px 14px}
+.capcutSegmented{margin:14px;width:calc(100% - 28px)}
+.capcutColorPicker{margin:14px;display:flex;align-items:center;gap:12px;color:#fff}
+.capcutColorPicker input{width:48px;height:48px;border:0;background:transparent}
+.capcutLayerRow{min-height:48px;display:grid;grid-template-columns:42px 1fr 76px;align-items:center;border-bottom:.5px solid rgba(255,255,255,.06)}
+.capcutLayerRow.selected{background:rgba(10,132,255,.13)}
+.capcutLayerRow button{border:0;background:transparent;color:#fff}
+.layerVisibilityButton{height:48px}
+.layerSelectButton{text-align:left;height:48px}
+.layerSelectButton strong{font-size:13px}
+.layerReorderButtons{display:flex}
+.layerReorderButtons button{width:34px;height:34px;font-size:18px}
+.layerBuiltinMark{text-align:center;color:#777}
+.visaToolGlyph{font-size:11px!important;letter-spacing:-.4px}
+.capcutCardInput{margin:10px 14px 14px;width:calc(100% - 28px)}
+@media(max-height:720px){.isStudioEditor .studioFloatingBar{margin-bottom:10px}.isStudioEditor .studioModeActions{margin-bottom:10px}.isStudioEditor .cardFrame{width:min(88vw,360px)}}
