@@ -6287,13 +6287,6 @@ export default function Page() {
           const snapY = snapValue(clamp(currentDesign.visaY + dy, 0.08, 0.92), [0.16, 1 / 3, 0.5, 2 / 3, 0.84]);
           setActiveGuides({ x: snapX.snapped ? snapX.value : null, y: snapY.snapped ? snapY.value : null });
           if (!Object.is(currentDesign.visaX, snapX.value) || !Object.is(currentDesign.visaY, snapY.value)) { recordGestureHistory(); patch({ visaX: snapX.value, visaY: snapY.value }, false); }
-        } else if (target === 'visa') {
-          const nextScale = clamp(currentDesign.visaScale * factor, 0.45, 2.2);
-          const nextRotation = normalizeFreeRotation(currentDesign.visaRotation + angleDelta);
-          if (!Object.is(currentDesign.visaScale, nextScale) || !Object.is(currentDesign.visaRotation, nextRotation)) {
-            recordGestureHistory();
-            patch({ visaScale: nextScale, visaRotation: nextRotation }, false);
-          }
         } else if (target !== 'artwork') {
           const layer = (currentDesign.customLayers || []).find((entry) => entry.id === target);
           if (layer && !layer.locked) {
@@ -6391,6 +6384,13 @@ export default function Page() {
           ) {
             recordGestureHistory();
             patch({ contactlessScale: nextScale, contactlessRotation: nextRotation }, false);
+          }
+        } else if (target === 'visa') {
+          const nextScale = clamp(currentDesign.visaScale * factor, 0.45, 2.2);
+          const nextRotation = normalizeFreeRotation(currentDesign.visaRotation + angleDelta);
+          if (!Object.is(currentDesign.visaScale, nextScale) || !Object.is(currentDesign.visaRotation, nextRotation)) {
+            recordGestureHistory();
+            patch({ visaScale: nextScale, visaRotation: nextRotation }, false);
           }
         } else if (target !== 'artwork' && gestureLayer) {
           const currentScale = Number(gestureLayer.scale ?? 1);
