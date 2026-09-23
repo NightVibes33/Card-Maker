@@ -2278,3 +2278,9 @@ button:disabled{opacity:.38}
 .isStudioEditor .layerSelectButton{padding:0 4px}
 .isStudioEditor .layerReorderButtons button{display:grid;place-items:center}
 @media(max-width:430px){.isStudioEditor .studioToolBar{padding-left:8px;padding-right:8px}.isStudioEditor .studioToolBar button{flex-basis:60px}}
+
+.studioColorSwatches{display:flex;gap:10px;overflow-x:auto;padding:10px 14px 16px}
+.studioColorSwatches button{flex:0 0 38px;width:38px;height:38px;border-radius:50%;border:2px solid rgba(255,255,255,.18);box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.isStudioEditor .capcutColorPicker{margin:12px 14px;padding:10px 12px;border-radius:14px;background:#202226}
+.isStudioEditor .capcutColorPicker input[type=color]{width:42px;height:42px;border:0;padding:0;background:transparent}
+.isStudioEditor .layerActionGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 14px}
