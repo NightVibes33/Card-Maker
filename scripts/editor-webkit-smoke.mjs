@@ -1115,7 +1115,9 @@ try {
     mimeType: 'image/svg+xml',
     buffer: oversizedSvg
   });
-  await page.getByText('Image resolution is too large for reliable iPhone editing.', { exact: true }).waitFor({
+  // The SVG is rejected before decode, but layer imports intentionally
+  // surface the exact SVG safety error rather than the raster-size wording.
+  await page.getByText('SVG dimensions could not be verified safely.', { exact: true }).waitFor({
     state: 'visible',
     timeout: 10000
   });
