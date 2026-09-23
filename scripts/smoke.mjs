@@ -273,10 +273,73 @@ async function checkSearch(catalogResults) {
   console.log('PASS CUCU cached search =>', token, result.json.results.length, 'results');
 }
 
+
+async function checkAnimeDeskMatCatalog() {
+  const { response, json } = await fetchJsonRetry(
+    base + '/api/animedeskmat?category=anime&page=1&limit=24',
+    'AnimeDeskMat catalog'
+  );
+
+  if (!Array.isArray(json.results) || json.results.length < 1) {
+    throw new Error('AnimeDeskMat catalog returned no products');
+  }
+  if (Number(json.total) !== 907) {
+    throw new Error('AnimeDeskMat catalog total changed unexpectedly: ' + json.total);
+  }
+
+  const invalid = json.results.find((item) => {
+    const direct = String(item.directAssetUrls?.[0] || '').toLowerCase();
+    return (
+      item.source !== 'AnimeDeskMat' ||
+      item.mediaType !== 'premade-card-skin' ||
+      item.assetMode !== 'direct-card-art' ||
+      item.cleanFilter !== 'strict-full-cover-no-chip' ||
+      !direct ||
+      !/full-cover(?:_[a-z0-9-]+)?\.(?:png|webp|jpe?g)(?:\?|$)/i.test(direct) ||
+      /with[-_](?:chip|window)|half[-_]cover|4[-_]sets?/i.test(direct) ||
+      !item.image?.startsWith('/api/image?') ||
+      !item.thumbnail?.includes('w=560') ||
+      !Array.isArray(item.inspectUrls) ||
+      !item.inspectUrls.every((url) => url.startsWith('/api/cucu/inspect?'))
+    );
+  });
+  if (invalid) throw new Error('Invalid AnimeDeskMat no-chip item: ' + JSON.stringify(invalid));
+
+  const thumb = await fetch(base + json.results[0].thumbnail);
+  if (!thumb.ok || !(thumb.headers.get('content-type') || '').startsWith('image/')) {
+    throw new Error('AnimeDeskMat thumbnail pipeline failed');
+  }
+
+  const cache = response.headers.get('cache-control') || '';
+  if (!/s-maxage=21600/.test(cache)) {
+    throw new Error('AnimeDeskMat catalog missing 6h edge cache: ' + cache);
+  }
+
+  console.log('PASS AnimeDeskMat => 907 anime skins · strict no-chip full-cover assets');
+}
+
+async function checkNoConsoleProducts() {
+  for (const query of ['ps5', 'playstation 5', 'nintendo switch', 'steam deck', 'controller']) {
+    const result = await fetchJsonRetry(
+      base + '/api/cucu?category=all&q=' + encodeURIComponent(query) + '&page=1&limit=24',
+      'CUCU console exclusion'
+    );
+    const bad = (result.json.results || []).find((item) =>
+      /playstation|ps5|nintendo switch|steam deck|controller/i.test(
+        [item.title, item.upstreamProductType, ...(item.tags || [])].join(' ')
+      )
+    );
+    if (bad) throw new Error('Console hardware leaked into card catalog: ' + JSON.stringify(bad));
+  }
+  console.log('PASS CUCU console exclusion => PS5 / Switch / Steam Deck / controllers blocked');
+}
+
 await checkHome();
 await checkInstallIcons();
 const results = await checkCatalog();
 await checkAnimeDeskMat();
 await checkPreprocessing(results);
 await checkSearch(results);
+await checkAnimeDeskMatCatalog();
+await checkNoConsoleProducts();
 console.log('Card Studio V2 CUCU smoke tests passed.');

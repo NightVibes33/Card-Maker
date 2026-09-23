@@ -4,6 +4,10 @@ import { IMAGE_PROXY_VERSION } from '../../lib/imagePolicy';
 const ORIGIN = 'https://www.animedeskmat.com';
 const COLLECTION = 'anime-credit-card-skins';
 const SHOPIFY_PAGE_SIZE = 100;
+// Verified catalog size for the dedicated anime credit-card-skins collection.
+// Keep this explicit so the shared Discover UI can report the combined Anime total
+// without crawling the entire Shopify collection on every request.
+const KNOWN_COLLECTION_TOTAL = 907;
 
 const pageCache = new Map();
 const productCache = new Map();
@@ -327,7 +331,7 @@ export async function GET(request) {
       const sourceCouldContinue =
         firstBatch.length === SHOPIFY_PAGE_SIZE &&
         (hasBufferedNext || secondBatch.length === SHOPIFY_PAGE_SIZE);
-      hasMore = hasBufferedNext || sourceCouldContinue;
+      hasMore = startIndex + limit < KNOWN_COLLECTION_TOTAL && (hasBufferedNext || sourceCouldContinue);
     }
 
     return NextResponse.json(
@@ -347,7 +351,8 @@ export async function GET(request) {
           collection: COLLECTION,
           shopifyPageSize: SHOPIFY_PAGE_SIZE,
           mode,
-          assetPolicy: 'plain-full-cover-only'
+          assetPolicy: 'plain-full-cover-only',
+          knownCollectionTotal: KNOWN_COLLECTION_TOTAL
         }
       },
       {
