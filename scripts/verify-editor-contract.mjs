@@ -21,6 +21,9 @@ const imagePolicy = read('app/lib/imagePolicy.js');
 const pageChecks = [
   [/function normalizeDesignState\(/, 'restored designs are normalized'],
   [/next\.backgroundColor = raw\.backgroundColor \? normalizeHexColor\(raw\.backgroundColor, DEFAULTS\.backgroundColor\) : '';/, 'chosen background colors survive draft and project normalization'],
+  [/next\.contactlessColor = normalizeHexColor\(/, 'card Contactless retains custom color across saves'],
+  [/next\.contactlessOpacity = finiteClamp\(/, 'card Contactless retains opacity across saves'],
+  [/function mergeCustomContactlessLayer\(id\)/, 'older extra Contactless layers can be merged into Card'],
   [/function replaceWithImportedArtwork\(asset\) \{[\s\S]{0,850}patch\(\{[\s\S]{0,120}background: 'idb:\/\/imports\/' \+ asset\.id/, 'selecting a saved import in Studio replaces artwork without clearing the card'],
   [/function normalizeImportArtworkSource\(/, 'persisted import artwork IDs are validated canonically'],
   [/rawUrl\.length > 2200/, 'persisted proxy targets are length bounded'],

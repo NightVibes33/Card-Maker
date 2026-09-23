@@ -155,6 +155,9 @@ const DEFAULTS = {
   contactlessY: 0.43,
   contactlessScale: 1,
   contactlessRotation: 0,
+  contactlessColor: '#ffffff',
+  contactlessOpacity: 0.9,
+  contactlessLocked: false,
   visa: false,
   visaX: 0.84,
   visaY: 0.84,
@@ -642,6 +645,9 @@ function normalizeDesignState(value) {
   next.contactlessY = finiteClamp(raw.contactlessY, DEFAULTS.contactlessY, 0.03, 0.97);
   next.contactlessScale = finiteClamp(raw.contactlessScale, DEFAULTS.contactlessScale, 0.4, 2.2);
   next.contactlessRotation = finiteClamp(raw.contactlessRotation, DEFAULTS.contactlessRotation, -180, 180);
+  next.contactlessColor = normalizeHexColor(raw.contactlessColor, raw.textColor || DEFAULTS.contactlessColor);
+  next.contactlessOpacity = finiteClamp(raw.contactlessOpacity, DEFAULTS.contactlessOpacity, 0, 1);
+  next.contactlessLocked = Boolean(raw.contactlessLocked);
 
   next.visa = raw.visa == null ? DEFAULTS.visa : Boolean(raw.visa);
   next.visaX = finiteClamp(raw.visaX, DEFAULTS.visaX, 0.1, 0.9);
@@ -1415,10 +1421,10 @@ function drawContactless(ctx, d) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate((Number(d.contactlessRotation || 0) * Math.PI) / 180);
-  ctx.strokeStyle = d.textColor;
+  ctx.strokeStyle = d.contactlessColor || d.textColor;
   ctx.lineWidth = 10 * scale;
   ctx.lineCap = 'round';
-  ctx.globalAlpha = 0.9;
+  ctx.globalAlpha *= clamp(Number(d.contactlessOpacity ?? 0.9), 0, 1);
   [28, 52, 78].forEach((radius) => {
     ctx.beginPath();
     ctx.arc(0, 0, radius * scale, -0.72, 0.72);
@@ -5204,34 +5210,22 @@ export default function Page() {
     setMessage('Chip layer added');
   }
 
-  function addContactlessLayer() {
-    if ((designRef.current.customLayers || []).length >= MAX_CUSTOM_LAYERS) {
-      setMessage('Layer limit reached. Delete a layer before adding another.');
-      return;
-    }
-    const id = makeId('layer');
+  function mergeCustomContactlessLayer(id) {
+    const extra = (designRef.current.customLayers || []).find((layer) => layer.id === id && layer.type === 'contactless');
+    if (!extra) return;
     patch((current) => ({
-      layerOrder: insertCustomLayerBelowHardware(current, id),
-      customLayers: [
-        ...(current.customLayers || []),
-        {
-          id,
-          type: 'contactless',
-          name: 'Contactless',
-          x: 0.33,
-          y: 0.46,
-          scale: 1,
-          rotation: 0,
-          opacity: 1,
-          color: '#ffffff',
-          locked: false
-        }
-      ]
+      contactless: true,
+      contactlessX: extra.x ?? current.contactlessX,
+      contactlessY: extra.y ?? current.contactlessY,
+      contactlessScale: extra.scale ?? current.contactlessScale,
+      contactlessRotation: extra.rotation ?? current.contactlessRotation,
+      contactlessColor: extra.color || current.contactlessColor,
+      contactlessOpacity: clamp(Number(extra.opacity ?? 1) * 0.9, 0, 1),
+      customLayers: (current.customLayers || []).filter((layer) => layer.id !== id),
+      layerOrder: (current.layerOrder || []).filter((entry) => entry !== id)
     }));
-    setSelectedElement(id);
-    setStudioTool('crop');
-    setStudioSubtool('transform');
-    setMessage('Contactless layer added');
+    setSelectedElement('contactless');
+    setMessage('Extra Contactless merged into Card · Undo to restore');
   }
 
   function updateLayer(id, delta) {
@@ -6388,7 +6382,7 @@ export default function Page() {
             recordGestureHistory();
             patch({ chipX: snapX.value, chipY: snapY.value }, false);
           }
-        } else if (target === 'contactless') {
+        } else if (target === 'contactless' && !currentDesign.contactlessLocked) {
           const snapX = snapValue(
             clamp(currentDesign.contactlessX + dx, 0.03, 0.97),
             [0.05, 0.285, 1 / 3, 0.5, 2 / 3, 0.95]
@@ -6485,6 +6479,7 @@ export default function Page() {
         : null;
       const transformBlocked = Boolean(
         target === 'card-text' ||
+        (target === 'contactless' && currentDesign.contactlessLocked) ||
         gestureLayer?.locked ||
         (target === 'artwork' && !currentDesign.background)
       );
@@ -6893,7 +6888,7 @@ export default function Page() {
         return layer
           ? {
               id,
-              name: layer.name || layer.type,
+              name: layer.type === 'contactless' ? 'Custom Contactless' : (layer.name || layer.type),
               type: layer.type,
               selection: layer.id,
               builtin: false,
@@ -7354,7 +7349,6 @@ export default function Page() {
                   <button type="button" disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={() => layerUploadRef.current?.click()}><IOSIcon name="photo" size={22}/><small>Image / Logo</small></button>
                   <button type="button" onClick={addShapeLayer}><IOSIcon name="shape" size={22}/><small>Shape</small></button>
                   <button type="button" onClick={addChipLayer}><IOSIcon name="chip" size={22}/><small>Chip Layer</small></button>
-                  <button type="button" onClick={addContactlessLayer}><IOSIcon name="contactless" size={22}/><small>Contactless</small></button>
                 </div>
               </section>
             ) : null}
@@ -7726,8 +7720,16 @@ export default function Page() {
                 {studioSubtool === 'contactless' ? (
                   <>
                     <SwitchRow label="Contactless" value={design.contactless} onChange={(value)=>patch({contactless:value})}/>
-                    {design.contactless ? <><SliderRow label="Contactless Scale" value={design.contactlessScale} min={0.45} max={2.2} step={0.01} onChange={(value)=>patch({contactlessScale:value})}/><SliderRow label="Contactless Horizontal Position" value={design.contactlessX} min={0.03} max={0.97} step={0.005} onChange={(value)=>patch({contactlessX:value})}/><SliderRow label="Contactless Vertical Position" value={design.contactlessY} min={0.03} max={0.97} step={0.005} onChange={(value)=>patch({contactlessY:value})}/>
-                    <SliderRow label="Contactless Rotation" value={design.contactlessRotation} min={-180} max={180} step={1} suffix="°" onChange={(value)=>patch({contactlessRotation:value})}/></> : null}
+                    <SwitchRow label="Lock Contactless Position" value={Boolean(design.contactlessLocked)} onChange={(value)=>patch({contactlessLocked:value})}/>
+                    {design.contactless ? <>
+                      <label className="capcutColorPicker"><input aria-label="Contactless color" type="color" value={design.contactlessColor||design.textColor} onChange={(event)=>patch({contactlessColor:event.target.value})}/><span>Color · {design.contactlessColor||design.textColor}</span></label>
+                      <SliderRow label="Contactless Opacity" value={design.contactlessOpacity??0.9} min={0} max={1} step={0.01} onChange={(value)=>patch({contactlessOpacity:value})}/>
+                      <SliderRow label="Contactless Scale" value={design.contactlessScale} min={0.4} max={2.2} step={0.01} disabled={design.contactlessLocked} onChange={(value)=>patch({contactlessScale:value})}/>
+                      <SliderRow label="Contactless Horizontal Position" value={design.contactlessX} min={0.03} max={0.97} step={0.005} disabled={design.contactlessLocked} onChange={(value)=>patch({contactlessX:value})}/>
+                      <SliderRow label="Contactless Vertical Position" value={design.contactlessY} min={0.03} max={0.97} step={0.005} disabled={design.contactlessLocked} onChange={(value)=>patch({contactlessY:value})}/>
+                      <SliderRow label="Contactless Rotation" value={design.contactlessRotation} min={-180} max={180} step={1} suffix="°" disabled={design.contactlessLocked} onChange={(value)=>patch({contactlessRotation:value})}/>
+                    </> : null}
+                    {(design.customLayers||[]).filter((layer)=>layer.type==='contactless').map((layer)=><button type="button" className="settingsResetButton" key={layer.id} onClick={()=>mergeCustomContactlessLayer(layer.id)}>Merge extra Contactless into Card · Undo available</button>)}
                   </>
                 ) : null}
                 {studioSubtool === 'visa' ? (

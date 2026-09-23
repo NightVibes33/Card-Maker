@@ -259,7 +259,7 @@ features:
     file: app/page.jsx
     contains:
       - "addChipLayer"
-      - "addContactlessLayer"
+      - "mergeCustomContactlessLayer"
       - "drawChipLayerAtOrigin"
       - "drawContactlessLayerAtOrigin"
       - "Bring Forward"
