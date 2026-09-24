@@ -2322,3 +2322,233 @@ button:disabled{opacity:.38}
 .isStudioEditor .effectTileRail .overlay img{filter:brightness(.53)}
 .isStudioEditor .effectTileRail .tintfx img{filter:sepia(.3) hue-rotate(260deg)}
 @media(max-width:430px){.isStudioEditor .studioToolBar button{flex:1 1 0;min-width:0}.isStudioEditor .studioToolBar button.active{flex:1 1 0}}
+
+/* Studio editor: keep the artwork in view while tools live in a CapCut-style dock and sheet. */
+html:has(.studio.isStudioEditor),
+body:has(.studio.isStudioEditor){
+  background:#08090c;
+  color:#f5f6fa;
+  color-scheme:dark;
+}
+.studio.isStudioEditor{
+  --system-bg:#08090c;
+  --secondary-bg:#17191e;
+  --tertiary-bg:#24272d;
+  --group-bg:#17191e;
+  --label:#f5f6fa;
+  --secondary-label:rgba(231,234,242,.72);
+  --tertiary-label:rgba(231,234,242,.48);
+  --separator:rgba(255,255,255,.1);
+  --blue:#168cff;
+  --blue-pressed:#0874df;
+  color:#f5f6fa;
+  color-scheme:dark;
+  height:100dvh;
+  min-height:100svh;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  padding:0;
+  background:#08090c;
+}
+.isStudioEditor > .largeTitleBar{display:none}
+.isStudioEditor > .editingPreview.studioPreview{
+  position:relative;
+  z-index:20;
+  top:auto;
+  flex:0 0 auto;
+  padding:calc(var(--safe-top) + 4px) 16px 0;
+  background:#08090c;
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+}
+.isStudioEditor .studioFloatingBar{
+  min-height:48px;
+  margin:0 0 16px;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+}
+.isStudioEditor .studioEditorTitle{font-size:16px;font-weight:650;letter-spacing:0}
+.isStudioEditor .studioPreview .historyButtons{gap:0}
+.isStudioEditor .studioPreview .historyButtons button{width:40px;min-width:40px;height:44px}
+.isStudioEditor .studioPreview .cardFrame{
+  width:100%;
+  max-width:440px;
+  border-radius:15px;
+  box-shadow:0 14px 34px rgba(0,0,0,.42),0 0 0 .5px rgba(255,255,255,.15);
+}
+.isStudioEditor .studioPreview .previewCaption{display:none}
+.isStudioEditor > .screenContent{
+  flex:1 1 auto;
+  min-height:0;
+  overflow:visible;
+  padding:0;
+}
+.isStudioEditor #panel-studio{
+  position:static;
+  min-height:0;
+  padding:0 0 calc(82px + var(--safe-bottom));
+  overflow:visible;
+  background:#08090c;
+}
+.isStudioEditor .studioModeRow{
+  position:static;
+  display:contents;
+  margin:0;
+  padding:0;
+  border:0;
+  background:transparent;
+  box-shadow:none;
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+}
+.isStudioEditor .studioModeActions{
+  display:flex;
+  order:initial;
+  justify-content:center;
+  min-height:50px;
+  margin:7px 12px 12px;
+  padding:0;
+}
+.isStudioEditor .studioModeLabel{display:none}
+.isStudioEditor .previewModeToggle{
+  width:min(220px,calc(100vw - 112px));
+  min-height:46px;
+  grid-template-columns:1fr 1fr;
+  gap:2px;
+  padding:3px;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:999px;
+  background:#17191e;
+  box-shadow:none;
+}
+.isStudioEditor .previewModeToggle button{
+  min-height:38px;
+  border-radius:999px;
+  color:#c4c8d0;
+  font-size:12px;
+  font-weight:600;
+}
+.isStudioEditor .previewModeToggle button.active{
+  background:#30343c;
+  color:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.25);
+}
+.isStudioEditor .studioToolBar{
+  position:fixed;
+  z-index:60;
+  left:50%;
+  bottom:0;
+  width:min(500px,100vw);
+  min-height:calc(76px + var(--safe-bottom));
+  transform:translateX(-50%);
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  align-items:center;
+  gap:2px;
+  overflow:visible;
+  padding:6px 8px calc(7px + var(--safe-bottom));
+  border-top:1px solid rgba(255,255,255,.09);
+  border-radius:0;
+  background:rgba(17,18,22,.97);
+  box-shadow:0 -10px 30px rgba(0,0,0,.24);
+  -webkit-backdrop-filter:saturate(150%) blur(20px);
+  backdrop-filter:saturate(150%) blur(20px);
+}
+.isStudioEditor .studioToolBar::-webkit-scrollbar{display:none}
+.isStudioEditor .studioToolBar button,
+.isStudioEditor .studioToolBar button.active{
+  flex:initial;
+  min-width:0;
+  min-height:60px;
+  padding:3px 1px 1px;
+  border:0!important;
+  border-radius:10px!important;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:#afb3bd;
+}
+.isStudioEditor .studioToolIcon,
+.isStudioEditor .studioToolBar button.active .studioToolIcon{
+  width:38px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  border-radius:9px;
+  background:transparent;
+  box-shadow:none;
+  color:currentColor;
+}
+.isStudioEditor .studioToolIcon svg{width:22px;height:22px}
+.isStudioEditor .studioToolBar button.active{color:#f6f8fb}
+.isStudioEditor .studioToolBar button.active .studioToolIcon{
+  color:#56adff;
+  background:rgba(22,140,255,.2);
+  box-shadow:inset 0 0 0 1px rgba(57,157,255,.48);
+}
+.isStudioEditor .studioToolLabel{font-size:10px;line-height:13px;font-weight:550}
+.isStudioEditor .studioContextCard{
+  position:fixed!important;
+  z-index:52;
+  left:50%;
+  bottom:calc(76px + var(--safe-bottom));
+  width:min(500px,100vw);
+  max-height:min(42dvh,420px);
+  margin:0!important;
+  padding:0 0 8px;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain;
+  transform:translateX(-50%);
+  border:1px solid rgba(255,255,255,.09);
+  border-bottom:0;
+  border-radius:22px 22px 0 0!important;
+  background:#17191e!important;
+  box-shadow:0 -14px 38px rgba(0,0,0,.3),inset 0 1px rgba(255,255,255,.04)!important;
+  scrollbar-width:thin;
+  scrollbar-color:#4a4d55 transparent;
+  animation:studioSheetIn .18s ease-out;
+}
+.isStudioEditor .studioContextCard::before{
+  content:"";
+  display:block;
+  width:36px;
+  height:4px;
+  margin:8px auto 2px;
+  border-radius:999px;
+  background:#555962;
+}
+.isStudioEditor .contextPanelHeader{
+  position:sticky;
+  z-index:2;
+  top:0;
+  min-height:50px;
+  padding:0 12px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  background:#17191e;
+}
+.isStudioEditor .contextPanelHeader strong{font-size:15px;font-weight:650}
+.isStudioEditor .contextPanelHeader button{color:#56adff}
+.isStudioEditor .studioContextCard .sectionLabel{padding-top:12px}
+.isStudioEditor .studioContextCard .editingTargetBar{margin:8px 12px}
+.isStudioEditor .studioContextCard .settingsResetButton{margin-bottom:8px}
+.isStudioEditor .tabBar{display:none}
+@keyframes studioSheetIn{from{opacity:.82}to{opacity:1}}
+@media(max-height:720px){
+  .isStudioEditor .studioContextCard{max-height:min(38dvh,330px)}
+  .isStudioEditor .studioFloatingBar{margin-bottom:10px}
+  .isStudioEditor .studioPreview .cardFrame{max-width:390px}
+}
+@media(prefers-reduced-motion:reduce){
+  .isStudioEditor .studioContextCard{animation:none}
+}
