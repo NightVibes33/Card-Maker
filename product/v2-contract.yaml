@@ -272,6 +272,7 @@ features:
       - "const CHIP_ART_HEIGHT = 188;"
       - "const CHIP_ART_URL = '/emv-chip.png';"
       - "drawChipArtwork"
+      - "const gray = Math.round(8 + luminance * 0.34);"
       - ".filter((layer) => layer.type !== 'chip')"
   unified_z_stack:
     file: app/page.jsx

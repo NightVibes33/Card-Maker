@@ -24,7 +24,6 @@ const CHIP_ART_URL = '/emv-chip.png';
 const chipToneCanvasCache = new WeakMap();
 const CHIP_TONE_OVERLAYS = {
   silver: 'rgba(194, 202, 209, 0.7)',
-  black: 'rgba(34, 37, 42, 0.72)',
   rose: 'rgba(201, 119, 103, 0.62)'
 };
 const EDITOR_PREVIEW_W = 1024;
@@ -1268,7 +1267,7 @@ function IOSIcon({ name, size = 24 }) {
 function chipArtworkForTone(chipImage, tone) {
   if (!chipImage) return null;
   const source = chipImage.gold || chipImage;
-  if (tone === 'gold' || !CHIP_TONE_OVERLAYS[tone]) return source;
+  if (tone === 'gold' || (tone !== 'black' && !CHIP_TONE_OVERLAYS[tone])) return source;
 
   let variants = chipToneCanvasCache.get(source);
   if (!variants) {
@@ -1288,11 +1287,25 @@ function chipArtworkForTone(chipImage, tone) {
   if (!toneContext) return source;
 
   toneContext.drawImage(source, 0, 0);
-  // This scratch canvas has a transparent background, so source-atop confines
-  // the finish tint to the chip's alpha mask, including its internal gaps.
-  toneContext.globalCompositeOperation = 'source-atop';
-  toneContext.fillStyle = CHIP_TONE_OVERLAYS[tone];
-  toneContext.fillRect(0, 0, width, height);
+  if (tone === 'black') {
+    const image = toneContext.getImageData(0, 0, width, height);
+    const pixels = image.data;
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (pixels[index + 3] === 0) continue;
+      const luminance = pixels[index] * 0.2126 + pixels[index + 1] * 0.7152 + pixels[index + 2] * 0.0722;
+      const gray = Math.round(8 + luminance * 0.34);
+      pixels[index] = gray;
+      pixels[index + 1] = gray;
+      pixels[index + 2] = gray;
+    }
+    toneContext.putImageData(image, 0, 0);
+  } else {
+    // This scratch canvas has a transparent background, so source-atop confines
+    // the finish tint to the chip's alpha mask, including its internal gaps.
+    toneContext.globalCompositeOperation = 'source-atop';
+    toneContext.fillStyle = CHIP_TONE_OVERLAYS[tone];
+    toneContext.fillRect(0, 0, width, height);
+  }
   variants.set(tone, canvas);
   return canvas;
 }
