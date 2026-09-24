@@ -2777,7 +2777,16 @@ export default function Page() {
   const [tab, setTab] = useState('discover');
   const [studioTool, setStudioTool] = useState('crop');
   const [studioSubtool, setStudioSubtool] = useState('');
+  const [studioPanelOpen, setStudioPanelOpen] = useState(true);
   const [studioMenuOpen, setStudioMenuOpen] = useState(false);
+  const closeStudioPanel = useCallback(() => {
+    setStudioPanelOpen(false);
+    setStudioMenuOpen(false);
+  }, []);
+  const openAppTab = useCallback((value) => {
+    if (value === 'studio') setStudioPanelOpen(true);
+    setTab(value);
+  }, []);
 
   // Each bottom-tab screen is a fresh navigation destination. Reset the
   // document and any app-level scroll container after the destination mounts.
@@ -6760,6 +6769,7 @@ export default function Page() {
   const activateStudioTool = useCallback((value) => {
     setStudioTool(value);
     setStudioSubtool('');
+    setStudioPanelOpen(true);
     setStudioMenuOpen(false);
     if (value === 'text') {
       const textLayer = (designRef.current.customLayers || []).find((layer) => layer.type === 'text' && !layer.hidden);
@@ -6868,15 +6878,17 @@ export default function Page() {
           </button>
         ) : null}
         {tab === 'studio' ? (
+          <button type="button" className="beforeAfterButton studioLayersButton" aria-label="Layers" title="Layers" onClick={() => activateStudioTool('layers')}><IOSIcon name="layers" size={18}/></button>
+        ) : null}
+        {tab === 'studio' ? (
           <div className="studioOverflowWrap">
             <button type="button" className="beforeAfterButton studioOverflowButton" aria-label="More Studio actions" aria-expanded={studioMenuOpen} onClick={() => setStudioMenuOpen((open) => !open)}>•••</button>
             {studioMenuOpen ? <div className="studioOverflowMenu">
-              <button type="button" onClick={() => { reset(); setStudioMenuOpen(false); }}>New Card</button>
+              <button type="button" onClick={() => { reset(); setStudioPanelOpen(true); setStudioMenuOpen(false); }}>New Card</button>
               <button type="button" onClick={() => { setGuidesEnabled((value) => !value); setStudioMenuOpen(false); }}>{guidesEnabled ? 'Hide Guides' : 'Show Guides'}</button>
               <button type="button" onClick={() => { if (expertMode && studioTool === 'crop' && studioSubtool === 'precision') setStudioSubtool(''); setExpertMode((value) => !value); setStudioMenuOpen(false); }}>{expertMode ? 'Disable Precision' : 'Enable Precision'}</button>
               <button type="button" disabled={!activeImageRenderable || !renderAssetsReady} onPointerDown={() => setShowOriginal(true)} onPointerUp={() => setShowOriginal(false)} onPointerCancel={() => setShowOriginal(false)}>Hold for Before</button>
-              <button type="button" onClick={() => { setSelectedElement('artwork'); setStudioTool('layers'); setStudioSubtool(''); setStudioMenuOpen(false); }}>Layers</button>
-              <button type="button" onClick={() => { setSelectedElement('artwork'); setStudioTool('background'); setStudioSubtool(''); setStudioMenuOpen(false); }}>Background</button>
+              <button type="button" onClick={() => activateStudioTool('background')}>Background</button>
             </div> : null}
           </div>
         ) : (
@@ -6990,7 +7002,7 @@ export default function Page() {
   return (
     <>
       <main
-        className={'studio ' + (tab === 'studio' ? 'isStudioEditor' : '')}
+        className={'studio ' + (tab === 'studio' ? 'isStudioEditor' : '') + (tab === 'studio' && !studioPanelOpen ? ' studioPanelClosed' : '')}
         inert={blockingAssetOperation || undefined}
         aria-busy={blockingAssetOperation || undefined}
       >
@@ -7159,7 +7171,7 @@ export default function Page() {
 
             {studioTool === 'crop' && !studioSubtool ? (
               <section className="studioContextCard capcutContextPanel capcutRootPanel">
-                <div className="contextPanelHeader"><strong>Edit</strong><span className="contextDone">✓</span></div>
+                <div className="contextPanelHeader"><strong>Edit</strong><button type="button" className="contextDone studioPanelDone" aria-label="Close Edit panel" title="Close Edit panel" onClick={closeStudioPanel}>✓</button></div>
                 <div className="capcutSubtools">
                   <button type="button" className="active" onClick={() => setStudioSubtool('crop')}><IOSIcon name="crop" size={22}/><small>Crop</small></button>
                   <button type="button" onClick={() => setStudioSubtool('transform')}><IOSIcon name="position" size={22}/><small>Transform</small></button>
@@ -7173,7 +7185,7 @@ export default function Page() {
 
             {studioTool === 'crop' && studioSubtool === 'transform' ? (
               <section className="studioContextCard capcutContextPanel">
-                <div className="contextPanelHeader"><button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button><strong>Transform</strong><button type="button" onClick={() => setStudioSubtool('')}>✓</button></div>
+                <div className="contextPanelHeader"><button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button><strong>Transform</strong><button type="button" className="studioPanelDone" aria-label="Close Transform panel" title="Close Transform panel" onClick={closeStudioPanel}>✓</button></div>
                 {selectedLayer ? <>
                   <fieldset disabled={Boolean(selectedLayer.locked)} style={{border:0,padding:0,margin:0,minWidth:0}}>
                   <SliderRow label="Scale" value={selectedLayer.scale || 1} min={0.2} max={4} step={0.01} disabled={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id,{scale:value})}/>
@@ -7200,7 +7212,7 @@ export default function Page() {
 
             {studioTool === 'crop' && studioSubtool === 'precision' && expertMode ? (
               <section className="studioContextCard capcutContextPanel">
-                <div className="contextPanelHeader"><button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button><strong>Precision</strong><button type="button" onClick={() => setStudioSubtool('')}>✓</button></div>
+                <div className="contextPanelHeader"><button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button><strong>Precision</strong><button type="button" className="studioPanelDone" aria-label="Close Precision panel" title="Close Precision panel" onClick={closeStudioPanel}>✓</button></div>
                 <Group title="Precision" footer="Exact numerical access to every global transform, adjustment, effect, and card-hardware parameter.">
                     <NumericField label="Zoom" value={design.zoom} min={0.5} max={5} onChange={(value) => patch({ zoom: value })} />
                     <NumericField label="Artwork X" value={design.x} min={-1.5} max={1.5} onChange={(value) => patch({ x: value })} />
@@ -7250,9 +7262,9 @@ export default function Page() {
 
             {studioTool === 'text' ? (
               <section className="studioContextCard capcutContextPanel">
-                <div className="contextPanelHeader">{studioSubtool ? <button type="button" className="contextBack" onClick={()=>setStudioSubtool('')}>‹</button> : <span/>}<strong>{studioSubtool ? ({font:'Font',style:'Style',color:'Color',shadow:'Shadow',spacing:'Spacing',align:'Align',layer:'Layer'}[studioSubtool] || 'Text') : 'Text'}</strong><button type="button" onClick={()=>{setStudioSubtool('');setStudioTool('crop')}}>✓</button></div>
+                <div className="contextPanelHeader">{studioSubtool ? <button type="button" className="contextBack" onClick={()=>setStudioSubtool('')}>‹</button> : <span/>}<strong>{studioSubtool ? ({font:'Font',style:'Style',color:'Color',shadow:'Shadow',spacing:'Spacing',align:'Align',layer:'Layer'}[studioSubtool] || 'Text') : 'Text'}</strong><button type="button" className="studioPanelDone" aria-label="Close Text panel" title="Close Text panel" onClick={closeStudioPanel}>✓</button></div>
                 {selectedLayer?.type === 'text' ? <>
-                  {!studioSubtool ? <><textarea className="capcutTextInput iosTextArea" rows={3} disabled={Boolean(selectedLayer.locked)} value={selectedLayer.text||''} aria-label="Layer text" onChange={(e)=>updateLayer(selectedLayer.id,{text:splitGraphemes(e.target.value).slice(0,500).join('')})}/><div className="capcutSubtools">
+                  {!studioSubtool ? <><textarea className="capcutTextInput iosTextArea" rows={3} disabled={Boolean(selectedLayer.locked)} value={selectedLayer.text||''} aria-label="Layer text" onChange={(e)=>updateLayer(selectedLayer.id,{text:splitGraphemes(e.target.value).slice(0,500).join('')})}/><div className="textLayerQuickActions"><button type="button" className="destructive" disabled={Boolean(selectedLayer.locked)} onClick={()=>deleteLayer(selectedLayer.id)}>Delete Text</button></div><div className="capcutSubtools">
                     {['font','style','color','shadow','spacing','align','layer'].map((key)=><button type="button" key={key} onClick={()=>setStudioSubtool(key)}><span className={key==='color'?'textColorToolIcon':''} style={key==='color'?{'--selected-text-color':selectedLayer.color||'#ffffff'}:undefined}>{{font:'Aa',style:'B',color:'',shadow:'◔',spacing:'≡',align:'☰',layer:'≡'}[key]}</span><small>{key[0].toUpperCase()+key.slice(1)}</small></button>)}
                   </div></> : null}
                   <fieldset disabled={Boolean(selectedLayer.locked)} style={{border:0,padding:0,margin:0,minWidth:0}}>
@@ -7263,14 +7275,14 @@ export default function Page() {
                   {studioSubtool==='spacing'?<><SliderRow label="Letter Spacing" value={selectedLayer.letterSpacing||0} min={-4} max={30} step={0.1} onChange={(v)=>updateLayer(selectedLayer.id,{letterSpacing:v})}/><SliderRow label="Line Height" value={selectedLayer.lineHeight||1.18} min={0.7} max={2.4} step={0.01} onChange={(v)=>updateLayer(selectedLayer.id,{lineHeight:v})}/></>:null}
                   {studioSubtool==='align'?<div className="segmentedControl capcutSegmented">{['left','center','right'].map(v=><button type="button" key={v} className={selectedLayer.align===v?'selected':''} onClick={()=>updateLayer(selectedLayer.id,{align:v})}>{v}</button>)}</div>:null}
                   </fieldset>
-                  {studioSubtool==='layer'?<><SliderRow label="Opacity" value={selectedLayer.opacity??1} min={0} max={1} step={0.01} disabled={Boolean(selectedLayer.locked)} onChange={(v)=>updateLayer(selectedLayer.id,{opacity:v})}/><SwitchRow label="Show Layer" value={!selectedLayer.hidden} onChange={(v)=>updateLayer(selectedLayer.id,{hidden:!v})}/><SwitchRow label="Lock Layer" value={Boolean(selectedLayer.locked)} onChange={(v)=>updateLayer(selectedLayer.id,{locked:v})}/><div className="layerActionGrid"><button type="button" onClick={()=>duplicateLayer(selectedLayer.id)}>Duplicate</button><button type="button" disabled={Boolean(selectedLayer.locked)} onClick={()=>deleteLayer(selectedLayer.id)}>Delete</button></div></>:null}
+                  {studioSubtool==='layer'?<><SliderRow label="Opacity" value={selectedLayer.opacity??1} min={0} max={1} step={0.01} disabled={Boolean(selectedLayer.locked)} onChange={(v)=>updateLayer(selectedLayer.id,{opacity:v})}/><SwitchRow label="Show Layer" value={!selectedLayer.hidden} onChange={(v)=>updateLayer(selectedLayer.id,{hidden:!v})}/><SwitchRow label="Lock Layer" value={Boolean(selectedLayer.locked)} onChange={(v)=>updateLayer(selectedLayer.id,{locked:v})}/><div className="layerActionGrid layerSingleAction"><button type="button" onClick={()=>duplicateLayer(selectedLayer.id)}>Duplicate</button></div></>:null}
                 </> : <button type="button" className="capcutPrimaryTile" onClick={addTextLayer}>+ Add Text</button>}
               </section>
             ) : null}
 
             {studioTool === 'add' ? (
               <section className="studioContextCard capcutContextPanel">
-                <div className="contextPanelHeader"><strong>Add</strong><button type="button" onClick={() => setStudioTool('crop')}>✓</button></div>
+                <div className="contextPanelHeader"><strong>Add</strong><button type="button" className="studioPanelDone" aria-label="Close Add panel" title="Close Add panel" onClick={closeStudioPanel}>✓</button></div>
                 <div className="capcutSubtools">
                   <button type="button" onClick={addTextLayer}><span>T</span><small>Text</small></button>
                   <button type="button" disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={() => layerUploadRef.current?.click()}><IOSIcon name="photo" size={22}/><small>Image / Logo</small></button>
@@ -7282,7 +7294,7 @@ export default function Page() {
 
             {studioTool === 'layers' ? (
               <section className="studioContextCard capcutContextPanel">
-                <div className="contextPanelHeader"><strong>Layers</strong><button type="button" onClick={() => setStudioTool('crop')}>✓</button></div>
+                <div className="contextPanelHeader"><strong>Layers</strong><button type="button" className="studioPanelDone" aria-label="Close Layers panel" title="Close Layers panel" onClick={closeStudioPanel}>✓</button></div>
                 <div className="capcutLayerList">
                   <button type="button" className={selectedElement === 'artwork' ? 'selected' : ''} onClick={() => { setSelectedElement('artwork'); setStudioTool('crop'); setStudioSubtool(''); }}><span>◉</span><strong>Artwork</strong><span>≡</span></button>
                   {visualLayerStack.map((entry) => (
@@ -7311,7 +7323,7 @@ export default function Page() {
 
             {studioTool === 'background' ? (
               <section className="studioContextCard capcutContextPanel">
-                <div className="contextPanelHeader">{studioSubtool ? <button type="button" className="contextBack" onClick={()=>setStudioSubtool('')}>‹</button>:<span/>}<strong>{studioSubtool ? studioSubtool[0].toUpperCase()+studioSubtool.slice(1) : 'Background'}</strong><button type="button" onClick={()=>{setStudioSubtool('');setStudioTool('crop')}}>✓</button></div>
+                <div className="contextPanelHeader">{studioSubtool ? <button type="button" className="contextBack" onClick={()=>setStudioSubtool('')}>‹</button>:<span/>}<strong>{studioSubtool ? studioSubtool[0].toUpperCase()+studioSubtool.slice(1) : 'Background'}</strong><button type="button" className="studioPanelDone" aria-label="Close Background panel" title="Close Background panel" onClick={closeStudioPanel}>✓</button></div>
                 {!studioSubtool ? <div className="capcutSubtools">
                   <button type="button" onClick={()=>setStudioSubtool('color')}><IOSIcon name="color" size={22}/><small>Color</small></button>
                   <button type="button" onClick={()=>setStudioSubtool('gradient')}><IOSIcon name="gradient" size={22}/><small>Gradient</small></button>
@@ -7327,7 +7339,7 @@ export default function Page() {
 
             {studioTool === 'crop' && studioSubtool === 'crop' ? (
               <section className="studioContextCard capcutContextPanel">
-                <div className="contextPanelHeader"><button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button><strong>Crop</strong><button type="button" onClick={() => setStudioSubtool('')}>✓</button></div>
+                <div className="contextPanelHeader"><button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button><strong>Crop</strong><button type="button" className="studioPanelDone" aria-label="Close Crop panel" title="Close Crop panel" onClick={closeStudioPanel}>✓</button></div>
               <Group title="Crop">
                 <div className="editingTargetBar">
                   <span>
@@ -7555,7 +7567,7 @@ export default function Page() {
                 <div className="contextPanelHeader">
                   {studioSubtool ? <button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button> : <span/>}
                   <strong>Adjust</strong>
-                  <button type="button" onClick={() => setStudioSubtool('')}>✓</button>
+                  <button type="button" className="studioPanelDone" aria-label="Close Adjust panel" title="Close Adjust panel" onClick={closeStudioPanel}>✓</button>
                 </div>
                 <div className="editingTargetBar"><span><strong>Editing {activeImageLabel}</strong><small>Adjustments affect this image only</small></span>{selectedImageLayer || (design.customLayers || []).some((layer) => layer.type === 'image' && !layer.hidden) ? <button type="button" onClick={() => setSelectedElement(selectedImageLayer ? 'artwork' : ((design.customLayers || []).find((layer) => layer.type === 'image' && !layer.hidden)?.id || 'artwork'))}>{selectedImageLayer ? 'Artwork' : 'Image Layer'}</button> : null}</div>
                 <>
@@ -7591,7 +7603,7 @@ export default function Page() {
                 <div className="contextPanelHeader">
                   {studioSubtool ? <button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button> : <span/>}
                   <strong>Effects</strong>
-                  <button type="button" onClick={() => setStudioSubtool('')}>✓</button>
+                  <button type="button" className="studioPanelDone" aria-label="Close Effects panel" title="Close Effects panel" onClick={closeStudioPanel}>✓</button>
                 </div>
                 <div className="editingTargetBar"><span><strong>Editing {activeImageLabel}</strong><small>Effects affect this image only</small></span>{selectedImageLayer || (design.customLayers || []).some((layer) => layer.type === 'image' && !layer.hidden) ? <button type="button" onClick={() => setSelectedElement(selectedImageLayer ? 'artwork' : ((design.customLayers || []).find((layer) => layer.type === 'image' && !layer.hidden)?.id || 'artwork'))}>{selectedImageLayer ? 'Artwork' : 'Image Layer'}</button> : null}</div>
                 <div className="effectTileRail">
@@ -7614,7 +7626,7 @@ export default function Page() {
                 <div className="contextPanelHeader">
                   {studioSubtool ? <button type="button" className="contextBack" onClick={() => setStudioSubtool('')}>‹</button> : <span/>}
                   <strong>{studioSubtool ? ({chip:'Chip',contactless:'Contactless',visa:'VISA',number:'Number',name:'Name',expiry:'Expiry',badge:'Badge',textstyle:'Text Style'}[studioSubtool] || 'Card') : 'Card'}</strong>
-                  <button type="button" onClick={() => setStudioSubtool('')}>✓</button>
+                  <button type="button" className="studioPanelDone" aria-label="Close Card panel" title="Close Card panel" onClick={closeStudioPanel}>✓</button>
                 </div>
                 {!studioSubtool ? (
                   <>
@@ -7927,9 +7939,9 @@ export default function Page() {
               event,
               TAB_ITEMS.map(([item]) => item),
               tab,
-              setTab
+              openAppTab
             )}
-            onClick={() => setTab(value)}
+            onClick={() => openAppTab(value)}
           >
             <IOSIcon name={value} size={24} />
             <span>{label}</span>
