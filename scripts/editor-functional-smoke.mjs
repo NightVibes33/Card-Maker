@@ -32,6 +32,23 @@ try {
   await page.goto(process.env.CARD_STUDIO_URL || 'http://127.0.0.1:3000/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('tab', { name: 'Studio', exact: true }).click();
 
+  await page.getByRole('button', { name: 'Close Edit panel', exact: true }).click();
+  await page.locator('.studioPanelClosed').waitFor();
+  await page.getByRole('tab', { name: 'Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Close Edit panel', exact: true }).waitFor({ state: 'visible' });
+
+  await page.getByRole('button', { name: 'Layers', exact: true }).click();
+  await page.locator('.capcutLayerList').waitFor({ state: 'visible' });
+  await page.getByRole('button', { name: 'Close Layers panel', exact: true }).click();
+
+  await page.getByRole('tab', { name: 'Text', exact: true }).click();
+  await page.getByRole('button', { name: /Add Text/ }).click();
+  await page.getByRole('textbox', { name: 'Layer text', exact: true }).waitFor({ state: 'visible' });
+  assert.equal(await page.getByRole('button', { name: 'Delete Text', exact: true }).isVisible(), true, 'Delete Text must be visible on the main Text panel');
+  await page.getByRole('button', { name: 'Delete Text', exact: true }).click();
+  await page.getByRole('button', { name: /Add Text/ }).waitFor({ state: 'visible' });
+  assert.equal(await page.getByRole('textbox', { name: 'Layer text', exact: true }).count(), 0, 'Delete Text removes the selected text layer');
+
   const artwork = await sharp({ create: { width: 640, height: 404, channels: 4, background: '#606060' } }).png().toBuffer();
   await page.locator('#panel-studio input[type="file"]').first().setInputFiles({ name: 'artwork.png', mimeType: 'image/png', buffer: artwork });
   await page.waitForFunction(() => {
