@@ -26,7 +26,7 @@ iPhone-first CUCU card-design PWA for AirCard-iOS.
 - edge bleed, safe text, chip, contactless, and snap guides
 - bounded 50-state undo/redo
 - hold Before / After comparison
-- Flat / Physical preview with preview-only tilt, sheen, shadow, and chip reflection
+- Flat / Physical preview with the original lightweight CSS tilt and one shared card-wide sheen
 - Original, Vivid, Dark, AMOLED, Warm, Cold, Film, Neon, Vintage, Monochrome image presets
 - Classic Gold, Black Metal, Silver, Rose Gold, Minimal, No Chip, Full Art card presets
 - exposure, brightness, contrast, saturation, highlights, shadows, temperature, tint, sharpness, blur
@@ -34,6 +34,8 @@ iPhone-first CUCU card-design PWA for AirCard-iOS.
 - EMV/contactless hardware
 - fixed card text plus custom text/image/shape layers
 - custom text font, weight, size, letter spacing, alignment, opacity, shadow, X/Y, rotation
+- imported TTF/OTF/WOFF fonts, text outline and curve, tracking, line spacing, reusable text styles
+- AI cutout under Effects → Cutout, with editable erase/restore masks for artwork and image layers
 - image/logo layers
 - Bring Forward / Send Back / Duplicate / Delete / Lock
 - Expert Mode numerical editing

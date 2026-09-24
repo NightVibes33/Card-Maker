@@ -2280,6 +2280,11 @@ button:disabled{opacity:.38}
 .isStudioEditor .aiCutoutButton{width:100%;min-height:48px;margin:8px 0 3px;padding:10px 14px;border-color:rgba(50,160,255,.34);background:linear-gradient(135deg,#153c67,#202b3b);color:#eef7ff;font-size:14px}
 .isStudioEditor .aiCutoutButton:disabled{opacity:.7}
 .isStudioEditor .aiCutoutHint{margin:3px 2px 10px;color:#a8b2c0;font-size:12px;line-height:1.45}
+.isStudioEditor .capcutTextSubtools{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;overflow:visible;padding:10px 12px 8px}
+.isStudioEditor .capcutTextSubtools button{width:100%;min-width:0;min-height:62px;flex:initial;gap:4px}
+.isStudioEditor .capcutTextSubtools button>span,.isStudioEditor .capcutTextSubtools button>svg{width:40px;height:40px;flex:none}
+.isStudioEditor .capcutTextSubtools small{font-size:9px;line-height:11px}
+.isStudioEditor .textToolsHint{margin:0 14px 12px;color:#a8b2c0;font-size:12px;line-height:1.45}
 .isStudioEditor .capcutColorPicker{min-height:58px;padding:8px 12px;margin:10px 14px;border-radius:13px;background:#24262b}
 .isStudioEditor .capcutColorPicker input[type=color]{width:42px;height:42px;padding:0;border:0;border-radius:50%;overflow:hidden;background:transparent}
 .isStudioEditor .capcutColorPicker span{font:600 13px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase}
@@ -2629,12 +2634,6 @@ body:has(.studio.isStudioEditor){
 .isStudioEditor .maskModeSwitch button{min-height:44px;border:0;border-radius:10px;background:transparent;color:#b8bdc7;font-size:13px;font-weight:600}
 .isStudioEditor .maskModeSwitch button.selected{background:#087cf0;color:#fff;box-shadow:0 3px 10px rgba(0,122,255,.23)}
 .isStudioEditor .effectTileRail .mask{display:grid;place-items:center;color:#e9edf4;font-size:32px;font-style:normal;background:radial-gradient(circle at center,#424752 0 18%,#252830 20% 30%,#17191e 31% 100%)}
-.physicalCard.physicalThreeReady{transform:none!important;animation:none!important;transform-style:flat}
-.physicalCard.physicalThreeReady:after{display:none}
-.physicalCard.physicalThreeReady>canvas:first-child{opacity:0}
-.threeCardPreview{position:absolute;z-index:3;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none}
-.threeCardPreview canvas{display:block;width:100%!important;height:100%!important;border-radius:inherit;-webkit-clip-path:inset(0 round var(--card-shape-radius));clip-path:inset(0 round var(--card-shape-radius))}
-.threeCardFallback{position:absolute;inset:auto 8px 8px;text-align:center;color:#c4c8d0;font-size:11px}
 @media(max-width:360px){
   .isStudioEditor .textStyleComposer{flex-wrap:wrap}
   .isStudioEditor .textStyleComposer button{flex:1 1 100%}

@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import dynamic from 'next/dynamic';
 import {
   blobToDataUrl,
   cacheArtwork,
@@ -17,11 +16,6 @@ import {
 import { IMAGE_PROXY_VERSION, parseAllowedRemoteImageUrl } from './lib/imagePolicy';
 import { adjustedImage } from './lib/pixelAdjust';
 import { createAICutoutMask } from './lib/aiCutout.mjs';
-
-const ThreeCardPreview = dynamic(() => import('./components/ThreeCardPreview'), {
-  ssr: false,
-  loading: () => null
-});
 
 const OUT_W = 1536;
 const OUT_H = 969;
@@ -3114,8 +3108,6 @@ export default function Page() {
   const [activeGuides, setActiveGuides] = useState({ x: null, y: null });
   const [selectedElement, setSelectedElement] = useState('artwork');
   const [previewMode, setPreviewMode] = useState('flat');
-  const [threePreviewReady, setThreePreviewReady] = useState(false);
-  const [canvasRevision, setCanvasRevision] = useState(0);
   const [fontVersion, setFontVersion] = useState(0);
   const [maskMode, setMaskMode] = useState('erase');
   const [maskBrushSize, setMaskBrushSize] = useState(28);
@@ -3192,7 +3184,6 @@ export default function Page() {
   const contactlessSelectionRef = useRef(null);
   const layerSelectionRef = useRef(null);
   const activeMaskStrokeRef = useRef(null);
-  const threeTextureRefreshTimerRef = useRef(null);
   const finishActiveGestureRef = useRef(null);
 
   const updateActiveGuides = useCallback((x, y) => {
@@ -3387,10 +3378,6 @@ export default function Page() {
       if (pendingDesignFrameRef.current) {
         window.cancelAnimationFrame(pendingDesignFrameRef.current);
         pendingDesignFrameRef.current = 0;
-      }
-      if (threeTextureRefreshTimerRef.current != null) {
-        window.clearTimeout(threeTextureRefreshTimerRef.current);
-        threeTextureRefreshTimerRef.current = null;
       }
       pendingVisualDesignRef.current = null;
     };
@@ -3911,16 +3898,6 @@ export default function Page() {
 
     return () => { cancelled = true; };
   }, [hydrated]);
-
-  useEffect(() => {
-    if (previewMode !== 'physical') {
-      setThreePreviewReady(false);
-      if (threeTextureRefreshTimerRef.current != null) {
-        window.clearTimeout(threeTextureRefreshTimerRef.current);
-        threeTextureRefreshTimerRef.current = null;
-      }
-    }
-  }, [previewMode]);
 
   useEffect(() => {
     if (!hydrated || !autosaveReady) return undefined;
@@ -4856,12 +4833,6 @@ export default function Page() {
 
       if (showExportPreview && fullPreviewCanvasRef.current) {
         renderCard(fullPreviewCanvasRef.current.getContext('2d'), OUT_W, OUT_H);
-      }
-      if (previewMode === 'physical' && threeTextureRefreshTimerRef.current == null) {
-        threeTextureRefreshTimerRef.current = window.setTimeout(() => {
-          threeTextureRefreshTimerRef.current = null;
-          setCanvasRevision((revision) => revision + 1);
-        }, 80);
       }
     });
 
@@ -7905,7 +7876,7 @@ export default function Page() {
         )}
       </div>
 
-      <div className={'cardFrame ' + (previewMode === 'physical' ? 'physicalCard' : '') + (previewMode === 'physical' && threePreviewReady ? ' physicalThreeReady' : '') + (tab === 'studio' && previewMode === 'flat' && guidesEnabled ? ' cardGuidesVisible' : '')}>
+      <div className={'cardFrame ' + (previewMode === 'physical' ? 'physicalCard' : '') + (tab === 'studio' && previewMode === 'flat' && guidesEnabled ? ' cardGuidesVisible' : '')}>
         <canvas
           ref={canvasRef}
           width={EDITOR_PREVIEW_W}
@@ -7926,10 +7897,6 @@ export default function Page() {
               : 'Physical card preview. Tap to return to Flat editing mode.'
           }
         />
-
-        {previewMode === 'physical' && canvasRef.current ? (
-          <ThreeCardPreview sourceCanvas={canvasRef.current} revision={canvasRevision} onReady={() => setThreePreviewReady(true)} />
-        ) : null}
 
         {tab === 'studio' && previewMode === 'flat' && guidesEnabled ? (
           <div className="cardGuides" aria-hidden="true">
@@ -8263,9 +8230,9 @@ export default function Page() {
 
             {studioTool === 'text' ? (
               <section className="studioContextCard capcutContextPanel">
-                <div className="contextPanelHeader">{studioSubtool ? <button type="button" className="contextBack" onClick={()=>setStudioSubtool('')}>‹</button> : <span/>}<strong>{studioSubtool ? ({font:'Font',style:'Style',color:'Color',shadow:'Shadow',spacing:'Spacing',align:'Align',layer:'Layer'}[studioSubtool] || 'Text') : 'Text'}</strong><button type="button" className="studioPanelDone" aria-label="Close Text panel" title="Close Text panel" onClick={closeStudioPanel}>✓</button></div>
+                <div className="contextPanelHeader">{studioSubtool ? <button type="button" className="contextBack" onClick={()=>setStudioSubtool('')}>‹</button> : <span/>}<strong>{studioSubtool ? ({font:'Font',style:'Style',outline:'Outline',curve:'Curve',color:'Color',shadow:'Shadow',spacing:'Spacing',align:'Align',saved:'Saved Styles',layer:'Layer'}[studioSubtool] || 'Text') : 'Text'}</strong><button type="button" className="studioPanelDone" aria-label="Close Text panel" title="Close Text panel" onClick={closeStudioPanel}>✓</button></div>
                 {selectedLayer?.type === 'text' ? <>
-                  {!studioSubtool ? <><textarea className="capcutTextInput iosTextArea" rows={3} disabled={Boolean(selectedLayer.locked)} value={selectedLayer.text||''} aria-label="Layer text" onChange={(e)=>updateLayer(selectedLayer.id,{text:splitGraphemes(e.target.value).slice(0,500).join('')})}/><div className="textLayerQuickActions"><button type="button" className="destructive" disabled={Boolean(selectedLayer.locked)} onClick={()=>deleteLayer(selectedLayer.id)}>Delete Text</button></div><div className="capcutSubtools">
+                  {!studioSubtool ? <><textarea className="capcutTextInput iosTextArea" rows={3} disabled={Boolean(selectedLayer.locked)} value={selectedLayer.text||''} aria-label="Layer text" onChange={(e)=>updateLayer(selectedLayer.id,{text:splitGraphemes(e.target.value).slice(0,500).join('')})}/><div className="textLayerQuickActions"><button type="button" className="destructive" disabled={Boolean(selectedLayer.locked)} onClick={()=>deleteLayer(selectedLayer.id)}>Delete Text</button></div><div className="capcutSubtools capcutTextSubtools">
                     {['font','style','outline','curve','color','shadow','spacing','align','saved','layer'].map((key)=><button type="button" key={key} className={studioSubtool===key?'active':''} onClick={()=>setStudioSubtool(key)}><span className={key==='color'?'textColorToolIcon':''} style={key==='color'?{'--selected-text-color':selectedLayer.color||'#ffffff'}:undefined}>{{font:'Aa',style:'B',outline:'◉',curve:'⌒',color:'',shadow:'◔',spacing:'≡',align:'☰',saved:'★',layer:'≡'}[key]}</span><small>{{font:'Font',style:'Style',outline:'Outline',curve:'Curve',color:'Color',shadow:'Shadow',spacing:'Spacing',align:'Align',saved:'Saved',layer:'Layer'}[key]}</small></button>)}
                   </div></> : null}
                   <fieldset disabled={Boolean(selectedLayer.locked)} style={{border:0,padding:0,margin:0,minWidth:0}}>
@@ -8280,7 +8247,7 @@ export default function Page() {
                   {studioSubtool==='saved'?<><div className="textStyleComposer"><input className="iosTextField" aria-label="Text style name" placeholder="Name this style" value={textStyleName} onChange={(e)=>setTextStyleName(splitGraphemes(e.target.value).slice(0,60).join(''))}/><button type="button" onClick={saveTextStyle}>Save Current Style</button></div>{textStyles.length?<div className="textStyleRail">{textStyles.map((style)=><div className="textStyleItem" key={style.id}><button type="button" onClick={()=>applyTextStyle(style)}>{style.name}</button><button type="button" aria-label={'Delete '+style.name} onClick={()=>deleteTextStyle(style.id)}>×</button></div>)}</div>:<p className="textStyleEmpty">Saved text looks will appear here.</p>}</>:null}
                   </fieldset>
                   {studioSubtool==='layer'?<><SliderRow label="Opacity" value={selectedLayer.opacity??1} min={0} max={1} step={0.01} disabled={Boolean(selectedLayer.locked)} onChange={(v)=>updateLayer(selectedLayer.id,{opacity:v})}/><SwitchRow label="Show Layer" value={!selectedLayer.hidden} onChange={(v)=>updateLayer(selectedLayer.id,{hidden:!v})}/><SwitchRow label="Lock Layer" value={Boolean(selectedLayer.locked)} onChange={(v)=>updateLayer(selectedLayer.id,{locked:v})}/><div className="layerActionGrid layerSingleAction"><button type="button" onClick={()=>duplicateLayer(selectedLayer.id)}>Duplicate</button></div></>:null}
-                </> : <button type="button" className="capcutPrimaryTile" onClick={addTextLayer}>+ Add Text</button>}
+                </> : <><button type="button" className="capcutPrimaryTile" onClick={addTextLayer}>+ Add Text</button><p className="textToolsHint">Add text to open custom fonts, outlines, curves, spacing, and saved styles.</p></>}
               </section>
             ) : null}
 
@@ -8612,7 +8579,7 @@ export default function Page() {
                 <div className="editingTargetBar"><span><strong>Editing {activeImageLabel}</strong><small>Effects affect this image only</small></span>{selectedImageLayer || (design.customLayers || []).some((layer) => layer.type === 'image' && !layer.hidden) ? <button type="button" onClick={() => setSelectedElement(selectedImageLayer ? 'artwork' : ((design.customLayers || []).find((layer) => layer.type === 'image' && !layer.hidden)?.id || 'artwork'))}>{selectedImageLayer ? 'Artwork' : 'Image Layer'}</button> : null}</div>
                 <div className="effectTileRail">
                     <button type="button" disabled={!activeImageEditable} onClick={() => patchImageTarget({vignette:0,grain:0,gloss:0,overlay:0,fade:0,effectTintStrength:0})}><i className="effectNone"/><small>None</small></button>
-                    {[['gloss','Gloss'],['grain','Grain'],['vignette','Vignette'],['fade','Film'],['overlay','Dark'],['tintfx','Tint'],['mask','Mask']].map(([key,label]) => <button type="button" key={key} disabled={key==='mask'&&!maskTargetAvailable} className={studioSubtool===key?'active':''} onClick={() => setStudioSubtool(key)}><i className={'effectSwatch '+key}>{key!=='mask'&&activeEffectThumbnail ? <img src={activeEffectThumbnail} alt=""/> : key==='mask'?'◌':null}</i><small>{label}</small></button>)}
+                    {[['mask','Cutout'],['gloss','Gloss'],['grain','Grain'],['vignette','Vignette'],['fade','Film'],['overlay','Dark'],['tintfx','Tint']].map(([key,label]) => <button type="button" key={key} disabled={key==='mask'&&!maskTargetAvailable} className={studioSubtool===key?'active':''} onClick={() => setStudioSubtool(key)}><i className={'effectSwatch '+key}>{key!=='mask'&&activeEffectThumbnail ? <img src={activeEffectThumbnail} alt=""/> : key==='mask'?'◌':null}</i><small>{label}</small></button>)}
                 </div>
                 {studioSubtool === 'mask' ? (
                   maskTargetAvailable ? <>

@@ -18,7 +18,6 @@ const imageRoute = read('app/api/image/route.js');
 const inspectRoute = read('app/api/cucu/inspect/route.js');
 const imagePolicy = read('app/lib/imagePolicy.js');
 const aiCutout = read('app/lib/aiCutout.mjs');
-const threePreview = read('app/components/ThreeCardPreview.jsx');
 
 const pageChecks = [
   [/const \[studioPanelOpen, setStudioPanelOpen\] = useState\(true\);/, 'Studio context panel starts open'],
@@ -252,10 +251,13 @@ requireMatch(
   'persisted proxy targets reject embedded credentials'
 );
 requireMatch(storage, /const DB_VERSION = 3;[\s\S]{0,140}const STORES = \[[^\]]*'fonts'/, 'custom fonts have a versioned local IndexedDB store');
-requireMatch(page, /dynamic\(\(\) => import\('\.\/components\/ThreeCardPreview'\), \{\s*ssr: false/, '3D preview stays lazy-loaded and client-only');
-requireMatch(threePreview, /new THREE\.CanvasTexture\(sourceCanvas\)/, '3D card uses the existing 2D artwork as its texture');
-requireMatch(threePreview, /texture\.needsUpdate = true/, '3D texture refreshes when card artwork changes');
-requireMatch(threePreview, /prefers-reduced-motion: reduce/, '3D motion respects the device reduced-motion setting');
+requireMatch(page, /previewMode === 'physical' \? 'physicalCard' : ''/, 'Physical Preview uses the original lightweight card renderer');
+requireMatch(css, /\.physicalCard\{[^}]*animation:physicalTilt/, 'Physical Preview retains the original CSS tilt');
+requireMatch(page, /\[\['mask','Cutout'\],\['gloss','Gloss'\]/, 'Cutout is the first visible Effects tool');
+requireMatch(page, /capcutSubtools capcutTextSubtools/, 'advanced text tools are shown together without hidden horizontal items');
+if (/ThreeCardPreview|physicalThreeReady|threeCardPreview/.test(page + css)) {
+  throw new Error('Editor contract failed: the unwanted Three.js preview must remain removed');
+}
 
 requireMatch(page, /onChange=\{emit\}/, 'range sliders use React controlled onChange');
 requireMatch(page, /type=\{Number\(min\) < 0 \? 'text' : 'number'\}/, 'signed Expert Mode fields remain typeable on iPhone');
