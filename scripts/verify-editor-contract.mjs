@@ -245,9 +245,12 @@ for (const [pattern, label] of touchChecks) {
 }
 requireMatch(
   css,
-  /\.physicalChipReflection\{[^}]*transform:rotate\(var\(--chip-rotation,0deg\)\)/s,
-  'physical chip reflection keeps its rotation when motion animation is disabled'
+  /\.physicalCard:after\{[^}]*background:linear-gradient\(/s,
+  'one card-wide sheen overlays the card artwork and chip together'
 );
+if (/physicalChipReflection|chipSheen/.test(page + css)) {
+  throw new Error('Editor contract failed: Preview must not render a separate chip sheen');
+}
 requireMatch(
   css,
   /\.studioPreview \.cardFrame\{[^}]*--card-shape-radius:18px;[^}]*border-radius:var\(--card-shape-radius\)/s,

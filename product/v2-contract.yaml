@@ -238,13 +238,12 @@ features:
     contains:
       - "Flat"
       - "Preview"
-      - "physicalChipReflection"
+      - "physicalCard"
   physical_motion_css:
     file: app/globals.css
     contains:
       - "@keyframes physicalTilt"
       - "@keyframes physicalSheen"
-      - "@keyframes chipSheen"
   liquid_glass_hierarchy:
     file: app/globals.css
     contains:

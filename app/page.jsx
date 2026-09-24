@@ -7057,20 +7057,6 @@ export default function Page() {
           />
         ) : null}
 
-        {previewMode === 'physical' && design.chip ? (
-          <i
-            className="physicalChipReflection"
-            aria-hidden="true"
-            style={{
-              left: (design.chipX * 100) + '%',
-              top: (design.chipY * 100) + '%',
-              width: ((CHIP_ART_WIDTH * design.chipScale / OUT_W) * 100) + '%',
-              height: ((CHIP_ART_HEIGHT * design.chipScale / OUT_H) * 100) + '%',
-              '--chip-rotation': Number(design.chipRotation || 0) + 'deg'
-            }}
-          />
-        ) : null}
-
         {tab === 'studio' &&
         previewMode === 'flat' &&
         selectedLayer &&

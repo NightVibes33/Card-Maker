@@ -1406,16 +1406,6 @@ button:disabled{opacity:.38}
 .physicalCard:after{
   animation:physicalSheen 3.8s ease-in-out infinite alternate;
 }
-.physicalChipReflection{
-  position:absolute;
-  z-index:3;
-  pointer-events:none;
-  border-radius:12px;
-  background:linear-gradient(118deg,transparent 18%,rgba(255,255,255,.48) 45%,rgba(255,255,255,.08) 58%,transparent 76%);
-  mix-blend-mode:screen;
-  transform:rotate(var(--chip-rotation,0deg));
-  animation:chipSheen 2.9s ease-in-out infinite alternate;
-}
 @keyframes physicalTilt{
   0%{transform:perspective(900px) rotateX(3deg) rotateY(-5deg) translateY(-1px)}
   100%{transform:perspective(900px) rotateX(-2deg) rotateY(5deg) translateY(-3px)}
@@ -1423,10 +1413,6 @@ button:disabled{opacity:.38}
 @keyframes physicalSheen{
   0%{background-position:-70% 0}
   100%{background-position:90% 0}
-}
-@keyframes chipSheen{
-  0%{opacity:.32;transform:rotate(var(--chip-rotation,0deg)) translateX(-8%)}
-  100%{opacity:.78;transform:rotate(var(--chip-rotation,0deg)) translateX(8%)}
 }
 .layerAddRow{
   grid-template-columns:repeat(2,minmax(0,1fr));
@@ -1489,7 +1475,7 @@ button:disabled{opacity:.38}
   button,input,select,textarea{font:inherit}
 }
 @media (prefers-reduced-motion:reduce){
-  .physicalCard,.physicalCard:after,.physicalChipReflection{animation:none!important}
+  .physicalCard,.physicalCard:after{animation:none!important}
 }
 
 .cropBoundary{
