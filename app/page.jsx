@@ -7012,16 +7012,19 @@ export default function Page() {
 
           let lastModelProgress = -1;
           const maskBlob = await createAICutoutMask(sourceBlob, (progress) => {
+            const modelLabel = progress?.model === 'anime' ? 'Anime model' : 'General fallback';
             if (progress?.status === 'progress' && Number.isFinite(Number(progress.progress))) {
               const percentage = Math.max(0, Math.min(100, Math.round(Number(progress.progress))));
               if (percentage === 100 || percentage - lastModelProgress >= 5) {
                 lastModelProgress = percentage;
-                setAiCutoutStatus('Loading AI model · ' + percentage + '%');
+                setAiCutoutStatus('Loading ' + modelLabel + ' · ' + percentage + '%');
               }
+            } else if (progress?.status === 'fallback') {
+              setAiCutoutStatus('Trying general cutout fallback…');
             } else if (progress?.status === 'loading' || progress?.status === 'initiate' || progress?.status === 'download') {
-              setAiCutoutStatus('Loading AI model…');
+              setAiCutoutStatus('Loading ' + modelLabel + '…');
             } else if (progress?.status === 'segmenting') {
-              setAiCutoutStatus('Finding the subject…');
+              setAiCutoutStatus(progress?.model === 'anime' ? 'Removing anime background…' : 'Finding the subject…');
             }
           });
           if (!isCurrent()) return;
@@ -8619,7 +8622,7 @@ export default function Page() {
                       <IOSIcon name="effects" size={19}/>
                       <span>{aiCutoutBusy ? (aiCutoutStatus || 'Preparing AI Cutout…') : activeAIMaskSource ? 'Run AI Cutout Again' : 'AI Cutout'}</span>
                     </button>
-                    <p className="aiCutoutHint">Runs on your device. First use downloads a 44–88 MB model. Use Erase and Restore to refine edges.</p>
+                    <p className="aiCutoutHint">Runs on your device. Anime model downloads about 176 MB on first use; a smaller general model is the fallback. Use Erase and Restore to refine edges.</p>
                     {aiCutoutError ? <p className="aiCutoutError" role="alert">{aiCutoutError}</p> : null}
                     {activeAIMaskSource ? <button type="button" className="settingsResetButton" disabled={aiCutoutBusy} onClick={()=>selectedImageLayer ? updateLayer(selectedImageLayer.id,{maskSource:''}) : patch({backgroundMaskSource:''})}>Reset AI Cutout</button> : null}
                     <div className="maskModeSwitch" role="group" aria-label="Image mask brush mode">

@@ -3,10 +3,22 @@ import { readFileSync } from 'node:fs';
 import { extractMattePixels, fitCutoutDimensions, isAppleMobileBrowser, refineMatteAlpha } from '../app/lib/aiCutout.mjs';
 
 const cutoutSource = readFileSync(new URL('../app/lib/aiCutout.mjs', import.meta.url), 'utf8');
+assert.match(cutoutSource, /const ANIME_MODEL = Object\.freeze/);
+assert.match(cutoutSource, /id: 'BritishWerewolf\/IS-Net-Anime'/, 'anime artwork uses an anime-focused model');
 assert.match(
   cutoutSource,
-  /const MODEL_REVISION = '034e2d884afbab897e10e78fc5bb566b29533fd6'/,
-  'AI cutout pins the model revision that includes preprocessor_config.json'
+  /revision: '99b14ab0ce4311317febbfad1d2fc00da5ea6d90'/,
+  'anime model revision is pinned'
+);
+assert.match(
+  cutoutSource,
+  /id: 'onnx-community\/ormbg-ONNX'/,
+  'the existing general model remains available as fallback'
+);
+assert.match(
+  cutoutSource,
+  /revision: '034e2d884afbab897e10e78fc5bb566b29533fd6'/,
+  'fallback model pins the revision containing its processor config'
 );
 
 assert.deepEqual(fitCutoutDimensions(4032, 3024), { width: 2048, height: 1536 });
@@ -50,6 +62,33 @@ assert.ok(sharpenedMatte[edgeIndex] > 32 && sharpenedMatte[edgeIndex] < 224, 'ed
 
 const cleanMatte = new Uint8ClampedArray([0, 0, 0, 0, 255, 255, 255, 255]);
 assert.deepEqual([...refineMatteAlpha(cleanMatte)], [...cleanMatte], 'already crisp mattes are left unchanged');
+
+const animeMask = extractMattePixels({
+  label: 'foreground',
+  mask: {
+    width: 2,
+    height: 2,
+    channels: 1,
+    data: new Uint8ClampedArray([0, 64, 192, 255])
+  }
+});
+assert.equal(animeMask.width, 2);
+assert.equal(animeMask.height, 2);
+assert.deepEqual([...animeMask.alpha], [0, 64, 192, 255], 'anime pipeline grayscale masks are accepted');
+
+const normalizedAnimeMask = extractMattePixels({
+  mask: {
+    width: 2,
+    height: 2,
+    channels: 1,
+    data: new Float32Array([0, 0.25, 0.75, 1])
+  }
+});
+assert.deepEqual(
+  [...normalizedAnimeMask.alpha],
+  [0, 64, 191, 255],
+  'normalized float masks are converted to alpha bytes'
+);
 
 const input = {
   width: 2,

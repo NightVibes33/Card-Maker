@@ -1,12 +1,24 @@
-const MODEL_ID = 'onnx-community/ormbg-ONNX';
-// Pin to a repository revision containing the processor configs as well as the
-// ONNX weights. c491647 was only the weight-upload commit and 404s on
-// preprocessor_config.json when Transformers.js initializes the pipeline.
-const MODEL_REVISION = '034e2d884afbab897e10e78fc5bb566b29533fd6';
+const ANIME_MODEL = Object.freeze({
+  id: 'BritishWerewolf/IS-Net-Anime',
+  // Pin the model export and its Transformers.js config together.
+  revision: '99b14ab0ce4311317febbfad1d2fc00da5ea6d90',
+  task: 'image-segmentation',
+  dtype: 'fp32',
+  label: 'anime'
+});
+const FALLBACK_MODEL = Object.freeze({
+  id: 'onnx-community/ormbg-ONNX',
+  // This revision includes the processor config as well as the ONNX weights.
+  revision: '034e2d884afbab897e10e78fc5bb566b29533fd6',
+  task: 'background-removal',
+  dtype: 'q8',
+  label: 'general'
+});
 const MAX_CUTOUT_EDGE = 2048;
 
 let pipelineLoader = null;
 let pipelineDevice = '';
+let pipelineModelKey = '';
 
 function ensureCanvasCompatibility() {
   if (typeof document === 'undefined' || typeof globalThis.OffscreenCanvas !== 'undefined') return;
@@ -121,7 +133,7 @@ export function refineMatteAlpha(alpha) {
   // high-contrast cutout. Leave its antialiased edge pixels untouched.
   if (threshold <= 12 || threshold >= 243) return new Uint8ClampedArray(alpha);
 
-  // ORMBG can return a very low-contrast matte on artwork. Push uncertain
+  // Some models return a low-contrast matte on artwork. Push uncertain
   // background pixels toward transparent and confident subject pixels toward
   // opaque, while retaining a narrow smooth transition for hair and edges.
   const low = Math.max(0, threshold - 8);
@@ -136,53 +148,69 @@ export function refineMatteAlpha(alpha) {
 }
 
 export function extractMattePixels(output) {
-  const width = Number(output?.width || 0);
-  const height = Number(output?.height || 0);
-  const channels = Number(output?.channels || 0);
-  const source = output?.data;
+  // Image-segmentation pipelines return { mask: RawImage }; the existing
+  // background-removal pipeline returns the RawImage directly with RGBA data.
+  const image = output?.mask || output;
+  const width = Number(image?.width || 0);
+  const height = Number(image?.height || 0);
+  const channels = Number(image?.channels || 0);
+  const source = image?.data;
   if (
     !Number.isInteger(width) || !Number.isInteger(height) ||
     width < 1 || height < 1 || width * height > 12_000_000 ||
-    channels !== 4 || !source || source.length !== width * height * 4
+    ![1, 4].includes(channels) || !source || source.length !== width * height * channels
   ) {
     throw new Error('The AI model returned an unsupported cutout mask.');
   }
 
+  let rawMinimum = Infinity;
+  let rawMaximum = -Infinity;
+  for (let index = 0; index < width * height; index += 1) {
+    const raw = Number(source[index * channels + (channels === 4 ? 3 : 0)]);
+    if (!Number.isFinite(raw)) throw new Error('The AI model returned an invalid cutout mask.');
+    if (raw < rawMinimum) rawMinimum = raw;
+    if (raw > rawMaximum) rawMaximum = raw;
+  }
+
+  // Some semantic-mask exports return normalized float data instead of bytes.
+  const scale = rawMinimum >= 0 && rawMaximum <= 1 ? 255 : 1;
   const alpha = new Uint8ClampedArray(width * height);
   let minimum = 255;
   let maximum = 0;
-  let visible = 0;
   for (let index = 0; index < width * height; index += 1) {
-    const value = source[index * 4 + 3];
+    const raw = Number(source[index * channels + (channels === 4 ? 3 : 0)]);
+    const value = Math.max(0, Math.min(255, Math.round(raw * scale)));
     alpha[index] = value;
     if (value < minimum) minimum = value;
     if (value > maximum) maximum = value;
-    if (value > 127) visible += 1;
   }
 
+  let visible = 0;
+  for (const value of alpha) {
+    if (value > 127) visible += 1;
+  }
   if (maximum - minimum < 8 || visible === 0 || visible === width * height) {
     throw new Error('The AI could not find a clear foreground in this image.');
   }
   return { width, height, alpha };
 }
-
-async function getPipeline(device, progressCallback) {
-  if (pipelineLoader && pipelineDevice === device) return pipelineLoader;
+async function getPipeline(model, device, progressCallback) {
+  const modelKey = `${model.id}@${model.revision}:${model.task}:${model.dtype}`;
+  if (pipelineLoader && pipelineDevice === device && pipelineModelKey === modelKey) return pipelineLoader;
 
   pipelineDevice = device;
+  pipelineModelKey = modelKey;
   pipelineLoader = (async () => {
     const { pipeline, env } = await import('@huggingface/transformers');
     if (device === 'wasm' && isAppleMobileBrowser()) {
-      // iOS browsers use WebKit and ONNX Runtime's WebGPU execution provider
-      // is not supported there. Keep inference on the supported single-thread
-      // WASM path, even if Safari exposes navigator.gpu.
+      // Keep iPhone inference on the supported single-thread WASM path.
       env.backends.onnx.wasm.numThreads = 1;
     }
-    return pipeline('background-removal', MODEL_ID, {
-      revision: MODEL_REVISION,
+    return pipeline(model.task, model.id, {
+      revision: model.revision,
       device,
-      dtype: device === 'webgpu' ? 'fp16' : 'q8',
-      progress_callback: progressCallback
+      dtype: model.dtype,
+      progress_callback: (progress) => progressCallback({ ...progress, model: model.label })
     });
   })();
 
@@ -191,10 +219,10 @@ async function getPipeline(device, progressCallback) {
   } catch (error) {
     pipelineLoader = null;
     pipelineDevice = '';
+    pipelineModelKey = '';
     throw error;
   }
 }
-
 function readSourceAlpha(canvas, width, height) {
   if (!canvas || typeof canvas.getContext !== 'function') return null;
   const context = canvas.getContext('2d', { willReadFrequently: true });
@@ -267,40 +295,79 @@ export async function createAICutoutMask(blob, onProgress = () => {}) {
   ensureCanvasCompatibility();
   const modelInput = await prepareModelInput(blob);
   let canUseWebGPU = false;
+  let canUseHalfPrecision = false;
   const currentNavigator = typeof navigator !== 'undefined' ? navigator : null;
   if (!isAppleMobileBrowser(currentNavigator)) {
     try {
       const adapter = currentNavigator?.gpu
         ? await currentNavigator.gpu.requestAdapter()
         : null;
-      canUseWebGPU = Boolean(adapter?.features?.has('shader-f16'));
+      canUseWebGPU = Boolean(adapter);
+      canUseHalfPrecision = Boolean(adapter?.features?.has('shader-f16'));
     } catch {
       canUseWebGPU = false;
+      canUseHalfPrecision = false;
     }
   }
-  const devices = canUseWebGPU ? ['webgpu', 'wasm'] : ['wasm'];
+
+  const attempts = [];
+  if (canUseWebGPU) attempts.push({ model: ANIME_MODEL, device: 'webgpu' });
+  attempts.push({ model: ANIME_MODEL, device: 'wasm' });
+  if (canUseWebGPU && canUseHalfPrecision) {
+    attempts.push({ model: FALLBACK_MODEL, device: 'webgpu', dtype: 'fp16' });
+  }
+  attempts.push({ model: FALLBACK_MODEL, device: 'wasm' });
   let lastError = null;
 
   try {
-    for (const device of devices) {
+    for (let index = 0; index < attempts.length; index += 1) {
+      const attempt = attempts[index];
       try {
-        onProgress({ status: 'loading', progress: 0, device });
-        const segmenter = await getPipeline(device, onProgress);
-        onProgress({ status: 'segmenting', progress: 100, device });
+        onProgress({
+          status: 'loading',
+          progress: 0,
+          device: attempt.device,
+          model: attempt.model.label
+        });
+        const modelConfig = attempt.dtype
+          ? { ...attempt.model, dtype: attempt.dtype }
+          : attempt.model;
+        const segmenter = await getPipeline(
+          modelConfig,
+          attempt.device,
+          (progress) => onProgress({ ...progress, model: attempt.model.label, device: attempt.device })
+        );
+        onProgress({
+          status: 'segmenting',
+          progress: 100,
+          device: attempt.device,
+          model: attempt.model.label
+        });
         const output = await segmenter(modelInput);
-        if (!Array.isArray(output) || !output[0]) {
-          throw new Error('The AI model did not return a cutout.');
-        }
-        const mask = await matteBlob(output[0], modelInput);
-        onProgress({ status: 'ready', progress: 100, device });
+        const prediction = Array.isArray(output) ? output[0] : output;
+        if (!prediction) throw new Error('The AI model did not return a cutout.');
+        const mask = await matteBlob(prediction, modelInput);
+        onProgress({
+          status: 'ready',
+          progress: 100,
+          device: attempt.device,
+          model: attempt.model.label
+        });
         return mask;
       } catch (error) {
         lastError = error;
-        if (device === 'wasm') break;
-        // Some browsers expose WebGPU but cannot allocate this model there.
-        // Recreate the same quantized model on WASM as a safe fallback.
+        // Drop the failed session before trying the next inference path.
         pipelineLoader = null;
         pipelineDevice = '';
+        pipelineModelKey = '';
+        if (index + 1 < attempts.length) {
+          onProgress({
+            status: 'fallback',
+            progress: 0,
+            model: attempt.model.label,
+            nextModel: attempts[index + 1].model.label
+          });
+        }
       }
     }
   } finally {
