@@ -2762,6 +2762,7 @@ export default function Page() {
   const [tab, setTab] = useState('discover');
   const [studioTool, setStudioTool] = useState('crop');
   const [studioSubtool, setStudioSubtool] = useState('');
+  const [studioEditControl, setStudioEditControl] = useState('crop');
   const [studioPanelOpen, setStudioPanelOpen] = useState(true);
   const [studioMenuOpen, setStudioMenuOpen] = useState(false);
   const closeStudioPanel = useCallback(() => {
@@ -7156,12 +7157,12 @@ export default function Page() {
               <section className="studioContextCard capcutContextPanel capcutRootPanel">
                 <div className="contextPanelHeader"><strong>Edit</strong><button type="button" className="contextDone studioPanelDone" aria-label="Close Edit panel" title="Close Edit panel" onClick={closeStudioPanel}>✓</button></div>
                 <div className="capcutSubtools">
-                  <button type="button" className="active" onClick={() => setStudioSubtool('crop')}><IOSIcon name="crop" size={22}/><small>Crop</small></button>
-                  <button type="button" onClick={() => setStudioSubtool('transform')}><IOSIcon name="position" size={22}/><small>Transform</small></button>
-                  <button type="button" disabled={Boolean(selectedLayer?.locked)} onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{rotation:normalizeFreeRotation(Number(selectedLayer.rotation||0)+90)}) : patch({ rotate: normalizeFreeRotation(Number(design.rotate || 0) + 90) })}><IOSIcon name="rotate" size={22}/><small>Rotate</small></button>
-                  <button type="button" disabled={Boolean(selectedLayer?.locked)} onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{flipX:!selectedLayer.flipX}) : patch({ flipX: !design.flipX })}><IOSIcon name="flip" size={22}/><small>Flip</small></button>
-                  <button type="button" disabled={Boolean(selectedLayer?.locked)} onClick={() => selectedLayer ? updateLayer(selectedLayer.id,{x:0.5,y:0.5,scale:1,rotation:0,flipX:false}) : patch({ zoom:1,x:0,y:0,rotate:0,flipX:false,sourceCrop:design.originalSourceCrop||null })}><IOSIcon name="reset" size={22}/><small>Reset</small></button>
-                  {expertMode ? <button type="button" onClick={() => setStudioSubtool('precision')}><span>123</span><small>Precision</small></button> : null}
+                  <button type="button" className={studioEditControl === 'crop' ? 'active' : ''} aria-current={studioEditControl === 'crop' ? 'true' : undefined} onClick={() => { setStudioEditControl('crop'); setStudioSubtool('crop'); }}><IOSIcon name="crop" size={22}/><small>Crop</small></button>
+                  <button type="button" className={studioEditControl === 'transform' ? 'active' : ''} aria-current={studioEditControl === 'transform' ? 'true' : undefined} onClick={() => { setStudioEditControl('transform'); setStudioSubtool('transform'); }}><IOSIcon name="position" size={22}/><small>Transform</small></button>
+                  <button type="button" className={studioEditControl === 'rotate' ? 'active' : ''} aria-current={studioEditControl === 'rotate' ? 'true' : undefined} disabled={Boolean(selectedLayer?.locked)} onClick={() => { setStudioEditControl('rotate'); selectedLayer ? updateLayer(selectedLayer.id,{rotation:normalizeFreeRotation(Number(selectedLayer.rotation||0)+90)}) : patch({ rotate: normalizeFreeRotation(Number(design.rotate || 0) + 90) }); }}><IOSIcon name="rotate" size={22}/><small>Rotate</small></button>
+                  <button type="button" className={studioEditControl === 'flip' ? 'active' : ''} aria-current={studioEditControl === 'flip' ? 'true' : undefined} disabled={Boolean(selectedLayer?.locked)} onClick={() => { setStudioEditControl('flip'); selectedLayer ? updateLayer(selectedLayer.id,{flipX:!selectedLayer.flipX}) : patch({ flipX: !design.flipX }); }}><IOSIcon name="flip" size={22}/><small>Flip</small></button>
+                  <button type="button" className={studioEditControl === 'reset' ? 'active' : ''} aria-current={studioEditControl === 'reset' ? 'true' : undefined} disabled={Boolean(selectedLayer?.locked)} onClick={() => { setStudioEditControl('reset'); selectedLayer ? updateLayer(selectedLayer.id,{x:0.5,y:0.5,scale:1,rotation:0,flipX:false}) : patch({ zoom:1,x:0,y:0,rotate:0,flipX:false,sourceCrop:design.originalSourceCrop||null }); }}><IOSIcon name="reset" size={22}/><small>Reset</small></button>
+                  {expertMode ? <button type="button" className={studioEditControl === 'precision' ? 'active' : ''} aria-current={studioEditControl === 'precision' ? 'true' : undefined} onClick={() => { setStudioEditControl('precision'); setStudioSubtool('precision'); }}><span>123</span><small>Precision</small></button> : null}
                 </div>
               </section>
             ) : null}
