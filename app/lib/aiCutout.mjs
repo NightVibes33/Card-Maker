@@ -1,8 +1,74 @@
 const MODEL_ID = 'onnx-community/ormbg-ONNX';
 const MODEL_REVISION = 'c491647edeccbd2729873e962c5af52aadeb8ffc';
+const MAX_CUTOUT_EDGE = 2048;
 
 let pipelineLoader = null;
 let pipelineDevice = '';
+
+function ensureCanvasCompatibility() {
+  if (typeof document === 'undefined' || typeof globalThis.OffscreenCanvas !== 'undefined') return;
+
+  // Transformers.js uses OffscreenCanvas for image resizing. Safari versions
+  // without it can still process a regular canvas, so provide that same small
+  // canvas surface before loading the library.
+  globalThis.OffscreenCanvas = class CanvasBackedOffscreenCanvas {
+    constructor(width, height) {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      return canvas;
+    }
+  };
+}
+
+async function prepareModelInput(blob) {
+  const url = URL.createObjectURL(blob);
+  const image = new Image();
+  image.decoding = 'async';
+  try {
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new Error('This image format could not be opened for AI Cutout on this browser.'));
+      image.src = url;
+    });
+
+    const naturalWidth = Number(image.naturalWidth || image.width || 0);
+    const naturalHeight = Number(image.naturalHeight || image.height || 0);
+    if (!naturalWidth || !naturalHeight) {
+      throw new Error('This image has no readable pixels for AI Cutout.');
+    }
+
+    const { width, height } = fitCutoutDimensions(naturalWidth, naturalHeight);
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) throw new Error('Canvas is unavailable for AI Cutout on this browser.');
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(image, 0, 0, width, height);
+    return canvas;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+export function fitCutoutDimensions(width, height, maxEdge = MAX_CUTOUT_EDGE) {
+  const sourceWidth = Number(width);
+  const sourceHeight = Number(height);
+  const edgeLimit = Number(maxEdge);
+  if (
+    !Number.isFinite(sourceWidth) || !Number.isFinite(sourceHeight) ||
+    !Number.isFinite(edgeLimit) || sourceWidth < 1 || sourceHeight < 1 || edgeLimit < 1
+  ) {
+    throw new Error('The selected image has invalid dimensions for AI Cutout.');
+  }
+  const scale = Math.min(1, edgeLimit / Math.max(sourceWidth, sourceHeight));
+  return {
+    width: Math.max(1, Math.round(sourceWidth * scale)),
+    height: Math.max(1, Math.round(sourceHeight * scale))
+  };
+}
 
 export function extractMattePixels(output) {
   const width = Number(output?.width || 0);
@@ -58,45 +124,28 @@ async function getPipeline(device, progressCallback) {
   }
 }
 
-async function readSourceAlpha(blob, width, height) {
-  if (/^image\/(jpeg|jpg)$/i.test(blob.type)) return null;
-  const scale = Math.min(1, 2048 / Math.max(width, height));
-  const targetWidth = Math.max(1, Math.round(width * scale));
-  const targetHeight = Math.max(1, Math.round(height * scale));
-  const url = URL.createObjectURL(blob);
-  const image = new Image();
-  image.decoding = 'async';
-  try {
-    await new Promise((resolve, reject) => {
-      image.onload = resolve;
-      image.onerror = () => reject(new Error('Could not read the selected image alpha.'));
-      image.src = url;
-    });
-    const canvas = document.createElement('canvas');
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context) throw new Error('Canvas is unavailable for reading the selected image.');
-    context.drawImage(image, 0, 0, targetWidth, targetHeight);
-    const data = context.getImageData(0, 0, targetWidth, targetHeight).data;
-    const alpha = new Uint8ClampedArray(targetWidth * targetHeight);
-    for (let index = 0; index < alpha.length; index += 1) {
-      alpha[index] = data[index * 4 + 3];
+function readSourceAlpha(canvas, width, height) {
+  if (!canvas || typeof canvas.getContext !== 'function') return null;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) throw new Error('Canvas is unavailable for reading the selected image alpha.');
+  const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  const alpha = new Uint8ClampedArray(width * height);
+  for (let y = 0; y < height; y += 1) {
+    const sourceY = Math.min(canvas.height - 1, Math.floor((y + 0.5) * canvas.height / height));
+    for (let x = 0; x < width; x += 1) {
+      const sourceX = Math.min(canvas.width - 1, Math.floor((x + 0.5) * canvas.width / width));
+      alpha[y * width + x] = data[(sourceY * canvas.width + sourceX) * 4 + 3];
     }
-    canvas.width = 1;
-    canvas.height = 1;
-    return { width: targetWidth, height: targetHeight, alpha };
-  } finally {
-    URL.revokeObjectURL(url);
   }
+  return { width, height, alpha };
 }
 
-async function matteBlob(output, sourceBlob) {
+async function matteBlob(output, sourceCanvas) {
   const matte = extractMattePixels(output);
   const scale = Math.min(1, 2048 / Math.max(matte.width, matte.height));
   const width = Math.max(1, Math.round(matte.width * scale));
   const height = Math.max(1, Math.round(matte.height * scale));
-  const sourceAlpha = await readSourceAlpha(sourceBlob, matte.width, matte.height);
+  const sourceAlpha = readSourceAlpha(sourceCanvas, matte.width, matte.height);
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -143,30 +192,45 @@ export async function createAICutoutMask(blob, onProgress = () => {}) {
     throw new Error('Choose an image before using AI Cutout.');
   }
 
-  const canUseWebGPU = typeof navigator !== 'undefined' && Boolean(navigator.gpu);
+  ensureCanvasCompatibility();
+  const modelInput = await prepareModelInput(blob);
+  let canUseWebGPU = false;
+  try {
+    const adapter = typeof navigator !== 'undefined' && navigator.gpu
+      ? await navigator.gpu.requestAdapter()
+      : null;
+    canUseWebGPU = Boolean(adapter?.features?.has('shader-f16'));
+  } catch {
+    canUseWebGPU = false;
+  }
   const devices = canUseWebGPU ? ['webgpu', 'wasm'] : ['wasm'];
   let lastError = null;
 
-  for (const device of devices) {
-    try {
-      onProgress({ status: 'loading', progress: 0, device });
-      const segmenter = await getPipeline(device, onProgress);
-      onProgress({ status: 'segmenting', progress: 100, device });
-      const output = await segmenter(blob);
-      if (!Array.isArray(output) || !output[0]) {
-        throw new Error('The AI model did not return a cutout.');
+  try {
+    for (const device of devices) {
+      try {
+        onProgress({ status: 'loading', progress: 0, device });
+        const segmenter = await getPipeline(device, onProgress);
+        onProgress({ status: 'segmenting', progress: 100, device });
+        const output = await segmenter(modelInput);
+        if (!Array.isArray(output) || !output[0]) {
+          throw new Error('The AI model did not return a cutout.');
+        }
+        const mask = await matteBlob(output[0], modelInput);
+        onProgress({ status: 'ready', progress: 100, device });
+        return mask;
+      } catch (error) {
+        lastError = error;
+        if (device === 'wasm') break;
+        // Some browsers expose WebGPU but cannot allocate this model there.
+        // Recreate the same quantized model on WASM as a safe fallback.
+        pipelineLoader = null;
+        pipelineDevice = '';
       }
-      const mask = await matteBlob(output[0], blob);
-      onProgress({ status: 'ready', progress: 100, device });
-      return mask;
-    } catch (error) {
-      lastError = error;
-      if (device === 'wasm') break;
-      // Some browsers expose WebGPU but cannot allocate this model there.
-      // Recreate the same small quantized model on WASM as a safe fallback.
-      pipelineLoader = null;
-      pipelineDevice = '';
     }
+  } finally {
+    modelInput.width = 1;
+    modelInput.height = 1;
   }
 
   throw lastError || new Error('AI Cutout is unavailable on this device.');

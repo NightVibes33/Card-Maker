@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
-import { extractMattePixels } from '../app/lib/aiCutout.mjs';
+import { extractMattePixels, fitCutoutDimensions } from '../app/lib/aiCutout.mjs';
+
+assert.deepEqual(fitCutoutDimensions(4032, 3024), { width: 2048, height: 1536 });
+assert.deepEqual(fitCutoutDimensions(1600, 900), { width: 1600, height: 900 });
+assert.throws(() => fitCutoutDimensions(0, 100), /invalid dimensions/);
 
 const input = {
   width: 2,
@@ -36,4 +40,4 @@ assert.throws(
   /unsupported cutout mask/
 );
 
-console.log('AI cutout contract PASS: preserves soft alpha edges and rejects unusable masks');
+console.log('AI cutout contract PASS: preserves soft alpha, bounds iPhone inputs, and rejects unusable masks');

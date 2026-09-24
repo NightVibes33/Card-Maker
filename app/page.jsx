@@ -967,7 +967,25 @@ function drawMaskedImageLayer(ctx, adjustedSource, source, crop, settings, layer
   if (aiMaskImage) {
     stencilCtx.imageSmoothingEnabled = true;
     stencilCtx.imageSmoothingQuality = 'high';
-    stencilCtx.drawImage(aiMaskImage, 0, 0, targetWidth, targetHeight);
+    if (crop) {
+      const maskX = clamp(crop.x, 0, 1) * aiMaskImage.width;
+      const maskY = clamp(crop.y, 0, 1) * aiMaskImage.height;
+      const maskWidth = clamp(crop.w, 0.01, 1) * aiMaskImage.width;
+      const maskHeight = clamp(crop.h, 0.01, 1) * aiMaskImage.height;
+      stencilCtx.drawImage(
+        aiMaskImage,
+        maskX,
+        maskY,
+        maskWidth,
+        maskHeight,
+        0,
+        0,
+        targetWidth,
+        targetHeight
+      );
+    } else {
+      stencilCtx.drawImage(aiMaskImage, 0, 0, targetWidth, targetHeight);
+    }
   } else {
     stencilCtx.fillStyle = '#fff';
     stencilCtx.fillRect(0, 0, targetWidth, targetHeight);
