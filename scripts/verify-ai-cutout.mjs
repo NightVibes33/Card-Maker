@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { extractMattePixels, fitCutoutDimensions, isAppleMobileBrowser } from '../app/lib/aiCutout.mjs';
+
+const cutoutSource = readFileSync(new URL('../app/lib/aiCutout.mjs', import.meta.url), 'utf8');
+assert.match(
+  cutoutSource,
+  /const MODEL_REVISION = '034e2d884afbab897e10e78fc5bb566b29533fd6'/,
+  'AI cutout pins the model revision that includes preprocessor_config.json'
+);
 
 assert.deepEqual(fitCutoutDimensions(4032, 3024), { width: 2048, height: 1536 });
 assert.deepEqual(fitCutoutDimensions(1600, 900), { width: 1600, height: 900 });

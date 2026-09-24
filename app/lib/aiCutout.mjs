@@ -1,5 +1,8 @@
 const MODEL_ID = 'onnx-community/ormbg-ONNX';
-const MODEL_REVISION = 'c491647edeccbd2729873e962c5af52aadeb8ffc';
+// Pin to a repository revision containing the processor configs as well as the
+// ONNX weights. c491647 was only the weight-upload commit and 404s on
+// preprocessor_config.json when Transformers.js initializes the pipeline.
+const MODEL_REVISION = '034e2d884afbab897e10e78fc5bb566b29533fd6';
 const MAX_CUTOUT_EDGE = 2048;
 
 let pipelineLoader = null;
