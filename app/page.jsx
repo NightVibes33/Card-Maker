@@ -7145,7 +7145,7 @@ export default function Page() {
 
               <div className="studioModeActions">
                 <span className="studioModeLabel">Preview</span>
-                <div className="previewModeToggle" role="group" aria-label="Preview style">
+                <div className="previewModeToggle" role="group" aria-label="Flat Preview">
                   <button type="button" aria-pressed={previewMode === 'flat'} className={previewMode === 'flat' ? 'active' : ''} onClick={() => setPreviewMode('flat')}>Flat</button>
                   <button type="button" aria-pressed={previewMode === 'physical'} className={previewMode === 'physical' ? 'active' : ''} onClick={() => setPreviewMode('physical')}>Preview</button>
                 </div>

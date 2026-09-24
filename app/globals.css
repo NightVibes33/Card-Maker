@@ -2581,3 +2581,8 @@ body:has(.studio.isStudioEditor){
 .isStudioEditor .textLayerQuickActions button{width:100%;min-height:44px;border:1px solid rgba(255,59,48,.35);border-radius:11px;background:rgba(255,59,48,.09);color:#ff6961;font-size:14px;font-weight:650}
 .isStudioEditor .textLayerQuickActions button:disabled{opacity:.45}
 .isStudioEditor .layerSingleAction{grid-template-columns:1fr}
+
+/* Keep the preview selector clear of the open editing sheet. */
+.isStudioEditor .studioModeActions{position:relative;transform:translateY(-14px)}
+.isStudioEditor .previewModeToggle{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+.isStudioEditor .previewModeToggle button{white-space:nowrap}
