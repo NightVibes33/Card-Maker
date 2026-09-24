@@ -2582,8 +2582,12 @@ body:has(.studio.isStudioEditor){
 .isStudioEditor .textLayerQuickActions button:disabled{opacity:.45}
 .isStudioEditor .layerSingleAction{grid-template-columns:1fr}
 
-/* Keep the preview selector clear of the open editing sheet. */
-.isStudioEditor .studioModeActions{position:relative;z-index:53;transform:translateY(-32px);overflow:visible}
+/* Keep artwork unchanged and place its mode selector directly below it. */
+.isStudioEditor > .editingPreview.studioPreview{min-height:0}
+.isStudioEditor .studioModeActions{
+  position:relative;z-index:53;min-height:48px;margin-top:6px;
+  align-items:flex-start;transform:none;overflow:visible;
+}
 .isStudioEditor .previewModeToggle{
   box-sizing:border-box;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
   gap:6px;height:48px;min-height:48px;overflow:hidden;
