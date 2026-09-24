@@ -21,6 +21,13 @@ function ensureCanvasCompatibility() {
   };
 }
 
+export function isAppleMobileBrowser(navigatorLike = globalThis.navigator) {
+  const userAgent = String(navigatorLike?.userAgent || '');
+  const platform = String(navigatorLike?.platform || '');
+  const touchPoints = Number(navigatorLike?.maxTouchPoints || 0);
+  return /iPhone|iPad|iPod/i.test(userAgent) || (/MacIntel/i.test(platform) && touchPoints > 1);
+}
+
 async function prepareModelInput(blob) {
   const url = URL.createObjectURL(blob);
   const image = new Image();
@@ -106,7 +113,13 @@ async function getPipeline(device, progressCallback) {
 
   pipelineDevice = device;
   pipelineLoader = (async () => {
-    const { pipeline } = await import('@huggingface/transformers');
+    const { pipeline, env } = await import('@huggingface/transformers');
+    if (device === 'wasm' && isAppleMobileBrowser()) {
+      // iOS browsers use WebKit and ONNX Runtime's WebGPU execution provider
+      // is not supported there. Keep inference on the supported single-thread
+      // WASM path, even if Safari exposes navigator.gpu.
+      env.backends.onnx.wasm.numThreads = 1;
+    }
     return pipeline('background-removal', MODEL_ID, {
       revision: MODEL_REVISION,
       device,
@@ -195,13 +208,16 @@ export async function createAICutoutMask(blob, onProgress = () => {}) {
   ensureCanvasCompatibility();
   const modelInput = await prepareModelInput(blob);
   let canUseWebGPU = false;
-  try {
-    const adapter = typeof navigator !== 'undefined' && navigator.gpu
-      ? await navigator.gpu.requestAdapter()
-      : null;
-    canUseWebGPU = Boolean(adapter?.features?.has('shader-f16'));
-  } catch {
-    canUseWebGPU = false;
+  const currentNavigator = typeof navigator !== 'undefined' ? navigator : null;
+  if (!isAppleMobileBrowser(currentNavigator)) {
+    try {
+      const adapter = currentNavigator?.gpu
+        ? await currentNavigator.gpu.requestAdapter()
+        : null;
+      canUseWebGPU = Boolean(adapter?.features?.has('shader-f16'));
+    } catch {
+      canUseWebGPU = false;
+    }
   }
   const devices = canUseWebGPU ? ['webgpu', 'wasm'] : ['wasm'];
   let lastError = null;

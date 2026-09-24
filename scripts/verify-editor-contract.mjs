@@ -1,452 +1,1 @@
-import fs from 'node:fs';
-
-function read(path) {
-  return fs.readFileSync(path, 'utf8');
-}
-
-function requireMatch(source, pattern, label) {
-  if (!pattern.test(source)) {
-    throw new Error('Editor contract failed: ' + label);
-  }
-}
-
-const page = read('app/page.jsx');
-const css = read('app/globals.css');
-const sw = read('public/sw.js');
-const storage = read('app/lib/storage.js');
-const imageRoute = read('app/api/image/route.js');
-const inspectRoute = read('app/api/cucu/inspect/route.js');
-const imagePolicy = read('app/lib/imagePolicy.js');
-const aiCutout = read('app/lib/aiCutout.mjs');
-
-const pageChecks = [
-  [/const \[studioPanelOpen, setStudioPanelOpen\] = useState\(true\);/, 'Studio context panel starts open'],
-  [/const closeStudioPanel = useCallback\(\(\) => \{[\s\S]{0,180}setStudioPanelOpen\(false\)/, 'Studio context panels have an explicit close action'],
-  [/aria-label="Close Edit panel"/, 'Edit panel close action is accessible'],
-  [/aria-label="Layers"[\s\S]{0,180}activateStudioTool\('layers'\)/, 'Layers is directly reachable from the Studio header'],
-  [/className="textLayerQuickActions"[\s\S]{0,260}Delete Text/, 'text deletion is visible on the main Text panel'],
-  [/function normalizeDesignState\(/, 'restored designs are normalized'],
-  [/next\.backgroundColor = raw\.backgroundColor \? normalizeHexColor\(raw\.backgroundColor, DEFAULTS\.backgroundColor\) : '';/, 'chosen background colors survive draft and project normalization'],
-  [/next\.contactlessColor = normalizeHexColor\(/, 'card Contactless retains custom color across saves'],
-  [/next\.contactlessOpacity = finiteClamp\(/, 'card Contactless retains opacity across saves'],
-  [/function mergeCustomContactlessLayer\(id\)/, 'older extra Contactless layers can be merged into Card'],
-  [/function replaceWithImportedArtwork\(asset\) \{[\s\S]{0,850}patch\(\{[\s\S]{0,120}background: 'idb:\/\/imports\/' \+ asset\.id/, 'selecting a saved import in Studio replaces artwork without clearing the card'],
-  [/function normalizeImportArtworkSource\(/, 'persisted import artwork IDs are validated canonically'],
-  [/rawUrl\.length > 2200/, 'persisted proxy targets are length bounded'],
-  [/const normalized = new URLSearchParams\(\)/, 'persisted proxy URLs are rebuilt from supported parameters only'],
-  [/if \(!source\.startsWith\('\/api\/image\?'\)\) return '';/, 'unknown artwork schemes and paths fail closed'],
-  [/This artwork source is unavailable or unsupported\./, 'invalid catalog artwork never enters editor state'],
-  [/if \(!hydrated \|\| !autosaveReady\) return undefined;/, 'autosave waits for safe draft hydration'],
-  [/draftReadFailed = true/, 'draft read failures are tracked separately from an empty draft'],
-  [/autosaveSafe = !draftReadFailed;/, 'draft read failures keep autosave paused even when a fallback exists'],
-  [/setSaveStatus\('Autosave paused'\)/, 'unsafe draft hydration pauses IndexedDB autosave instead of overwriting storage'],
-  [/const autosavePausedBaselineRef = useRef\(null\)/, 'paused autosave tracks the exact hydrated baseline'],
-  [/if \(!hydrated \|\| autosaveReady\) return undefined;/, 'paused autosave has a local-recovery-only path'],
-  [/if \(!autosaveReady && autosavePausedBaselineRef\.current === designRef\.current\)/, 'paused pagehide flush never overwrites recovery storage before a real edit'],
-  [/function pointInRotatedBounds\(/, 'rotated geometry hit testing exists'],
-  [/Math\.abs\(normalized\.w - 1\) < 1e-9[\s\S]{0,120}return null;/, 'full-frame crops normalize back to no-op state'],
-  [/try \{[\s\S]{0,100}setPointerCapture\(event\.pointerId\);[\s\S]{0,50}\} catch \{\}/, 'mobile pointer capture failures are non-fatal'],
-  [/function normalizeFreeRotation\(/, 'free rotations wrap smoothly through the Â±180Â° boundary'],
-  [/const nextRotation = normalizeFreeRotation\([\s\S]{0,420}contactlessRotation: nextRotation/, 'contactless gesture rotation wraps instead of sticking at 180Â°'],
-  [/const nextRotation = normalizeFreeRotation\(currentRotation \+ angleDelta\)[\s\S]{0,1800}rotation: nextRotation/, 'custom layer gesture rotation wraps instead of sticking at 180Â°'],
-  [/target === 'artwork'[\s\S]{0,420}const nextRotation = normalizeFreeRotation\(currentRotation \+ angleDelta\)[\s\S]{0,420}patch\(\{ zoom: nextZoom, rotate: nextRotation \}, false\)/, 'artwork gesture rotation wraps instead of sticking at 180Â°'],
-  [/const localPadding = Number\(padding \|\| 0\) \/ safeScale;/, 'transformed hit padding remains scale-independent'],
-  [/const hitPadding = Math\.max\(14, \(22 \* OUT_W\) \/ Math\.max\(1, rect\.width\)\);/, 'canvas hit padding tracks a true iPhone-sized touch target'],
-  [/function pointInRotatedEllipse\(/, 'ellipse layers use true ellipse hit testing'],
-  [/function pointInRotatedRoundedRect\(/, 'rounded shape hit testing follows rendered corners'],
-  [/const CONTACTLESS_BOUNDS = \{/, 'contactless selection uses rendered symbol bounds'],
-  [/function customLayerSelectionStyle\(/, 'selection outlines use object geometry'],
-  [/const renderPixelScale = Math\.max\(/, 'preview render tracks output pixel scale'],
-  [/adjustedImage\(image,[\s\S]{0,230}renderPixelScale\)/, 'artwork adjustments use the Safari-compatible pixel renderer'],
-  [/shadowBlur = renderDesign\.shadow \? 16 \* renderPixelScale : 0/, 'built-in text shadows scale consistently between preview and export'],
-  [/loadedImageLayerSourceKey === imageLayerSourceKey/, 'image layers are source-key gated'],
-  [/loadedBackgroundKey === renderDesign\.background/, 'background rendering is source-key gated'],
-  [/label="Corner Radius"/, 'shape corner-radius control exists'],
-  [/normalized\.fontId =/, 'text layers retain an optional imported font ID'],
-  [/normalized\.outlineWidth = finiteClamp\(layer\.outlineWidth/, 'text outline width is safely bounded'],
-  [/normalized\.curve = finiteClamp\(layer\.curve/, 'text curve is safely bounded'],
-  [/drawTrackedText\([\s\S]{0,360}outlineColor:[\s\S]{0,120}curve:/, 'text outlines and curves render into the same card artwork'],
-  [/MAX_IMPORTED_FONT_BYTES = 12 \* 1024 \* 1024/, 'custom font imports have a size bound'],
-  [/accept="\.ttf,\.otf,\.woff,\.woff2/, 'custom font imports use browser-supported font formats'],
-  [/dbPut\('kv', \{ id: 'text-styles', styles: next \}\)/, 'reusable text styles persist locally'],
-  [/normalized\.maskStrokes = normalizeMaskStrokes\(layer\.maskStrokes\)/, 'mask strokes are sanitized when image layers enter design state'],
-  [/normalized\.maskSource = normalized\.src[\s\S]{0,120}normalizeImportArtworkSource\(layer\.maskSource\)/, 'AI layer mattes persist with their image layers'],
-  [/next\.backgroundMaskStrokes = normalizeMaskStrokes\(raw\.backgroundMaskStrokes\)/, 'main artwork masks survive draft and project restoration'],
-  [/next\.backgroundMaskSource = next\.background[\s\S]{0,120}normalizeImportArtworkSource\(raw\.backgroundMaskSource\)/, 'AI artwork mattes persist with the card design'],
-  [/delta\.background !== current\.background[\s\S]{0,430}backgroundMaskStrokes:[\s\S]{0,180}backgroundMaskSource:/, 'replacing the source artwork clears masks tied to the previous image'],
-  [/function maskPointForArtwork\(event\)[\s\S]{0,2200}current\.flipX[\s\S]{0,600}maskBrushSize/, 'artwork mask coordinates follow crop, fit, zoom, rotation, and flip'],
-  [/selectedElement === 'artwork' && maskPointForArtwork\(event\)[\s\S]{0,80}'mask:artwork'/, 'the mask brush can target imported card artwork'],
-  [/backgroundMaskStrokes: strokes/, 'main artwork mask strokes use the same live gesture and history path as image layers'],
-  [/drawMaskedImageLayer\([\s\S]{0,250}renderDesign\.backgroundMaskStrokes/, 'main artwork masks render through the shared PNG export renderer'],
-  [/activeMaskStrokes\.length[\s\S]{0,240}backgroundMaskStrokes:\[\]/, 'the clear-mask action clears the currently selected artwork target'],
-  [/ctx\.drawImage\(maskedLayerCanvas, -w \/ 2, -h \/ 2, w, h\)/, 'masked image layers still use the shared card renderer and export path'],
-  [/stencilCtx\.drawImage\(aiMaskImage, 0, 0, targetWidth, targetHeight\)/, 'AI alpha mattes render through the shared card/export mask compositor'],
-  [/drawMaskedImageLayer\([\s\S]{0,340}layerMaskImage/, 'image layer AI mattes and brush strokes share one editable mask path'],
-  [/addDesignImportRefs\(value, referenced\)/, 'AI masks stay protected during unused-import cleanup'],
-  [/addDesignImportRefs\(currentDesign, refs\)/, 'AI masks are included in exported design presets'],
-  [/pointerId: event\.pointerId/, 'mask gestures record the active finger ID'],
-  [/activeMaskStrokeRef\.current\.pointerId === event\.pointerId/, 'mask painting stays on one captured finger'],
-  [/quadraticCurveTo\(points\[index\]\.x, points\[index\]\.y, midpoint\.x, midpoint\.y\)/, 'mask brush strokes are smoothed between touch samples'],
-  [/label="Show Layer"/, 'hidden layers remain recoverable'],
-  [/Clean Unused Imports/, 'unused import cleanup exists'],
-  [/renderAssetsReady/, 'exports are gated on decoded assets'],
-  [/if \(!ctx\) \{[\s\S]{0,120}throw new Error\('Canvas rendering is unavailable'\)/, 'export canvas allocation fails closed'],
-  [/historyGroupRef/, 'continuous edits use grouped undo history'],
-  [/gestureStartDesign\.current = designRef\.current/, 'gestures snapshot authoritative state'],
-  [/pointers\.current\.clear\(\)/, 'leaving the editable canvas clears stale pointer state'],
-  [/gestureTarget\.current = 'artwork'/, 'leaving the editable canvas resets the gesture target'],
-  [/const finishActiveGesture = useCallback\(/, 'discrete actions can terminate active canvas gestures'],
-  [/finishActiveGestureRef\.current = finishActiveGesture/, 'central editor patching can finalize active gestures'],
-  [/recordHistory[\s\S]{0,180}finishActiveGestureRef\.current\(\)/, 'normal Studio edits terminate a live canvas gesture before mutation'],
-  [/patch\(\{ chipX: nextX, chipY: nextY \}, false\)/, 'chip drags preserve unsnapped finger coordinates'],
-  [/next\.cardTextOffsetX = finiteClamp\([\s\S]{0,150}next\.cardTextOffsetY = finiteClamp\(/, 'built-in card text drag offsets survive draft and project normalization'],
-  [/target === 'card-text'[\s\S]{0,500}patch\(\{ cardTextOffsetX: nextX, cardTextOffsetY: nextY \}, false\)/, 'built-in card text can move freely on the canvas'],
-  [/renderCardRef\.current\(context, EDITOR_PREVIEW_W, EDITOR_PREVIEW_H, \{\s*design: pending\s*\}\)[\s\S]{0,100}gestureRenderedDesignRef\.current = \{ design: pending, canvas \}/, 'gesture preview records which canvas received its frame'],
-  [/gestureRender\.canvas === canvas/, 'a newly mounted canvas is never treated as already painted'],
-  [/showExportPreview, tab, previewMode\]/, 'tab changes schedule a fresh canvas draw when re-entering Studio'],
-  [/function syncSelectionOutline\(target\)/, 'selection overlays have a direct manipulation update path'],
-  [/syncSelectionOutline\(target\);/, 'selection outlines stay attached to objects during direct canvas movement'],
-  [/function pointerUp\(event\)[\s\S]{0,1400}replaceDesign\(designRef\.current\)/, 'final finger position commits to React state, history, and autosave'],
-  [/nextLayers\[index\] = \{ \.\.\.entry, x: nextX, y: nextY \}/, 'custom layer drags retain unsnapped finger coordinates'],
-  [/patch\(\{ x: rawX, y: rawY \}, false\)/, 'artwork drags retain unsnapped finger coordinates'],
-  [/if \(!gestureAlreadyRendered \|\| showOriginal\)/, 'gesture preview avoids a duplicate canvas redraw after state commit'],
-  [/Object\.is\(currentDesign\.zoom, nextZoom\)/, 'bounded artwork pinch gestures do not create no-op history'],
-  [/return true;\s*\n\s*}\s*\n\s*\n\s*async function uploadImage/, 'artwork selection reports successful application'],
-  [/if \(useArtwork\(menuItem\)\) \{\s*setShowExportPreview\(true\)/, 'final preview opens only after artwork selection succeeds'],
-  [/const workingImage = proxyImageWidth\(item\.image, 3072\);[\s\S]{0,180}if \(!workingImage\)[\s\S]{0,520}startFreshWorkingProject\(/, 'invalid artwork sources are rejected before starting a fresh project'],
-  [/finishActiveGesture\(\);[\s\S]{0,120}if \(cleanupInFlightRef\.current\)/, 'Undo and other guarded actions finalize active gestures first'],
-  [/inert=\{blockingAssetOperation \|\| undefined\}/, 'blocking editor operations use a boolean inert attribute'],
-  [/setSelectedElement\('card-text'\)/, 'built-in card text keeps an independent selection state'],
-  [/selection: 'card-text'/, 'layer stack identifies built-in card text independently'],
-  [/if \(pointers\.current\.size >= 2\) return;/, 'gesture tracking ignores accidental third touches'],
-  [/function textLayerLines\(/, 'multiline text is modeled explicitly'],
-  [/function singleLineCardText\(/, 'built-in card text normalizes restored control characters'],
-  [/const blockingAssetOperation = cleanupInProgress \|\| presetTransferInProgress;/, 'destructive asset transactions expose one editor-wide interaction lock'],
-  [/inert=\{blockingAssetOperation \|\| undefined\}/, 'preset and cleanup transactions make the editor inert'],
-  [/next\.numberText = singleLineCardText\(/, 'masked card number hydration uses single-line normalization'],
-  [/next\.holderText = singleLineCardText\(/, 'card-holder hydration uses single-line normalization'],
-  [/const CATALOG_ARTWORK_OVERSCAN = 0\.0225;/, 'Library artwork framing has one exact 2.25%-per-edge overscan constant'],
-  [/const CATALOG_ARTWORK_EDITOR_ZOOM = 1 \+ CATALOG_ARTWORK_OVERSCAN \* 2;/, 'Studio reproduces the exact Library overscan geometry'],
-  [/async function loadBackground\(\) \{[\s\S]{0,400}setImage\(null\);[\s\S]{0,120}setLoadedBackgroundKey\(''\)/, 'Studio waits for full-size artwork rather than handing off a thumbnail'],
-  [/className="catalogArtworkFallback"/, 'failed catalog artwork has an in-app visual fallback'],
-  [/onError=\{\(\) => setFailed\(true\)\}/, 'catalog artwork decode failures switch to the fallback'],
-  [/function pointInBuiltinText\(/, 'built-in card text is directly tappable'],
-  [/return 'card-text';/, 'built-in text hit testing routes to card controls'],
-  [/setStudioTool\('card'\)/, 'tapping built-in text opens the Card tool'],
-  [/label="Line Spacing"/, 'multiline text has line-spacing controls'],
-  [/<textarea[\s\S]*aria-label="Layer text"/, 'text layers use a multiline editor'],
-  [/designRef\.current === startupDesign/, 'startup hydration does not overwrite newer edits'],
-  [/async function saveProject\([\s\S]*?if \(!hydrated\)/, 'named project saves wait for Library hydration before enforcing project limits'],
-  [/setFavorites\(\(current\) => \{[\s\S]*?mergedById/, 'startup favorite hydration merges early user actions'],
-  [/setProjects\(\(current\) => \{[\s\S]{0,700}const merged = \[\.\.\.mergedById\.values\(\)\][\s\S]{0,240}return merged;/, 'startup project hydration merges early user actions'],
-  [/setImports\(\(current\) => \{[\s\S]*?mergedById/, 'startup import hydration merges early user actions'],
-  [/setExportHistory\(\(current\) => \{[\s\S]*?mergedById/, 'startup export hydration merges early user actions'],
-  [/for \(let attempt = 0; attempt < 3; attempt \+= 1\)/, 'service-worker reload retries until the latest draft is stable'],
-  [/if \(designRef\.current !== snapshot\)/, 'service-worker reload refuses to discard edits made during persistence'],
-  [/let hasServiceWorkerController = Boolean\(navigator\.serviceWorker\.controller\)/, 'service-worker distinguishes first claim from an update'],
-  [/if \(!hasServiceWorkerController\)/, 'first service-worker claim does not force an app reload'],
-  [/imageImportInFlightRef\.current \|\|[\s\S]{0,220}exportInFlightRef\.current/, 'service-worker updates never reload through active editor transactions'],
-  [/Layer limit reached\. Delete a layer before adding another\./, 'custom layer adds enforce the layer cap'],
-  [/order\.unshift\(id\);/, 'new custom layers start at the bottom of the unified stack'],
-  [/visibleImageIdsTopDown\.length > MAX_VISIBLE_IMAGE_LAYERS/, 'older designs normalize overflow image layers instead of failing hydration'],
-  [/visibleImageIdsTopDown\.slice\(0, MAX_VISIBLE_IMAGE_LAYERS\)/, 'overflow normalization preserves topmost visible image layers'],
-  [/setSelectedElement\('artwork'\);[\s\S]{0,220}setStudioTool\('crop'\)/, 'Library artwork selection targets the background before crop editing'],
-  [/for \(const snapshot of undoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves undo history assets'],
-  [/for \(const snapshot of redoRef\.current\) addDesignRefs\(snapshot\)/, 'import cleanup preserves redo history assets'],
-  [/function startFreshWorkingProject\(/, 'fresh project transitions centralize state replacement'],
-  [/function applyImportedArtwork\([\s\S]{0,700}startFreshWorkingProject\(/, 'Library imports start a fresh working project'],
-  [/onClick=\{\(\) => applyImportedArtwork\(asset\)\}/, 'Library import rows cannot bypass artwork replacement safety'],
-  [/dbPutIfBelowLimit\('projects', project, MAX_SAVED_PROJECTS\)/, 'named project saves enforce capacity inside IndexedDB'],
-  [/dbPutIfBelowLimit\('projects', copy, MAX_SAVED_PROJECTS\)/, 'project duplicates share the atomic IndexedDB capacity limit'],
-  [/copyInserted = await dbPutIfBelowLimit\('projects', copy, MAX_SAVED_PROJECTS\)/, 'project duplication enforces the project cap atomically'],
-  [/if \(projectOpsRef\.current\.size\) \{[\s\S]{0,180}before cleaning imported images/, 'import cleanup waits for active project transactions'],
-  [/const imageImportGenerationRef = useRef\(0\)/, 'image imports use a generation token'],
-  [/function invalidatePendingImageImport\(\)/, 'newer card actions can invalidate stale image imports'],
-  [/await dbDelete\('imports', id\)\.catch/, 'stale background imports remove orphaned blobs'],
-  [/await dbDelete\('imports', assetId\)\.catch/, 'stale layer imports remove orphaned blobs'],
-  [/Finish the image import before saving this design/, 'project saves do not race image imports'],
-  [/Finish the image import before exporting\./, 'PNG exports do not race image imports'],
-  [/const presetImportGenerationRef = useRef\(0\)/, 'preset imports use a generation token'],
-  [/function invalidatePendingPresetImport\(\)/, 'newer card actions can invalidate stale preset imports'],
-  [/Finish cleaning imported images before editing\./, 'editor mutations are blocked during destructive import cleanup'],
-  [/Finish saving the design before cleaning imported images\./, 'import cleanup cannot race an in-flight project save'],
-  [/className="cleanupShield"/, 'cleanup presents an interaction shield while deleting blobs'],
-  [/if \(presetImportActiveRef\.current\) \{[\s\S]{0,120}presetImportGenerationRef\.current \+= 1;/, 'editor edits invalidate pending preset imports'],
-  [/ensureCurrentPresetImport\(\);[\s\S]{0,120}presetImportActiveRef\.current = false;[\s\S]{0,220}startFreshWorkingProject\([\s\S]{0,120}\.\.\.DEFAULTS, \.\.\.imported/, 'preset final apply starts a fresh project without self-canceling'],
-  [/const flushedDraft = await persistDraftSnapshot\(designRef\.current\)/, 'cleanup flushes the authoritative current draft before deleting blobs'],
-  [/await draftSaveQueueRef\.current;[\s\S]{0,120}const latestDraft = await dbGet\('kv', 'draft'\)/, 'cleanup drains queued autosaves before its final reference check'],
-  [/storedDraft = await dbGet\('kv', 'draft'\)/, 'cleanup protects IndexedDB autosave assets'],
-  [/const fallbackDraft = localStorage\.getItem\('aircard-sticker-fvp-v3'\)/, 'cleanup protects local fallback draft assets'],
-  [/storedImports = await dbGetImportMetadata\(\)/, 'import cleanup verifies authoritative IndexedDB metadata'],
-  [/Could not verify the fallback draft, so no imported images were removed\./, 'import cleanup fails closed if fallback draft verification fails'],
-  [/for \(const layer of Array\.isArray\(design\.customLayers\) \? design\.customLayers : \[\]\)/, 'import cleanup tolerates malformed legacy customLayers'],
-  [/for \(const layer of currentDesign\.customLayers \|\| \[\]\)/, 'project saving scans custom layers for remote artwork'],
-  [/some remote art is not cached offline/, 'project saving reports incomplete offline artwork caching'],
-  [/const referencedPresetAssetIds = new Set\(\)/, 'preset import tracks only referenced embedded assets'],
-  [/const stored = await dbGet\('imports', asset\.id\)/, 'preset export re-reads one image blob at a time instead of retaining all blobs'],
-  [/Preset is missing a referenced image asset/, 'preset import rejects missing referenced image blobs'],
-  [/previous unsaved work cleared/, 'opening a saved project discards the previous unsaved working draft'],
-  [/const undo = useCallback\(\(\) => \{[\s\S]{0,260}invalidatePendingImageImport\(\);[\s\S]{0,120}invalidatePendingPresetImport\(\);/, 'Undo cancels in-flight image and preset imports'],
-  [/const redo = useCallback\(\(\) => \{[\s\S]{0,260}invalidatePendingImageImport\(\);[\s\S]{0,120}invalidatePendingPresetImport\(\);/, 'Redo cancels in-flight image and preset imports'],
-  [/const MAX_VISIBLE_IMAGE_LAYERS = 12;/, 'visible image layers have an iPhone memory cap'],
-  [/name: safeDisplayText\(file\.name, 'Imported image', 160\)/, 'background import metadata is bounded before persistence'],
-  [/name: safeDisplayText\(file\.name, 'Image layer', 160\)/, 'image-layer import metadata is bounded before persistence'],
-  [/name: safeDisplayText\(asset\.name, 'Preset asset', 160\)/, 'preset image metadata is bounded before persistence'],
-  [/async function withImageImportLock\(/, 'image imports are serialized'],
-  [/const imageImportInFlightRef = useRef\(false\)/, 'image import concurrency has an authoritative lock'],
-  [/disabled=\{imageImportInProgress \|\| presetTransferInProgress \|\| cleanupInProgress\} onClick=\{\(\) => layerUploadRef\.current\?\.click\(\)\}/, 'image-layer import entry point is disabled during conflicting asset operations'],
-  [/favoriteOpsRef\.current\.has\(itemId\)/, 'favorite writes are serialized per card'],
-  [/projectSaveInFlightRef\.current/, 'project saves reject overlapping double taps'],
-  [/const historySaved = await recordExport/, 'export history status reflects durable storage writes'],
-  [/export history could not be stored/, 'successful exports report history persistence failure separately'],
-  [/presetTransferInFlightRef\.current/, 'preset import and export operations are serialized'],
-  [/const imageImportInFlightRef = useRef\(false\)/, 'image imports use a synchronous concurrency guard'],
-  [/Finish the image import before cleaning imported images\./, 'cleanup cannot overlap an in-flight image import'],
-  [/Finish the image import before importing a preset\./, 'preset import cannot overlap a normal image import'],
-  [/const cleanupInFlightRef = useRef\(false\)/, 'import cleanup has a synchronous concurrency guard'],
-  [/Finish the preset operation before cleaning imported images\./, 'import cleanup cannot overlap preset transfers'],
-  [/function fillGrain\(/, 'grain rendering uses a cached pattern instead of per-frame dot loops'],
-  [/imageLayers\.length > MAX_VISIBLE_IMAGE_LAYERS/, 'image hydration refuses unsafe visible-image counts'],
-  [/visibleImageLayers\(designRef\.current\)\.length >= MAX_VISIBLE_IMAGE_LAYERS/, 'image-layer creation enforces the visible-image cap'],
-  [/draftSaveQueueRef\.current/, 'draft writes are serialized through one persistence queue'],
-  [/const projectOpsRef = useRef\(new Set\(\)\)/, 'project actions use an authoritative same-frame lock'],
-  [/async function withProjectOperation\(/, 'project duplicate and delete actions are serialized'],
-  [/projectOpsRef\.current\.has\(id\)/, 'rapid duplicate and delete taps are rejected immediately'],
-  [/const queuedAt = Date\.now\(\);/, 'draft timestamps are assigned when snapshots are queued'],
-  [/version === draftSaveVersionRef\.current/, 'stale queued drafts cannot overwrite the latest local fallback'],
-  [/const flushDraftBeforeSuspend = \(\) =>/, 'draft flushes before iOS suspension'],
-  [/document\.addEventListener\('visibilitychange', onVisibilityChange\)/, 'backgrounding triggers a draft flush'],
-  [/window\.addEventListener\('pagehide', flushDraftBeforeSuspend\)/, 'pagehide triggers a draft flush'],
-  [/aircard-sticker-fvp-v3-updated-at/, 'local draft fallback records a comparable timestamp'],
-  [/localUpdatedAt >= indexedUpdatedAt/, 'startup prefers the synchronous fallback when draft timestamps tie'],
-  [/startFreshWorkingProject\(createDefaultProjectDesign\(\),[\s\S]{0,180}New card ready Â· unsaved work cleared/, 'New Card starts a clean working project'],
-  [/undoRef\.current = \[\];[\s\S]{0,80}redoRef\.current = \[\];/, 'fresh project transitions clear undo and redo history'],
-  [/const \[guidesEnabled, setGuidesEnabled\] = useState\(false\);/, 'alignment guides start disabled'],
-  [/setGuidesEnabled\(false\)/, 'fresh project transitions keep alignment guides disabled'],
-  [/AMOLED:[\s\S]{0,700}contrast: 1\.62[\s\S]{0,700}shadows: -0\.72[\s\S]{0,700}overlay: 0\.24/, 'AMOLED preset creates crushed blacks instead of a cosmetic label'],
-  [/Neon:[\s\S]{0,700}saturation: 1\.95[\s\S]{0,700}effectTint: '#8a16ff'[\s\S]{0,300}effectTintStrength: 0\.28/, 'Neon preset applies an actual high-saturation tinted look'],
-  [/Monochrome:[\s\S]{0,400}saturation: 0/, 'Monochrome preset actually removes color'],
-  [/localStorage\.setItem\('aircard-sticker-fvp-v3', JSON\.stringify\(next\)\)/, 'fresh project transitions synchronously replace the recovery draft'],
-  [/function createDefaultProjectDesign\([\s\S]{0,500}customLayers: \[\],[\s\S]{0,120}layerOrder: \[\.\.\.DEFAULTS\.layerOrder\]/, 'new projects clone pristine default layer state'],
-  [/function useArtwork\([\s\S]{0,1000}startFreshWorkingProject\(createDefaultProjectDesign\(\{[\s\S]{0,260}background: workingImage/, 'main Card Library artwork selection starts from a pristine default project'],
-  [/function openProject\([\s\S]{0,700}startFreshWorkingProject\(/, 'opening a saved project starts a new working session rather than preserving unsaved undo history']
-];
-
-for (const [pattern, label] of pageChecks) requireMatch(page, pattern, label);
-requireMatch(
-  aiCutout,
-  /function createAICutoutMask\([\s\S]{0,600}const devices = canUseWebGPU \? \['webgpu', 'wasm'\] : \['wasm'\]/,
-  'AI cutouts use WebGPU on supported iPhones with a WASM fallback'
-);
-requireMatch(
-  aiCutout,
-  /dtype: device === 'webgpu' \? 'fp16' : 'q8'/,
-  'AI cutouts use higher precision on the iPhone GPU path'
-);
-
-requireMatch(imagePolicy, /url\.protocol !== 'https:'/, 'persisted proxy targets require HTTPS');
-requireMatch(
-  imagePolicy,
-  /url\.username \|\|[\s\S]{0,80}url\.password/,
-  'persisted proxy targets reject embedded credentials'
-);
-requireMatch(storage, /const DB_VERSION = 3;[\s\S]{0,140}const STORES = \[[^\]]*'fonts'/, 'custom fonts have a versioned local IndexedDB store');
-requireMatch(page, /previewMode === 'physical' \? 'physicalCard' : ''/, 'Physical Preview uses the original lightweight card renderer');
-requireMatch(css, /\.physicalCard\{[^}]*animation:physicalTilt/, 'Physical Preview retains the original CSS tilt');
-requireMatch(page, /\[\['mask','Cutout'\],\['gloss','Gloss'\]/, 'Cutout is the first visible Effects tool');
-requireMatch(page, /capcutSubtools capcutTextSubtools/, 'advanced text tools are shown together without hidden horizontal items');
-if (/ThreeCardPreview|physicalThreeReady|threeCardPreview/.test(page + css)) {
-  throw new Error('Editor contract failed: the unwanted Three.js preview must remain removed');
-}
-
-requireMatch(page, /onChange=\{emit\}/, 'range sliders use React controlled onChange');
-requireMatch(page, /type=\{Number\(min\) < 0 \? 'text' : 'number'\}/, 'signed Expert Mode fields remain typeable on iPhone');
-if (/onInput=\{emit\}/.test(page)) {
-  throw new Error('Editor contract failed: range sliders must not use raw onInput');
-}
-if (/for \(let i = 0; i < (?:3600|900); i \+= 1\)/.test(page)) {
-  throw new Error('Editor contract failed: grain must not use per-frame thousands-of-rectangles loops');
-}
-
-requireMatch(css, /scroll-padding-bottom:calc\(88px \+ var\(--safe-bottom\)\)/, 'focused controls stay clear of the fixed bottom tab bar');
-requireMatch(css, /\.studioPreview\{[^}]*position:relative;[^}]*top:auto;/s, 'Studio preview scrolls naturally instead of becoming a giant sticky header');
-requireMatch(css, /\.studioModeRow\{[^}]*position:sticky;[^}]*top:var\(--safe-top\);/s, 'Studio tool dock owns the safe-area sticky position');
-requireMatch(css, /#panel-studio input,[\s\S]{0,180}scroll-margin-top:calc\(var\(--safe-top\) \+ 126px\)/, 'Studio controls focus below the compact sticky tool dock');
-
-const touchChecks = [
-  [/\.studioToolBar button\{[^}]*min-height:44px/s, 'Studio tool buttons'],
-  [/\.previewModeToggle button\{[^}]*min-height:44px/s, 'Preview mode buttons'],
-  [/\.historyButtons button,.beforeAfterButton\{[^}]*min-height:44px/s, 'History and compare buttons'],
-  [/\.layerAddRow button,.layerActionGrid button\{[^}]*min-height:44px/s, 'Layer action buttons'],
-  [/\.textAlignRow button\{[^}]*min-height:44px/s, 'Text alignment buttons'],
-  [/\.doneSelectionButton\{[^}]*min-height:44px/s, 'Done selection button'],
-  [/\.studioNewCardButton\{[^}]*min-height:44px/s, 'Studio New Card button'],
-  [/\.sliderRow input\{[^}]*min-height:44px/s, 'Range slider touch surface']
-];
-
-for (const [pattern, label] of touchChecks) {
-  requireMatch(css, pattern, label + ' keep a 44px minimum touch height');
-}
-requireMatch(
-  css,
-  /\.physicalCard:after\{[^}]*background:linear-gradient\(/s,
-  'one card-wide sheen overlays the card artwork and chip together'
-);
-if (/physicalChipReflection|chipSheen/.test(page + css)) {
-  throw new Error('Editor contract failed: Preview must not render a separate chip sheen');
-}
-requireMatch(
-  css,
-  /\.studioPreview \.cardFrame\{[^}]*--card-shape-radius:18px;[^}]*border-radius:var\(--card-shape-radius\)/s,
-  'Studio card shape has one shared corner-radius token'
-);
-requireMatch(
-  css,
-  /\.physicalCard canvas\{[^}]*border-radius:inherit;[^}]*clip-path:inset\(0 round var\(--card-shape-radius\)\)/s,
-  'physical canvas is independently clipped to the exact Studio card shape'
-);
-requireMatch(
-  css,
-  /\.physicalCard:after\{[^}]*inset:0;[^}]*border-radius:inherit;[^}]*clip-path:inset\(0 round var\(--card-shape-radius\)\)/s,
-  'physical sheen cannot bleed outside the exact card mask'
-);
-if (/\.physicalCard:after\{[\s\S]{0,180}inset:-15%/.test(css)) {
-  throw new Error('Editor contract failed: physical sheen must not overscan past the card mask');
-}
-requireMatch(
-  css,
-  /\.cleanupShield\{[^}]*position:fixed;[^}]*z-index:260;[^}]*inset:0;/s,
-  'cleanup shield covers and blocks the editor during destructive maintenance'
-);
-
-requireMatch(sw, /\[ART_CACHE\]:\s*40/, 'full artwork cache is bounded');
-requireMatch(sw, /\[THUMB_CACHE\]:\s*160/, 'thumbnail cache is bounded separately');
-requireMatch(sw, /async function trimCache\(/, 'service-worker cache eviction exists');
-requireMatch(sw, /const SHELL = \['\/', '\/manifest\.webmanifest'\];/, 'app root is precached for first offline launch');
-requireMatch(sw, /async function precacheAppShell\(/, 'service worker has an install-time app-shell preloader');
-requireMatch(sw, /url\.pathname\.startsWith\('\/_next\/static\/'\)/, 'install-time app-shell preload discovers hashed Next.js chunks');
-requireMatch(sw, /await staticCache\.put\(request, response\)/, 'discovered Next.js chunks are stored for first offline launch');
-requireMatch(sw, /const OWNED_CACHE_PREFIX = 'card-studio-';/, 'service-worker cleanup is scoped to Card Studio caches');
-requireMatch(sw, /key\.startsWith\(OWNED_CACHE_PREFIX\)/, 'service-worker leaves unrelated origin caches untouched');
-requireMatch(sw, /url\.pathname === '\/manifest\.webmanifest'[\s\S]{0,140}staleWhileRevalidate\(event\.request, SHELL_CACHE\)/, 'PWA manifest refreshes online while remaining available from the shell cache offline');
-requireMatch(sw, /if \(response\.status >= 500\)/, 'navigation falls back to cached shell on transient server failures');
-requireMatch(sw, /requestedWidth > 0 && requestedWidth <= 800/, 'thumbnail cache routing is width-bounded');
-requireMatch(page, /proxyImageWidth\(item\.image, 3072\)/, 'editor artwork uses a bounded high-resolution working copy');
-
-requireMatch(storage, /const DB_VERSION = 3;/, 'IndexedDB schema includes import metadata migration and custom fonts');
-requireMatch(storage, /'importMeta'/, 'import metadata store exists');
-requireMatch(storage, /export async function dbGetImportMetadata\(/, 'metadata-only import listing exists');
-requireMatch(storage, /async function serializeImportRecord\(/, 'imported image payloads detach from live File objects before IndexedDB storage');
-requireMatch(storage, /blobBytes: bytes/, 'imported image binary payloads persist as ArrayBuffer data');
-requireMatch(storage, /return store === 'imports' \? hydrateImportRecord\(value\) : value;/, 'import reads reconstruct usable Blob objects from stored binary data');
-requireMatch(storage, /export async function dbPutIfBelowLimit\(/, 'IndexedDB supports atomic capacity-limited writes');
-requireMatch(storage, /db\.transaction\(store, 'readwrite'\)/, 'capacity checks and writes share one readwrite transaction');
-requireMatch(storage, /objectStore\.count\(\)/, 'atomic capacity writes count the durable store before inserting');
-requireMatch(storage, /async function withDbRetry\(/, 'transient IndexedDB operations retry through a fresh connection');
-requireMatch(storage, /db\.onclose = \(\) => \{[\s\S]{0,100}dbPromise = null;/, 'unexpected IndexedDB closure invalidates the cached connection');
-requireMatch(storage, /const snapshot = await withDbRetry\(/, 'import metadata hydration uses the transient IndexedDB retry path');
-requireMatch(storage, /parsed\.pathname !== '\/api\/image'/, 'offline artwork cache only accepts the local image proxy');
-requireMatch(storage, /parseAllowedRemoteImageUrl\(upstream\)/, 'offline artwork cache validates the upstream image host');
-requireMatch(imagePolicy, /export const IMAGE_PROXY_VERSION = '[1-9][0-9]*';/, 'image proxy URLs have an explicit cache generation');
-requireMatch(page, /normalized\.set\('v', IMAGE_PROXY_VERSION\)/, 'client proxy URLs use the current cache generation');
-requireMatch(inspectRoute, /IMAGE_PROXY_VERSION/, 'inspected artwork URLs use the current cache generation');
-requireMatch(storage, /await cache\.delete\(url\);[\s\S]{0,120}await cache\.put\(url, existing\.clone\(\)\)/, 'explicit offline saves refresh cache eviction priority');
-requireMatch(storage, /if \(!db\) throw new Error\('IndexedDB unavailable'\);/, 'durable IndexedDB writes fail instead of reporting fake success');
-requireMatch(storage, /if \(settled\) \{[\s\S]{0,80}db\.close\(\);/, 'late IndexedDB upgrade success closes orphaned connections');
-requireMatch(storage, /db\.onclose = \(\) => \{[\s\S]{0,80}dbPromise = null;/, 'unexpected IndexedDB closure resets the cached connection');
-requireMatch(storage, /const CACHE_ARTWORK_TIMEOUT_MS = 12000;/, 'offline artwork caching has a mobile-network timeout');
-requireMatch(storage, /signal: controller\.signal/, 'offline artwork cache fetches are abortable');
-requireMatch(page, /dbGetImportMetadata\(\)/, 'Library hydrates import metadata instead of blobs');
-requireMatch(page, /const MAX_SVG_IMPORT_BYTES = 2 \* 1024 \* 1024;/, 'SVG imports have a strict source-size ceiling');
-requireMatch(page, /const MAX_IMAGE_PIXELS = 52_000_000;/, 'source image pixels are bounded for iPhone decode safety');
-requireMatch(page, /const MAX_IMAGE_DIMENSION = 10_000;/, 'source image dimensions are bounded for iPhone decode safety');
-requireMatch(page, /async function probeLocalImageDimensions\(/, 'common image dimensions are probed before full decode');
-requireMatch(
-  page,
-  /async function prepareLocalImageBlob\([\s\S]*?probeLocalImageDimensions\(blob\)[\s\S]*?assertSafeSourceDimensions\(probedDimensions\)[\s\S]*?decodeLocalImageBlob\(blob\)/,
-  'dimension preflight runs before image decoding'
-);
-requireMatch(page, /async function validateSafeSvgBlob\(/, 'SVG imports are inspected before rasterization');
-requireMatch(page, /px\|pt\|pc\|in\|cm\|mm\|q/, 'SVG absolute units are normalized before dimension safety checks');
-requireMatch(page, /if \(Number\.isNaN\(width\) \|\| Number\.isNaN\(height\)\) return null;/, 'unsupported SVG dimensions fail verification');
-requireMatch(page, /if \(svgSource && !probedDimensions\)/, 'unverifiable SVG dimensions fail closed before raster decode');
-requireMatch(page, /<\\s\*script\\b/, 'SVG active script content is rejected');
-requireMatch(page, /<\\s\*foreignObject\\b/, 'SVG foreignObject content is rejected');
-requireMatch(page, /unsupported active or remote content/, 'SVG remote or active content fails closed');
-requireMatch(page, /const MAX_STORED_IMAGE_PIXELS = 12_000_000;/, 'local image working-set pixels are bounded');
-requireMatch(page, /const MAX_STORED_IMAGE_DIMENSION = 4096;/, 'local image working-set dimensions are bounded');
-requireMatch(page, /const MAX_UNPROBED_IMAGE_BYTES = 8 \* 1024 \* 1024;/, 'large images require pre-decode dimension verification');
-requireMatch(page, /Image dimensions could not be verified safely/, 'large unverified images fail closed before decode');
-requireMatch(page, /const MAX_STORED_LAYER_IMAGE_PIXELS = 4_000_000;/, 'custom image-layer working-set pixels are bounded separately');
-requireMatch(page, /const MAX_STORED_LAYER_IMAGE_DIMENSION = 2560;/, 'custom image-layer dimensions are bounded separately');
-requireMatch(page, /const MAX_VISIBLE_IMAGE_DECODE_PIXELS = 24_000_000;/, 'visible image-layer decoded pixels have a total iPhone memory budget');
-requireMatch(page, /decodedPixels \+ pixels > MAX_VISIBLE_IMAGE_DECODE_PIXELS/, 'image-layer hydration enforces the decoded-pixel budget');
-requireMatch(page, /Visible image layers exceed the safe iPhone memory budget/, 'image-layer memory pressure fails with a recoverable editor message');
-requireMatch(page, /const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS \* 2 \+ 2;/, 'preset asset cap includes each layer, its AI matte, and the card artwork');
-requireMatch(page, /refs\.size > MAX_PRESET_ASSETS/, 'preset export guards asset-count round-trip compatibility');
-requireMatch(
-  page,
-  /for \(const \[assetId, asset\] of presetAssets\)[\s\S]*?referencedPresetAssetIds\.has\(assetId\)[\s\S]*?asset\.data = ''[\s\S]*?presetAssetMap\.delete\(assetId\)/,
-  'preset import releases unreferenced embedded payloads'
-);
-requireMatch(
-  page,
-  /const blob = dataUrlToBlob\(asset\.data\);[\s\S]*?asset\.data = ''[\s\S]*?prepareLocalImageBlob\(/,
-  'preset import releases base64 strings after Blob conversion'
-);
-requireMatch(page, /const EDITOR_PREVIEW_W = 1024;/, 'interactive editor canvas uses a reduced backing width');
-requireMatch(page, /const EDITOR_PREVIEW_H = 646;/, 'interactive editor canvas preserves the exact card ratio');
-requireMatch(page, /width=\{EDITOR_PREVIEW_W\}/, 'interactive canvas uses the reduced backing width');
-requireMatch(page, /height=\{EDITOR_PREVIEW_H\}/, 'interactive canvas uses the reduced backing height');
-requireMatch(page, /const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS \* 2 \+ 2;/, 'preset asset capacity covers each image matte and its source art');
-requireMatch(page, /const MAX_PRESET_IMPORT_BYTES = 48 \* 1024 \* 1024;/, 'preset transfer size is bounded for iPhone memory safety');
-requireMatch(page, /async function prepareLocalImageBlob\(/, 'oversized local images are downsampled before persistence');
-requireMatch(page, /webp\|avif\|heic\|heif/, 'WebP, AVIF, HEIC, and HEIF imports are raster-normalized for deterministic export');
-requireMatch(page, /maxPixels: MAX_STORED_LAYER_IMAGE_PIXELS/, 'custom image-layer imports use the smaller working set');
-requireMatch(
-  page,
-  /function normalizePersistedArtworkSource\([\s\S]*?proxyImageWidth\([\s\S]*?width\)/,
-  'restored proxied artwork is normalized back to working resolution'
-);
-requireMatch(page, /parsed\.background = normalizePersistedArtworkSource\(parsed\.background, 3072\)/, 'legacy draft artwork is upgraded instead of cleared');
-requireMatch(page, /imported\.background = normalizePersistedArtworkSource\(imported\.background, 3072\)/, 'legacy preset background artwork is upgraded instead of cleared');
-requireMatch(page, /normalizePersistedArtworkSource\(src, MAX_STORED_LAYER_IMAGE_DIMENSION\)/, 'legacy preset image layers are upgraded instead of cleared');
-requireMatch(page, /const decodedBySource = new Map\(\);/, 'duplicate image layers share decoded sources');
-requireMatch(page, /const animatedOrVectorSource =/, 'animated and vector imports are normalized');
-requireMatch(page, /chunkType === 'acTL'/, 'APNG animation is detected from the PNG animation-control chunk');
-requireMatch(page, /Boolean\(probedDimensions\?\.animated\)/, 'ordinary image\/png APNG files are raster-normalized deterministically');
-requireMatch(page, /gif\|apng\|svg\\\+xml/, 'APNG, GIF, and SVG imports use deterministic rasterization');
-requireMatch(page, /const encodeCanvas = \(type, quality\)/, 'image optimization has an encoder fallback path');
-requireMatch(page, /optimizedBlob\.size > MAX_IMAGE_IMPORT_BYTES/, 'optimized image blobs cannot exceed the import storage ceiling');
-if (/dbGetAll\('imports'\)/.test(page)) {
-  throw new Error('Editor contract failed: Library must not hydrate full import blobs into React state');
-}
-
-console.log('PASS editor regression contract');
-
-
-requireMatch(imageRoute, /Math\.min\(3072, Math\.floor\(requestedWidth\)\)/, 'image proxy bounds working artwork width');
-
-const proxySecurityChecks = [
-  [imageRoute, /parseAllowedRemoteImageUrl/, 'image proxy shares the canonical remote-host policy'],
-  [imageRoute, /redirect:\s*'manual'/, 'image proxy validates redirects before following them'],
-  [imageRoute, /SAFE_IMAGE_TYPES/, 'image proxy rejects unsafe image formats'],
-  [imageRoute, /readLimitedBody\(/, 'image proxy stream-limits response bodies'],
-  [imageRoute, /const MAX_PROXY_OUTPUT_BYTES = 15 \* 1024 \* 1024;/, 'image proxy bounds normalized output size'],
-  [imageRoute, /Processed image too large/, 'oversized normalized proxy output fails closed'],
-  [imageRoute, /import sharp from 'sharp'/, 'image proxy can resize non-CDN artwork server-side'],
-  [imageRoute, /limitInputPixels: MAX_DECODED_IMAGE_PIXELS/, 'proxy decoding has a pixel safety bound'],
-  [imageRoute, /const shouldNormalize = width >= 160 \|\| Boolean\(cropRect\);/, 'every requested proxy width is enforced server-side'],
-  [imageRoute, /\.resize\(\{[\s\S]*width,[\s\S]*withoutEnlargement: true/s, 'proxy width requests are enforced server-side'],
-  [imageRoute, /responseType = 'image\/webp'/, 'normalized proxy images return a deterministic web format'],
-  [inspectRoute, /redirect:\s*'manual'/, 'artwork inspector validates redirects before following them'],
-  [inspectRoute, /SAFE_IMAGE_TYPES/, 'artwork inspector rejects unsafe image formats'],
-  [inspectRoute, /const MAX_ANALYSIS_PIXELS = 40_000_000;/, 'artwork inspector bounds decoded pixels'],
-  [inspectRoute, /limitInputPixels: MAX_ANALYSIS_PIXELS/, 'artwork inspector enforces the decoded-pixel bound'],
-  [inspectRoute, /\.rotate\(\)/, 'artwork inspector honors EXIF orientation before pixel analysis'],
-  [inspectRoute, /readLimitedBody\(/, 'artwork inspector stream-limits response bodies']
-];
-
-for (const [source, pattern, label] of proxySecurityChecks) {
-  requireMatch(source, pattern, label);
-}
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éí×Ž{ñ:-jZ.¶›­–)Þ³V–×÷'Bg2g&öÒvæöFS¦g2s° ¦gVæ7F–öâ&VB‡F‚’°¢&WGW&âg2ç&VDf–ÆU7–æ2‡F‚ÂwWFc‚r“°§Ð ¦gVæ7F–öâ&WV—&TÖF6‚‡6÷W&6RÂGFW&âÂÆ&VÂ’°¢–b‚GFW&âçFW7B‡6÷W&6R’’°¢F‡&÷ræWrW'&÷"‚tVF—F÷"6öçG&7Bf–ÆVC¢r²Æ&VÂ“°¢Ð§Ð ¦6öç7BvRÒ&VB‚v÷vRæ§7‚r“°¦6öç7B772Ò&VB‚vövÆö&Ç2æ772r“°¦6öç7B7rÒ&VB‚wV&Æ–2÷7ræ§2r“°¦6öç7B7F÷&vRÒ&VB‚vöÆ–"÷7F÷&vRæ§2r“°¦6öç7B–ÖvU&÷WFRÒ&VB‚vö’ö–ÖvR÷&÷WFRæ§2r“°¦6öç7B–ç7V7E&÷WFRÒ&VB‚vö’ö7V7Rö–ç7V7B÷&÷WFRæ§2r“°¦6öç7B–ÖvUöÆ–7’Ò&VB‚vöÆ–"ö–ÖvUöÆ–7’æ§2r“°¦6öç7B”7WF÷WBÒ&VB‚vöÆ–"ö”7WF÷WBæÖ§2r“° ¦6öç7BvT6†V6·2Ò°¢²ö6öç7BÅ·7GVF–õæVÄ÷VâÂ6WE7GVF–õæVÄ÷VåÅÒÒW6U7FFUÂ‡G'VUÂ“²òÂu7GVF–ò6öçFW‡BæVÂ7F'G2÷VâuÒÀ¢²ö6öç7B6Æ÷6U7GVF–õæVÂÒW6T6ÆÆ&6µÂ…Â…Â’ÓâÇµµÇ5Å5×³Ãƒ×6WE7GVF–õæVÄ÷VåÂ†fÇ6UÂ’òÂu7GVF–ò6öçFW‡BæVÇ2†fRâW‡Æ–6—B6Æ÷6R7F–öâuÒÀ¢²ö&–ÖÆ&VÃÒ$6Æ÷6RVF—BæVÂ"òÂtVF—BæVÂ6Æ÷6R7F–öâ—266W76–&ÆRuÒÀ¢²ö&–ÖÆ&VÃÒ$Æ–W'2%µÇ5Å5×³ÃƒÖ7F—fFU7GVF–õFööÅÂ‚vÆ–W'2uÂ’òÂtÆ–W'2—2F—&V7FÇ’&V6†&ÆRg&öÒF†R7GVF–ò†VFW"uÒÀ¢²ö6Æ74æÖSÒ'FW‡DÆ–W%V–6´7F–öç2%µÇ5Å5×³Ã#cÔFVÆWFRFW‡BòÂwFW‡BFVÆWF–öâ—2f—6–&ÆRöâF†RÖ–âFW‡BæVÂuÒÀ¢²ögVæ7F–öâæ÷&ÖÆ—¦TFW6–vå7FFUÂ‚òÂw&W7F÷&VBFW6–vç2&Ræ÷&ÖÆ—¦VBuÒÀ¢²öæW‡EÂæ&6¶w&÷VæD6öÆ÷"Ò&uÂæ&6¶w&÷VæD6öÆ÷"Ãòæ÷&ÖÆ—¦T†W„6öÆ÷%Â‡&uÂæ&6¶w&÷VæD6öÆ÷"ÂDTdTÅE5Âæ&6¶w&÷VæD6öÆ÷%Â’¢rs²òÂv6†÷6Vâ&6¶w&÷VæB6öÆ÷'27W'f—fRG&gBæB&ö¦V7Bæ÷&ÖÆ—¦F–öâuÒÀ¢²öæW‡EÂæ6öçF7FÆW746öÆ÷"Òæ÷&ÖÆ—¦T†W„6öÆ÷%Â‚òÂv6&B6öçF7FÆW72&WF–ç27W7FöÒ6öÆ÷"7&÷726fW2uÒÀ¢²öæW‡EÂæ6öçF7FÆW74÷6—G’Òf–æ—FT6Æ×Â‚òÂv6&B6öçF7FÆW72&WF–ç2÷6—G’7&÷726fW2uÒÀ¢²ögVæ7F–öâÖW&vT7W7FöÔ6öçF7FÆW74Æ–W%Â†–EÂ’òÂvöÆFW"W‡G&6öçF7FÆW72Æ–W'26â&RÖW&vVB–çFò6&BuÒÀ¢²ögVæ7F–öâ&WÆ6Uv—F„–×÷'FVD'Gv÷&µÂ†76WEÂ’ÇµµÇ5Å5×³ÃƒS×F6…Â…ÇµµÇ5Å5×³Ã#Ö&6¶w&÷VæC¢v–F#¥ÂõÂö–×÷'G5ÂòrÂ²76WEÂæ–BòÂw6VÆV7F–ær6fVB–×÷'B–â7GVF–ò&WÆ6W2'Gv÷&²v—F†÷WB6ÆV&–ærF†R6&BuÒÀ¢²ögVæ7F–öâæ÷&ÖÆ—¦T–×÷'D'Gv÷&µ6÷W&6UÂ‚òÂwW'6—7FVB–×÷'B'Gv÷&²”G2&RfÆ–FFVB6æöæ–6ÆÇ’uÒÀ¢²÷&uW&ÅÂæÆVæwF‚â##òÂwW'6—7FVB&÷‡’F&vWG2&RÆVæwF‚&÷VæFVBuÒÀ¢²ö6öç7Bæ÷&ÖÆ—¦VBÒæWrU$Å6V&6…&×5Â…Â’òÂwW'6—7FVB&÷‡’U$Ç2&R&V'V–ÇBg&öÒ7W÷'FVB&ÖWFW'2öæÇ’uÒÀ¢²ö–bÂ‚6÷W&6UÂç7F'G5v—F…Â‚uÂö•Âö–ÖvUÃòuÂ•Â’&WGW&ârs²òÂwVæ¶æ÷vâ'Gv÷&²66†VÖW2æBF‡2f–Â6Æ÷6VBuÒÀ¢²õF†—2'Gv÷&²6÷W&6R—2Væf–Æ&ÆR÷"Vç7W÷'FVEÂâòÂv–çfÆ–B6FÆör'Gv÷&²æWfW"VçFW'2VF—F÷"7FFRuÒÀ¢²ö–bÂ‚‡–G&FVBÇÅÇÂWF÷6fU&VG•Â’&WGW&âVæFVf–æVC²òÂvWF÷6fRv—G2f÷"6fRG&gB‡–G&F–öâuÒÀ¢²öG&gE&VDf–ÆVBÒG'VRòÂvG&gB&VBf–ÇW&W2&RG&6¶VB6W&FVÇ’g&öÒâV×G’G&gBuÒÀ¢²öWF÷6fU6fRÒG&gE&VDf–ÆVC²òÂvG&gB&VBf–ÇW&W2¶VWWF÷6fRW6VBWfVâv†VâfÆÆ&6²W†—7G2uÒÀ¢²÷6WE6fU7FGW5Â‚tWF÷6fRW6VBuÂ’òÂwVç6fRG&gB‡–G&F–öâW6W2–æFW†VDD"WF÷6fR–ç7FVBöb÷fW'w&—F–ær7F÷&vRuÒÀ¢²ö6öç7BWF÷6fUW6VD&6VÆ–æU&VbÒW6U&VeÂ†çVÆÅÂ’òÂwW6VBWF÷6fRG&6·2F†RW†7B‡–G&FVB&6VÆ–æRuÒÀ¢²ö–bÂ‚‡–G&FVBÇÅÇÂWF÷6fU&VG•Â’&WGW&âVæFVf–æVC²òÂwW6VBWF÷6fR†2Æö6Â×&V6÷fW'’ÖöæÇ’F‚uÒÀ¢²ö–bÂ‚WF÷6fU&VG’bbWF÷6fUW6VD&6VÆ–æU&VeÂæ7W'&VçBÓÓÒFW6–vå&VeÂæ7W'&VçEÂ’òÂwW6VBvV†–FRfÇW6‚æWfW"÷fW'w&—FW2&V6÷fW'’7F÷&vR&Vf÷&R&VÂVF—BuÒÀ¢²ögVæ7F–öâö–çD–å&÷FFVD&÷VæG5Â‚òÂw&÷FFVBvVöÖWG'’†—BFW7F–ærW†—7G2uÒÀ¢²ôÖF…Âæ'5Â†æ÷&ÖÆ—¦VEÂçrÒÂ’ÂRÓ•µÇ5Å5×³Ã#×&WGW&âçVÆÃ²òÂvgVÆÂÖg&ÖR7&÷2æ÷&ÖÆ—¦R&6²FòæòÖ÷7FFRuÒÀ¢²÷G'’ÇµµÇ5Å5×³Ã×6WEö–çFW$6GW&UÂ†WfVçEÂçö–çFW$–EÂ“µµÇ5Å5×³ÃSÕÇÒ6F6‚ÇµÇÒòÂvÖö&–ÆRö–çFW"6GW&Rf–ÇW&W2&RæöâÖfFÂuÒÀ¢²ögVæ7F–öâæ÷&ÖÆ—¦Tg&VU&÷FF–öåÂ‚òÂvg&VR&÷FF–öç2w&6Öö÷F†Ç’F‡&÷Vv‚F†R+ƒ+&÷VæF'’uÒÀ¢²ö6öç7BæW‡E&÷FF–öâÒæ÷&ÖÆ—¦Tg&VU&÷FF–öåÂ…µÇ5Å5×³ÃC#Ö6öçF7FÆW75&÷FF–öã¢æW‡E&÷FF–öâòÂv6öçF7FÆW72vW7GW&R&÷FF–öâw&2–ç7FVBöb7F–6¶–ærBƒ+uÒÀ¢²ö6öç7BæW‡E&÷FF–öâÒæ÷&ÖÆ—¦Tg&VU&÷FF–öåÂ†7W'&VçE&÷FF–öâÂ²ævÆTFVÇFÂ•µÇ5Å5×³Ãƒ×&÷FF–öã¢æW‡E&÷FF–öâòÂv7W7FöÒÆ–W"vW7GW&R&÷FF–öâw&2–ç7FVBöb7F–6¶–ærBƒ+uÒÀ¢²÷F&vWBÓÓÒv'Gv÷&²uµÇ5Å5×³ÃC#Ö6öç7BæW‡E&÷FF–öâÒæ÷&ÖÆ—¦Tg&VU&÷FF–öåÂ†7W'&VçE&÷FF–öâÂ²ævÆTFVÇFÂ•µÇ5Å5×³ÃC#×F6…Â…Ç²¦ööÓ¢æW‡E¦ööÒÂ&÷FFS¢æW‡E&÷FF–öâÇÒÂfÇ6UÂ’òÂv'Gv÷&²vW7GW&R&÷FF–öâw&2–ç7FVBöb7F–6¶–ærBƒ+uÒÀ¢²ö6öç7BÆö6ÅFF–ærÒçVÖ&W%Â‡FF–ærÇÅÇÂÂ’Âò6fU66ÆS²òÂwG&ç6f÷&ÖVB†—BFF–ær&VÖ–ç266ÆRÖ–æFWVæFVçBuÒÀ¢²ö6öç7B†—EFF–ærÒÖF…ÂæÖ…ÂƒBÂÂƒ#"Â¢õUEõuÂ’ÂòÖF…ÂæÖ…ÂƒÂ&V7EÂçv–GF…Â•Â“²òÂv6çf2†—BFF–ærG&6·2G'VR•†öæR×6—¦VBF÷V6‚F&vWBuÒÀ¢²ögVæ7F–öâö–çD–å&÷FFVDVÆÆ—6UÂ‚òÂvVÆÆ—6RÆ–W'2W6RG'VRVÆÆ—6R†—BFW7F–æruÒÀ¢²ögVæ7F–öâö–çD–å&÷FFVE&÷VæFVE&V7EÂ‚òÂw&÷VæFVB6†R†—BFW7F–ærföÆÆ÷w2&VæFW&VB6÷&æW'2uÒÀ¢²ö6öç7B4ôåD5DÄU55ô$õTäE2ÒÇ²òÂv6öçF7FÆW726VÆV7F–öâW6W2&VæFW&VB7–Ö&öÂ&÷VæG2uÒÀ¢²ögVæ7F–öâ7W7FöÔÆ–W%6VÆV7F–öå7G–ÆUÂ‚òÂw6VÆV7F–öâ÷WFÆ–æW2W6Rö&¦V7BvVöÖWG'’uÒÀ¢²ö6öç7B&VæFW%—†VÅ66ÆRÒÖF…ÂæÖ…Â‚òÂw&Wf–Wr&VæFW"G&6·2÷WGWB—†VÂ66ÆRuÒÀ¢²öF§W7FVD–ÖvUÂ†–ÖvRÅµÇ5Å5×³Ã#3×&VæFW%—†VÅ66ÆUÂ’òÂv'Gv÷&²F§W7FÖVçG2W6RF†R6f&’Ö6ö×F–&ÆR—†VÂ&VæFW&W"uÒÀ¢²÷6†F÷t&ÇW"Ò&VæFW$FW6–våÂç6†F÷rÃòbÂ¢&VæFW%—†VÅ66ÆR¢òÂv'V–ÇBÖ–âFW‡B6†F÷w266ÆR6öç6—7FVçFÇ’&WGvVVâ&Wf–WræBW‡÷'BuÒÀ¢²öÆöFVD–ÖvTÆ–W%6÷W&6T¶W’ÓÓÒ–ÖvTÆ–W%6÷W&6T¶W’òÂv–ÖvRÆ–W'2&R6÷W&6RÖ¶W’vFVBuÒÀ¢²öÆöFVD&6¶w&÷VæD¶W’ÓÓÒ&VæFW$FW6–våÂæ&6¶w&÷VæBòÂv&6¶w&÷VæB&VæFW&–ær—26÷W&6RÖ¶W’vFVBuÒÀ¢²öÆ&VÃÒ$6÷&æW"&F—W2"òÂw6†R6÷&æW"×&F—W26öçG&öÂW†—7G2uÒÀ¢²öæ÷&ÖÆ—¦VEÂæföçD–BÒòÂwFW‡BÆ–W'2&WF–ââ÷F–öæÂ–×÷'FVBföçB”BuÒÀ¢²öæ÷&ÖÆ—¦VEÂæ÷WFÆ–æUv–GF‚Òf–æ—FT6Æ×Â†Æ–W%Âæ÷WFÆ–æUv–GF‚òÂwFW‡B÷WFÆ–æRv–GF‚—26fVÇ’&÷VæFVBuÒÀ¢²öæ÷&ÖÆ—¦VEÂæ7W'fRÒf–æ—FT6Æ×Â†Æ–W%Âæ7W'fRòÂwFW‡B7W'fR—26fVÇ’&÷VæFVBuÒÀ¢²öG&uG&6¶VEFW‡EÂ…µÇ5Å5×³Ã3cÖ÷WFÆ–æT6öÆ÷#¥µÇ5Å5×³Ã#Ö7W'fS¢òÂwFW‡B÷WFÆ–æW2æB7W'fW2&VæFW"–çFòF†R6ÖR6&B'Gv÷&²uÒÀ¢²ôÔ…ô”Õõ%DTEôdôåEô%•DU2Ò"Â¢#BÂ¢#BòÂv7W7FöÒföçB–×÷'G2†fR6—¦R&÷VæBuÒÀ¢²ö66WCÒ%ÂçGFbÅÂæ÷FbÅÂçvöfbÅÂçvöfc"òÂv7W7FöÒföçB–×÷'G2W6R'&÷w6W"×7W÷'FVBföçBf÷&ÖG2uÒÀ¢²öF%WEÂ‚v·brÂÇ²–C¢wFW‡B×7G–ÆW2rÂ7G–ÆW3¢æW‡BÇÕÂ’òÂw&WW6&ÆRFW‡B7G–ÆW2W'6—7BÆö6ÆÇ’uÒÀ¢²öæ÷&ÖÆ—¦VEÂæÖ6µ7G&ö¶W2Òæ÷&ÖÆ—¦TÖ6µ7G&ö¶W5Â†Æ–W%ÂæÖ6µ7G&ö¶W5Â’òÂvÖ6²7G&ö¶W2&R6æ—F—¦VBv†Vâ–ÖvRÆ–W'2VçFW"FW6–vâ7FFRuÒÀ¢²öæ÷&ÖÆ—¦VEÂæÖ6µ6÷W&6RÒæ÷&ÖÆ—¦VEÂç7&5µÇ5Å5×³Ã#Öæ÷&ÖÆ—¦T–×÷'D'Gv÷&µ6÷W&6UÂ†Æ–W%ÂæÖ6µ6÷W&6UÂ’òÂt’Æ–W"ÖGFW2W'6—7Bv—F‚F†V—"–ÖvRÆ–W'2uÒÀ¢²öæW‡EÂæ&6¶w&÷VæDÖ6µ7G&ö¶W2Òæ÷&ÖÆ—¦TÖ6µ7G&ö¶W5Â‡&uÂæ&6¶w&÷VæDÖ6µ7G&ö¶W5Â’òÂvÖ–â'Gv÷&²Ö6·27W'f—fRG&gBæB&ö¦V7B&W7F÷&F–öâuÒÀ¢²öæW‡EÂæ&6¶w&÷VæDÖ6µ6÷W&6RÒæW‡EÂæ&6¶w&÷VæEµÇ5Å5×³Ã#Öæ÷&ÖÆ—¦T–×÷'D'Gv÷&µ6÷W&6UÂ‡&uÂæ&6¶w&÷VæDÖ6µ6÷W&6UÂ’òÂt’'Gv÷&²ÖGFW2W'6—7Bv—F‚F†R6&BFW6–vâuÒÀ¢²öFVÇFÂæ&6¶w&÷VæBÓÒ7W'&VçEÂæ&6¶w&÷VæEµÇ5Å5×³ÃC3Ö&6¶w&÷VæDÖ6µ7G&ö¶W3¥µÇ5Å5×³ÃƒÖ&6¶w&÷VæDÖ6µ6÷W&6S¢òÂw&WÆ6–ærF†R6÷W&6R'Gv÷&²6ÆV'2Ö6·2F–VBFòF†R&Wf–÷W2–ÖvRuÒÀ¢²ögVæ7F–öâÖ6µö–çDf÷$'Gv÷&µÂ†WfVçEÂ•µÇ5Å5×³Ã##Ö7W'&VçEÂæfÆ—…µÇ5Å5×³ÃcÖÖ6´''W6…6—¦RòÂv'Gv÷&²Ö6²6ö÷&F–æFW2föÆÆ÷r7&÷Âf—BÂ¦ööÒÂ&÷FF–öâÂæBfÆ—uÒÀ¢²÷6VÆV7FVDVÆVÖVçBÓÓÒv'Gv÷&²rbbÖ6µö–çDf÷$'Gv÷&µÂ†WfVçEÂ•µÇ5Å5×³ÃƒÒvÖ6³¦'Gv÷&²ròÂwF†RÖ6²''W6‚6âF&vWB–×÷'FVB6&B'Gv÷&²uÒÀ¢²ö&6¶w&÷VæDÖ6µ7G&ö¶W3¢7G&ö¶W2òÂvÖ–â'Gv÷&²Ö6²7G&ö¶W2W6RF†R6ÖRÆ—fRvW7GW&RæB†—7F÷'’F‚2–ÖvRÆ–W'2uÒÀ¢²öG&tÖ6¶VD–ÖvTÆ–W%Â…µÇ5Å5×³Ã#S×&VæFW$FW6–våÂæ&6¶w&÷VæDÖ6µ7G&ö¶W2òÂvÖ–â'Gv÷&²Ö6·2&VæFW"F‡&÷Vv‚F†R6†&VBärW‡÷'B&VæFW&W"uÒÀ¢²ö7F—fTÖ6µ7G&ö¶W5ÂæÆVæwF…µÇ5Å5×³Ã#CÖ&6¶w&÷VæDÖ6µ7G&ö¶W3¥ÅµÅÒòÂwF†R6ÆV"ÖÖ6²7F–öâ6ÆV'2F†R7W'&VçFÇ’6VÆV7FVB'Gv÷&²F&vWBuÒÀ¢²ö7G…ÂæG&t–ÖvUÂ†Ö6¶VDÆ–W$6çf2Â×rÂò"ÂÖ‚Âò"ÂrÂ…Â’òÂvÖ6¶VB–ÖvRÆ–W'27F–ÆÂW6RF†R6†&VB6&B&VæFW&W"æBW‡÷'BF‚uÒÀ¢²÷7FVæ6–Ä7G…ÂæG&t–ÖvUÂ†”Ö6´–ÖvRÂÂÂF&vWEv–GF‚ÂF&vWD†V–v‡EÂ’òÂt’Ç†ÖGFW2&VæFW"F‡&÷Vv‚F†R6†&VB6&BöW‡÷'BÖ6²6ö×÷6—F÷"uÒÀ¢²öG&tÖ6¶VD–ÖvTÆ–W%Â…µÇ5Å5×³Ã3CÖÆ–W$Ö6´–ÖvRòÂv–ÖvRÆ–W"’ÖGFW2æB''W6‚7G&ö¶W26†&RöæRVF—F&ÆRÖ6²F‚uÒÀ¢²öFDFW6–vä–×÷'E&Vg5Â‡fÇVRÂ&VfW&Væ6VEÂ’òÂt’Ö6·27F’&÷FV7FVBGW&–ærVçW6VBÖ–×÷'B6ÆVçWuÒÀ¢²öFDFW6–vä–×÷'E&Vg5Â†7W'&VçDFW6–vâÂ&Vg5Â’òÂt’Ö6·2&R–æ6ÇVFVB–âW‡÷'FVBFW6–vâ&W6WG2uÒÀ¢²÷ö–çFW$–C¢WfVçEÂçö–çFW$–BòÂvÖ6²vW7GW&W2&V6÷&BF†R7F—fRf–ævW"”BuÒÀ¢²ö7F—fTÖ6µ7G&ö¶U&VeÂæ7W'&VçEÂçö–çFW$–BÓÓÒWfVçEÂçö–çFW$–BòÂvÖ6²–çF–ær7F—2öâöæR6GW&VBf–ævW"uÒÀ¢²÷VG&F–47W'fUFõÂ‡ö–çG5Å¶–æFW…ÅÕÂç‚Âö–çG5Å¶–æFW…ÅÕÂç’ÂÖ–Gö–çEÂç‚ÂÖ–Gö–çEÂç•Â’òÂvÖ6²''W6‚7G&ö¶W2&R6Öö÷F†VB&WGvVVâF÷V6‚6×ÆW2uÒÀ¢²öÆ&VÃÒ%6†÷rÆ–W""òÂv†–FFVâÆ–W'2&VÖ–â&V6÷fW&&ÆRuÒÀ¢²ô6ÆVâVçW6VB–×÷'G2òÂwVçW6VB–×÷'B6ÆVçWW†—7G2uÒÀ¢²÷&VæFW$76WG5&VG’òÂvW‡÷'G2&RvFVBöâFV6öFVB76WG2uÒÀ¢²ö–bÂ‚7G…Â’ÇµµÇ5Å5×³Ã#×F‡&÷ræWrW'&÷%Â‚t6çf2&VæFW&–ær—2Væf–Æ&ÆRuÂ’òÂvW‡÷'B6çf2ÆÆö6F–öâf–Ç26Æ÷6VBuÒÀ¢²ö†—7F÷'”w&÷W&VbòÂv6öçF–çV÷W2VF—G2W6Rw&÷WVBVæFò†—7F÷'’uÒÀ¢²övW7GW&U7F'DFW6–våÂæ7W'&VçBÒFW6–vå&VeÂæ7W'&VçBòÂvvW7GW&W26æ6†÷BWF†÷&—FF—fR7FFRuÒÀ¢²÷ö–çFW'5Âæ7W'&VçEÂæ6ÆV%Â…Â’òÂvÆVf–ærF†RVF—F&ÆR6çf26ÆV'27FÆRö–çFW"7FFRuÒÀ¢²övW7GW&UF&vWEÂæ7W'&VçBÒv'Gv÷&²ròÂvÆVf–ærF†RVF—F&ÆR6çf2&W6WG2F†RvW7GW&RF&vWBuÒÀ¢²ö6öç7Bf–æ—6„7F—fTvW7GW&RÒW6T6ÆÆ&6µÂ‚òÂvF—67&WFR7F–öç26âFW&Ö–æFR7F—fR6çf2vW7GW&W2uÒÀ¢²öf–æ—6„7F—fTvW7GW&U&VeÂæ7W'&VçBÒf–æ—6„7F—fTvW7GW&RòÂv6VçG&ÂVF—F÷"F6†–ær6âf–æÆ—¦R7F—fRvW7GW&W2uÒÀ¢²÷&V6÷&D†—7F÷'•µÇ5Å5×³ÃƒÖf–æ—6„7F—fTvW7GW&U&VeÂæ7W'&VçEÂ…Â’òÂvæ÷&ÖÂ7GVF–òVF—G2FW&Ö–æFRÆ—fR6çf2vW7GW&R&Vf÷&R×WFF–öâuÒÀ¢²÷F6…Â…Ç²6†—ƒ¢æW‡E‚Â6†—“¢æW‡E’ÇÒÂfÇ6UÂ’òÂv6†—G&w2&W6W'fRVç6æVBf–ævW"6ö÷&F–æFW2uÒÀ¢²öæW‡EÂæ6&EFW‡Döfg6WE‚Òf–æ—FT6Æ×Â…µÇ5Å5×³ÃSÖæW‡EÂæ6&EFW‡Döfg6WE’Òf–æ—FT6Æ×Â‚òÂv'V–ÇBÖ–â6&BFW‡BG&röfg6WG27W'f—fRG&gBæB&ö¦V7Bæ÷&ÖÆ—¦F–öâuÒÀ¢²÷F&vWBÓÓÒv6&B×FW‡BuµÇ5Å5×³ÃS×F6…Â…Ç²6&EFW‡Döfg6WEƒ¢æW‡E‚Â6&EFW‡Döfg6WE“¢æW‡E’ÇÒÂfÇ6UÂ’òÂv'V–ÇBÖ–â6&BFW‡B6âÖ÷fRg&VVÇ’öâF†R6çf2uÒÀ¢²÷&VæFW$6&E&VeÂæ7W'&VçEÂ†6öçFW‡BÂTD•Dõ%õ$Ud”UuõrÂTD•Dõ%õ$Ud”Uuô‚ÂÇµÇ2¦FW6–vã¢VæF–æuÇ2¥ÇÕÂ•µÇ5Å5×³ÃÖvW7GW&U&VæFW&VDFW6–vå&VeÂæ7W'&VçBÒÇ²FW6–vã¢VæF–ærÂ6çf2ÇÒòÂvvW7GW&R&Wf–Wr&V6÷&G2v†–6‚6çf2&V6V—fVB—G2g&ÖRuÒÀ¢²övW7GW&U&VæFW%Âæ6çf2ÓÓÒ6çf2òÂvæWvÇ’Ö÷VçFVB6çf2—2æWfW"G&VFVB2Ç&VG’–çFVBuÒÀ¢²÷6†÷tW‡÷'E&Wf–WrÂF"Â&Wf–WtÖöFUÅÒòÂwF"6†ævW266†VGVÆRg&W6‚6çf2G&rv†Vâ&RÖVçFW&–ær7GVF–òuÒÀ¢²ögVæ7F–öâ7–æ56VÆV7F–öä÷WFÆ–æUÂ‡F&vWEÂ’òÂw6VÆV7F–öâ÷fW&Æ—2†fRF—&V7BÖæ—VÆF–öâWFFRF‚uÒÀ¢²÷7–æ56VÆV7F–öä÷WFÆ–æUÂ‡F&vWEÂ“²òÂw6VÆV7F–öâ÷WFÆ–æW27F’GF6†VBFòö&¦V7G2GW&–ærF—&V7B6çf2Ö÷fVÖVçBuÒÀ¢²ögVæ7F–öâö–çFW%WÂ†WfVçEÂ•µÇ5Å5×³ÃC×&WÆ6TFW6–våÂ†FW6–vå&VeÂæ7W'&VçEÂ’òÂvf–æÂf–ævW"÷6—F–öâ6öÖÖ—G2Fò&V7B7FFRÂ†—7F÷'’ÂæBWF÷6fRuÒÀ¢²öæW‡DÆ–W'5Å¶–æFW…ÅÒÒÇ²ÂåÂåÂæVçG'’Âƒ¢æW‡E‚Â“¢æW‡E’ÇÒòÂv7W7FöÒÆ–W"G&w2&WF–âVç6æVBf–ævW"6ö÷&F–æFW2uÒÀ¢²÷F6…Â…Ç²ƒ¢&u‚Â“¢&u’ÇÒÂfÇ6UÂ’òÂv'Gv÷&²G&w2&WF–âVç6æVBf–ævW"6ö÷&F–æFW2uÒÀ¢²ö–bÂ‚vW7GW&TÇ&VG•&VæFW&VBÇÅÇÂ6†÷t÷&–v–æÅÂ’òÂvvW7GW&R&Wf–Wrfö–G2GWÆ–6FR6çf2&VG&rgFW"7FFR6öÖÖ—BuÒÀ¢²ôö&¦V7EÂæ—5Â†7W'&VçDFW6–våÂç¦ööÒÂæW‡E¦ööÕÂ’òÂv&÷VæFVB'Gv÷&²–æ6‚vW7GW&W2Fòæ÷B7&VFRæòÖ÷†—7F÷'’uÒÀ¢²÷&WGW&âG'VSµÇ2¥ÆåÇ2§ÕÇ2¥ÆåÇ2¥ÆåÇ2¦7–æ2gVæ7F–öâWÆöD–ÖvRòÂv'Gv÷&²6VÆV7F–öâ&W÷'G27V66W76gVÂÆ–6F–öâuÒÀ¢²ö–bÂ‡W6T'Gv÷&µÂ†ÖVçT—FVÕÂ•Â’ÇµÇ2§6WE6†÷tW‡÷'E&Wf–WuÂ‡G'VUÂ’òÂvf–æÂ&Wf–Wr÷Vç2öæÇ’gFW"'Gv÷&²6VÆV7F–öâ7V66VVG2uÒÀ¢²ö6öç7Bv÷&¶–æt–ÖvRÒ&÷‡”–ÖvUv–GF…Â†—FVÕÂæ–ÖvRÂ3s%Â“µµÇ5Å5×³ÃƒÖ–bÂ‚v÷&¶–æt–ÖvUÂ•µÇ5Å5×³ÃS#×7F'Dg&W6…v÷&¶–æu&ö¦V7EÂ‚òÂv–çfÆ–B'Gv÷&²6÷W&6W2&R&V¦V7FVB&Vf÷&R7F'F–ærg&W6‚&ö¦V7BuÒÀ¢²öf–æ—6„7F—fTvW7GW&UÂ…Â“µµÇ5Å5×³Ã#Ö–bÂ†6ÆVçW–äfÆ–v‡E&VeÂæ7W'&VçEÂ’òÂuVæFòæB÷F†W"wV&FVB7F–öç2f–æÆ—¦R7F—fRvW7GW&W2f—'7BuÒÀ¢²ö–æW'CÕÇ¶&Æö6¶–æt76WD÷W&F–öâÇÅÇÂVæFVf–æVEÇÒòÂv&Æö6¶–ærVF—F÷"÷W&F–öç2W6R&ööÆVâ–æW'BGG&–'WFRuÒÀ¢²÷6WE6VÆV7FVDVÆVÖVçEÂ‚v6&B×FW‡BuÂ’òÂv'V–ÇBÖ–â6&BFW‡B¶VW2â–æFWVæFVçB6VÆV7F–öâ7FFRuÒÀ¢²÷6VÆV7F–öã¢v6&B×FW‡BròÂvÆ–W"7F6²–FVçF–f–W2'V–ÇBÖ–â6&BFW‡B–æFWVæFVçFÇ’uÒÀ¢²ö–bÂ‡ö–çFW'5Âæ7W'&VçEÂç6—¦RãÒ%Â’&WGW&ã²òÂvvW7GW&RG&6¶–ær–væ÷&W266–FVçFÂF†—&BF÷V6†W2uÒÀ¢²ögVæ7F–öâFW‡DÆ–W$Æ–æW5Â‚òÂv×VÇF–Æ–æRFW‡B—2ÖöFVÆVBW‡Æ–6—FÇ’uÒÀ¢²ögVæ7F–öâ6–ævÆTÆ–æT6&EFW‡EÂ‚òÂv'V–ÇBÖ–â6&BFW‡Bæ÷&ÖÆ—¦W2&W7F÷&VB6öçG&öÂ6†&7FW'2uÒÀ¢²ö6öç7B&Æö6¶–æt76WD÷W&F–öâÒ6ÆVçW–å&öw&W72ÇÅÇÂ&W6WEG&ç6fW$–å&öw&W73²òÂvFW7G'V7F—fR76WBG&ç67F–öç2W‡÷6RöæRVF—F÷"×v–FR–çFW&7F–öâÆö6²uÒÀ¢²ö–æW'CÕÇ¶&Æö6¶–æt76WD÷W&F–öâÇÅÇÂVæFVf–æVEÇÒòÂw&W6WBæB6ÆVçWG&ç67F–öç2Ö¶RF†RVF—F÷"–æW'BuÒÀ¢²öæW‡EÂæçVÖ&W%FW‡BÒ6–ævÆTÆ–æT6&EFW‡EÂ‚òÂvÖ6¶VB6&BçVÖ&W"‡–G&F–öâW6W26–ævÆRÖÆ–æRæ÷&ÖÆ—¦F–öâuÒÀ¢²öæW‡EÂæ†öÆFW%FW‡BÒ6–ævÆTÆ–æT6&EFW‡EÂ‚òÂv6&BÖ†öÆFW"‡–G&F–öâW6W26–ævÆRÖÆ–æRæ÷&ÖÆ—¦F–öâuÒÀ¢²ö6öç7B4DÄôuô%Etõ$µôõdU%44âÒÂã##S²òÂtÆ–'&'’'Gv÷&²g&Ö–ær†2öæRW†7B"ã#RR×W"ÖVFvR÷fW'66â6öç7FçBuÒÀ¢²ö6öç7B4DÄôuô%Etõ$µôTD•Dõ%õ¤ôôÒÒÂ²4DÄôuô%Etõ$µôõdU%44âÂ¢#²òÂu7GVF–ò&W&öGV6W2F†RW†7BÆ–'&'’÷fW'66âvVöÖWG'’uÒÀ¢²ö7–æ2gVæ7F–öâÆöD&6¶w&÷VæEÂ…Â’ÇµµÇ5Å5×³ÃC×6WD–ÖvUÂ†çVÆÅÂ“µµÇ5Å5×³Ã#×6WDÆöFVD&6¶w&÷VæD¶W•Â‚ruÂ’òÂu7GVF–òv—G2f÷"gVÆÂ×6—¦R'Gv÷&²&F†W"F†â†æF–æröfbF‡VÖ&æ–ÂuÒÀ¢²ö6Æ74æÖSÒ&6FÆöt'Gv÷&´fÆÆ&6²"òÂvf–ÆVB6FÆör'Gv÷&²†2â–âÖf—7VÂfÆÆ&6²uÒÀ¢²ööäW'&÷#ÕÇµÂ…Â’Óâ6WDf–ÆVEÂ‡G'VUÂ•ÇÒòÂv6FÆör'Gv÷&²FV6öFRf–ÇW&W27v—F6‚FòF†RfÆÆ&6²uÒÀ¢²ögVæ7F–öâö–çD–ä'V–ÇF–åFW‡EÂ‚òÂv'V–ÇBÖ–â6&BFW‡B—2F—&V7FÇ’F&ÆRuÒÀ¢²÷&WGW&âv6&B×FW‡Bs²òÂv'V–ÇBÖ–âFW‡B†—BFW7F–ær&÷WFW2Fò6&B6öçG&öÇ2uÒÀ¢²÷6WE7GVF–õFööÅÂ‚v6&BuÂ’òÂwF–ær'V–ÇBÖ–âFW‡B÷Vç2F†R6&BFööÂuÒÀ¢²öÆ&VÃÒ$Æ–æR76–ær"òÂv×VÇF–Æ–æRFW‡B†2Æ–æR×76–ær6öçG&öÇ2uÒÀ¢²óÇFW‡F&VµÇ5Å5Ò¦&–ÖÆ&VÃÒ$Æ–W"FW‡B"òÂwFW‡BÆ–W'2W6R×VÇF–Æ–æRVF—F÷"uÒÀ¢²öFW6–vå&VeÂæ7W'&VçBÓÓÒ7F'GWFW6–vâòÂw7F'GW‡–G&F–öâFöW2æ÷B÷fW'w&—FRæWvW"VF—G2uÒÀ¢²ö7–æ2gVæ7F–öâ6fU&ö¦V7EÂ…µÇ5Å5Ò£ö–bÂ‚‡–G&FVEÂ’òÂvæÖVB&ö¦V7B6fW2v—Bf÷"Æ–'&'’‡–G&F–öâ&Vf÷&RVæf÷&6–ær&ö¦V7BÆ–Ö—G2uÒÀ¢²÷6WDff÷&—FW5Â…Â†7W'&VçEÂ’ÓâÇµµÇ5Å5Ò£öÖW&vVD'”–BòÂw7F'GWff÷&—FR‡–G&F–öâÖW&vW2V&Ç’W6W"7F–öç2uÒÀ¢²÷6WE&ö¦V7G5Â…Â†7W'&VçEÂ’ÓâÇµµÇ5Å5×³ÃsÖ6öç7BÖW&vVBÒÅµÂåÂåÂæÖW&vVD'”–EÂçfÇVW5Â…Â•ÅÕµÇ5Å5×³Ã#C×&WGW&âÖW&vVC²òÂw7F'GW&ö¦V7B‡–G&F–öâÖW&vW2V&Ç’W6W"7F–öç2uÒÀ¢²÷6WD–×÷'G5Â…Â†7W'&VçEÂ’ÓâÇµµÇ5Å5Ò£öÖW&vVD'”–BòÂw7F'GW–×÷'B‡–G&F–öâÖW&vW2V&Ç’W6W"7F–öç2uÒÀ¢²÷6WDW‡÷'D†—7F÷'•Â…Â†7W'&Vî9ïËh‘éì¶»§q«^uÕ¥É•5…Ñ ¡ÍÌ°€¼Á…¹•°µÍÑÕ‘¥¼¥¹ÁÕÐ±mqÍqMuìÀ°ÄàÁõÍÉ½±°µµ…É¥¸µÑ½Àé…±p¡Ù…Ép ´µÍ…™”µÑ½Áp¤p¬€ÄÈÙÁáp¤¼°€MÑÕ‘¥¼½¹ÑÉ½±Ì™½ÕÌ‰•±½ÜÑ¡”½µÁ…ÐÍÑ¥­äÑ½½°‘½¬œ¤ì()½¹ÍÐÑ½Õ¡¡•­Ì€ôl(€l½p¹ÍÑÕ‘¥½Q½½±	…È‰ÕÑÑ½¹qímyõt©µ¥¸µ¡•¥¡ÐèÐÑÁà½Ì°€MÑÕ‘¥¼Ñ½½°‰ÕÑÑ½¹Ìt°(€l½p¹ÁÉ•Ù¥•Ý5½‘•Q½±”‰ÕÑÑ½¹qímyõt©µ¥¸µ¡•¥¡ÐèÐÑÁà½Ì°€AÉ•Ù¥•Üµ½‘”‰ÕÑÑ½¹Ìt°(€l½p¹¡¥ÍÑ½Éå	ÕÑÑ½¹Ì‰ÕÑÑ½¸°¹‰•™½É•™Ñ•É	ÕÑÑ½¹qímyõt©µ¥¸µ¡•¥¡ÐèÐÑÁà½Ì°€!¥ÍÑ½Éä…¹½µÁ…É”‰ÕÑÑ½¹Ìt°(€l½p¹±…å•É‘‘I½Ü‰ÕÑÑ½¸°¹±…å•ÉÑ¥½¹É¥‰ÕÑÑ½¹qímyõt©µ¥¸µ¡•¥¡ÐèÐÑÁà½Ì°€1…å•È…Ñ¥½¸‰ÕÑÑ½¹Ìt°(€l½p¹Ñ•áÑ±¥¹I½Ü‰ÕÑÑ½¹qímyõt©µ¥¸µ¡•¥¡ÐèÐÑÁà½Ì°€Q•áÐ…±¥¹µ•¹Ð‰ÕÑÑ½¹Ìt°(€l½p¹‘½¹•M•±•Ñ¥½¹	ÕÑÑ½¹qímyõt©µ¥¸µ¡•¥¡ÐèÐÑÁà½Ì°€½¹”Í•±•Ñ¥½¸‰ÕÑÑ½¸t°(€l½p¹ÍÑÕ‘¥½9•Ý…É‘	ÕÑÑ½¹qímyõt©µ¥¸µ¡•¥¡ÐèÐÑÁà½Ì°€MÑÕ‘¥¼9•Ü…É‰ÕÑÑ½¸t°(€l½p¹Í±¥‘•ÉI½Ü¥¹ÁÕÑqímyõt©µ¥¸µ¡•¥¡ÐèÐÑÁà½Ì°€I…¹”Í±¥‘•ÈÑ½Õ ÍÕÉ™…”t)tì()™½È€¡½¹ÍÐmÁ…ÑÑ•É¸°±…‰•±t½˜Ñ½Õ¡¡•­Ì¤ì(€É•ÅÕ¥É•5…Ñ ¡ÍÌ°Á…ÑÑ•É¸°±…‰•°€¬€œ­••À„€ÐÑÁàµ¥¹¥µÕ´Ñ½Õ ¡•¥¡Ðœ¤ì)ô)É•ÅÕ¥É•5…Ñ  (€ÍÌ°(€€½p¹Á¡åÍ¥…±…Éé…™Ñ•Éqímyõt©‰…­É½Õ¹é±¥¹•…ÈµÉ…‘¥•¹Ñp ½Ì°(€€½¹”…ÉµÝ¥‘”Í¡••¸½Ù•É±…åÌÑ¡”…É…ÉÑÝ½É¬…¹¡¥ÀÑ½•Ñ¡•Èœ(¤ì)¥˜€ ½Á¡åÍ¥…±¡¥ÁI•™±•Ñ¥½¹ñ¡¥ÁM¡••¸¼¹Ñ•ÍÐ¡Á…”€¬ÍÌ¤¤ì(€Ñ¡É½Ü¹•ÜÉÉ½È ‘¥Ñ½È½¹ÑÉ…Ð™…¥±•èAÉ•Ù¥•ÜµÕÍÐ¹½ÐÉ•¹‘•È„Í•Á…É…Ñ”¡¥ÀÍ¡••¸œ¤ì)ô)É•ÅÕ¥É•5…Ñ  (€ÍÌ°(€€½p¹ÍÑÕ‘¥½AÉ•Ù¥•Üp¹…É‘É…µ•qímyõt¨´µ…ÉµÍ¡…Á”µÉ…‘¥ÕÌèÄáÁàímyõt©‰½É‘•ÈµÉ…‘¥ÕÌéÙ…Ép ´µ…ÉµÍ¡…Á”µÉ…‘¥ÕÍp¤½Ì°(€€MÑÕ‘¥¼…ÉÍ¡…Á”¡…Ì½¹”Í¡…É•½É¹•ÈµÉ…‘¥ÕÌÑ½­•¸œ(¤ì)É•ÅÕ¥É•5…Ñ  (€ÍÌ°(€€½p¹Á¡åÍ¥…±…É…¹Ù…Íqímyõt©‰½É‘•ÈµÉ…‘¥ÕÌé¥¹¡•É¥Ðímyõt©±¥ÀµÁ…Ñ é¥¹Í•Ñp ÀÉ½Õ¹Ù…Ép ´µ…ÉµÍ¡…Á”µÉ…‘¥ÕÍp¥p¤½Ì°(€€Á¡åÍ¥…°…¹Ù…Ì¥Ì¥¹‘•Á•¹‘•¹Ñ±ä±¥ÁÁ•Ñ¼Ñ¡”•á…ÐMÑÕ‘¥¼…ÉÍ¡…Á”œ(¤ì)É•ÅÕ¥É•5…Ñ  (€ÍÌ°(€€½p¹Á¡åÍ¥…±…Éé…™Ñ•Éqímyõt©¥¹Í•ÐèÀímyõt©‰½É‘•ÈµÉ…‘¥ÕÌé¥¹¡•É¥Ðímyõt©±¥ÀµÁ…Ñ é¥¹Í•Ñp ÀÉ½Õ¹Ù…Ép ´µ…ÉµÍ¡…Á”µÉ…‘¥ÕÍp¥p¤½Ì°(€€Á¡åÍ¥…°Í¡••¸…¹¹½Ð‰±••½ÕÑÍ¥‘”Ñ¡”•á…Ð…Éµ…Í¬œ(¤ì)¥˜€ ½p¹Á¡åÍ¥…±…Éé…™Ñ•ÉqímqÍqMuìÀ°ÄàÁõ¥¹Í•Ðè´ÄÔ”¼¹Ñ•ÍÐ¡ÍÌ¤¤ì(€Ñ¡É½Ü¹•ÜÉÉ½È ‘¥Ñ½È½¹ÑÉ…Ð™…¥±•èÁ¡åÍ¥…°Í¡••¸µÕÍÐ¹½Ð½Ù•ÉÍ…¸Á…ÍÐÑ¡”…Éµ…Í¬œ¤ì)ô)É•ÅÕ¥É•5…Ñ  (€ÍÌ°(€€½p¹±•…¹ÕÁM¡¥•±‘qímyõt©Á½Í¥Ñ¥½¸é™¥á•ímyõt©èµ¥¹‘•àèÈØÀímyõt©¥¹Í•ÐèÀì½Ì°(€€±•…¹ÕÀÍ¡¥•±½Ù•ÉÌ…¹‰±½­ÌÑ¡”•‘¥Ñ½È‘ÕÉ¥¹œ‘•ÍÑÉÕÑ¥Ù”µ…¥¹Ñ•¹…¹”œ(¤ì()É•ÅÕ¥É•5…Ñ ¡ÍÜ°€½qmIQ}!qtéqÌ¨ÐÀ¼°€™Õ±°…ÉÑÝ½É¬…¡”¥Ì‰½Õ¹‘•œ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÜ°€½qmQ!U5	}!qtéqÌ¨ÄØÀ¼°€Ñ¡Õµ‰¹…¥°…¡”¥Ì‰½Õ¹‘•Í•Á…É…Ñ•±äœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÜ°€½…Íå¹Œ™Õ¹Ñ¥½¸ÑÉ¥µ…¡•p ¼°€Í•ÉÙ¥”µÝ½É­•È…¡”•Ù¥Ñ¥½¸•á¥ÍÑÌœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÜ°€½½¹ÍÐM!10€ôqlp¼œ°€p½µ…¹¥™•ÍÑp¹Ý•‰µ…¹¥™•ÍÐqtì¼°€…ÁÀÉ½½Ð¥ÌÁÉ•…¡•™½È™¥ÉÍÐ½™™±¥¹”±…Õ¹ œ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÜ°€½…Íå¹Œ™Õ¹Ñ¥½¸ÁÉ•…¡•ÁÁM¡•±±p ¼°€Í•ÉÙ¥”Ý½É­•È¡…Ì…¸¥¹ÍÑ…±°µÑ¥µ”…ÁÀµÍ¡•±°ÁÉ•±½…‘•Èœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÜ°€½ÕÉ±p¹Á…Ñ¡¹…µ•p¹ÍÑ…ÉÑÍ]¥Ñ¡p p½}¹•áÑp½ÍÑ…Ñ¥p¼p¤¼°€¥¹ÍÑ…±°µÑ¥µ”…ÁÀµÍ¡•±°ÁÉ•±½…‘¥Í½Ù•ÉÌ¡…Í¡•9•áÐ¹©Ì¡Õ¹­Ìœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÜ°€½…Ý…¥ÐÍÑ…Ñ¥…¡•p¹ÁÕÑp¡É•ÅÕ•ÍÐ°É•ÍÁ½¹Í•p¤¼°€‘¥Í½Ù•É•9•áÐ¹©Ì¡Õ¹­Ì…É”ÍÑ½É•™½È™¥ÉÍÐ½™™±¥¹”±…Õ¹ œ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÜ°€½½¹ÍÐ=]9}!}AI%`€ô€…ÉµÍÑÕ‘¥¼´œì¼°€Í•ÉÙ¥”µÝ½É­•È±•…¹ÕÀ¥ÌÍ½Á•Ñ¼…ÉMÑÕ‘¥¼…¡•Ìœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÜ°€½­•åp¹ÍÑ…ÉÑÍ]¥Ñ¡p¡=]9}!}AI%ap¤¼°€Í•ÉÙ¥”µÝ½É­•È±•…Ù•ÌÕ¹É•±…Ñ•½É¥¥¸…¡•ÌÕ¹Ñ½Õ¡•œ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÜ°€½ÕÉ±p¹Á…Ñ¡¹…µ”€ôôô€p½µ…¹¥™•ÍÑp¹Ý•‰µ…¹¥™•ÍÐmqÍqMuìÀ°ÄÐÁõÍÑ…±•]¡¥±•I•Ù…±¥‘…Ñ•p¡•Ù•¹Ñp¹É•ÅÕ•ÍÐ°M!11}!p¤¼°€A]µ…¹¥™•ÍÐÉ•™É•Í¡•Ì½¹±¥¹”Ý¡¥±”É•µ…¥¹¥¹œ…Ù…¥±…‰±”™É½´Ñ¡”Í¡•±°…¡”½™™±¥¹”œ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÜ°€½¥˜p¡É•ÍÁ½¹Í•p¹ÍÑ…ÑÕÌ€øô€ÔÀÁp¤¼°€¹…Ù¥…Ñ¥½¸™…±±Ì‰…¬Ñ¼…¡•Í¡•±°½¸ÑÉ…¹Í¥•¹ÐÍ•ÉÙ•È™…¥±ÕÉ•Ìœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÜ°€½É•ÅÕ•ÍÑ•‘]¥‘Ñ €ø€À€˜˜É•ÅÕ•ÍÑ•‘]¥‘Ñ €ðô€àÀÀ¼°€Ñ¡Õµ‰¹…¥°…¡”É½ÕÑ¥¹œ¥ÌÝ¥‘Ñ µ‰½Õ¹‘•œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½ÁÉ½áå%µ…•]¥‘Ñ¡p¡¥Ñ•µp¹¥µ…”°€ÌÀÜÉp¤¼°€•‘¥Ñ½È…ÉÑÝ½É¬ÕÍ•Ì„‰½Õ¹‘•¡¥ µÉ•Í½±ÕÑ¥½¸Ý½É­¥¹œ½Áäœ¤ì()É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½½¹ÍÐ	}YIM%=8€ô€Ìì¼°€%¹‘•á•‘Í¡•µ„¥¹±Õ‘•Ì¥µÁ½ÉÐµ•Ñ…‘…Ñ„µ¥É…Ñ¥½¸…¹ÕÍÑ½´™½¹ÑÌœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€¼¥µÁ½ÉÑ5•Ñ„œ¼°€¥µÁ½ÉÐµ•Ñ…‘…Ñ„ÍÑ½É”•á¥ÍÑÌœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½•áÁ½ÉÐ…Íå¹Œ™Õ¹Ñ¥½¸‘‰•Ñ%µÁ½ÉÑ5•Ñ…‘…Ñ…p ¼°€µ•Ñ…‘…Ñ„µ½¹±ä¥µÁ½ÉÐ±¥ÍÑ¥¹œ•á¥ÍÑÌœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½…Íå¹Œ™Õ¹Ñ¥½¸Í•É¥…±¥é•%µÁ½ÉÑI•½É‘p ¼°€¥µÁ½ÉÑ•¥µ…”Á…å±½…‘Ì‘•Ñ… ™É½´±¥Ù”¥±”½‰©•ÑÌ‰•™½É”%¹‘•á•‘ÍÑ½É…”œ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½‰±½‰	åÑ•Ìè‰åÑ•Ì¼°€¥µÁ½ÉÑ•¥µ…”‰¥¹…ÉäÁ…å±½…‘ÌÁ•ÉÍ¥ÍÐ…ÌÉÉ…å	Õ™™•È‘…Ñ„œ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½É•ÑÕÉ¸ÍÑ½É”€ôôô€¥µÁ½ÉÑÌœpü¡å‘É…Ñ•%µÁ½ÉÑI•½É‘p¡Ù…±Õ•p¤€èÙ…±Õ”ì¼°€¥µÁ½ÉÐÉ•…‘ÌÉ•½¹ÍÑÉÕÐÕÍ…‰±”	±½ˆ½‰©•ÑÌ™É½´ÍÑ½É•‰¥¹…Éä‘…Ñ„œ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½•áÁ½ÉÐ…Íå¹Œ™Õ¹Ñ¥½¸‘‰AÕÑ%™	•±½Ý1¥µ¥Ñp ¼°€%¹‘•á•‘ÍÕÁÁ½ÉÑÌ…Ñ½µ¥Œ…Á…¥Ñäµ±¥µ¥Ñ•ÝÉ¥Ñ•Ìœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½‘‰p¹ÑÉ…¹Í…Ñ¥½¹p¡ÍÑ½É”°€É•…‘ÝÉ¥Ñ”p¤¼°€…Á…¥Ñä¡•­Ì…¹ÝÉ¥Ñ•ÌÍ¡…É”½¹”É•…‘ÝÉ¥Ñ”ÑÉ…¹Í…Ñ¥½¸œ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½½‰©•ÑMÑ½É•p¹½Õ¹Ñp¡p¤¼°€…Ñ½µ¥Œ…Á…¥ÑäÝÉ¥Ñ•Ì½Õ¹ÐÑ¡”‘ÕÉ…‰±”ÍÑ½É”‰•™½É”¥¹Í•ÉÑ¥¹œœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½…Íå¹Œ™Õ¹Ñ¥½¸Ý¥Ñ¡‰I•ÑÉåp ¼°€ÑÉ…¹Í¥•¹Ð%¹‘•á•‘½Á•É…Ñ¥½¹ÌÉ•ÑÉäÑ¡É½Õ „™É•Í ½¹¹•Ñ¥½¸œ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½‘‰p¹½¹±½Í”€ôp¡p¤€ôøqímqÍqMuìÀ°ÄÀÁõ‘‰AÉ½µ¥Í”€ô¹Õ±°ì¼°€Õ¹•áÁ•Ñ•%¹‘•á•‘±½ÍÕÉ”¥¹Ù…±¥‘…Ñ•ÌÑ¡”…¡•½¹¹•Ñ¥½¸œ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½½¹ÍÐÍ¹…ÁÍ¡½Ð€ô…Ý…¥ÐÝ¥Ñ¡‰I•ÑÉåp ¼°€¥µÁ½ÉÐµ•Ñ…‘…Ñ„¡å‘É…Ñ¥½¸ÕÍ•ÌÑ¡”ÑÉ…¹Í¥•¹Ð%¹‘•á•‘É•ÑÉäÁ…Ñ œ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½Á…ÉÍ•‘p¹Á…Ñ¡¹…µ”€„ôô€p½…Á¥p½¥µ…”œ¼°€½™™±¥¹”…ÉÑÝ½É¬…¡”½¹±ä…•ÁÑÌÑ¡”±½…°¥µ…”ÁÉ½áäœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½Á…ÉÍ•±±½Ý•‘I•µ½Ñ•%µ…•UÉ±p¡ÕÁÍÑÉ•…µp¤¼°€½™™±¥¹”…ÉÑÝ½É¬…¡”Ù…±¥‘…Ñ•ÌÑ¡”ÕÁÍÑÉ•…´¥µ…”¡½ÍÐœ¤ì)É•ÅÕ¥É•5…Ñ ¡¥µ…•A½±¥ä°€½•áÁ½ÉÐ½¹ÍÐ%5}AI=ae}YIM%=8€ô€lÄ´åulÀ´åt¨œì¼°€¥µ…”ÁÉ½áäUI1Ì¡…Ù”…¸•áÁ±¥¥Ð…¡”•¹•É…Ñ¥½¸œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½¹½Éµ…±¥é•‘p¹Í•Ñp Øœ°%5}AI=ae}YIM%=9p¤¼°€±¥•¹ÐÁÉ½áäUI1ÌÕÍ”Ñ¡”ÕÉÉ•¹Ð…¡”•¹•É…Ñ¥½¸œ¤ì)É•ÅÕ¥É•5…Ñ ¡¥¹ÍÁ•ÑI½ÕÑ”°€½%5}AI=ae}YIM%=8¼°€¥¹ÍÁ•Ñ•…ÉÑÝ½É¬UI1ÌÕÍ”Ñ¡”ÕÉÉ•¹Ð…¡”•¹•É…Ñ¥½¸œ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½…Ý…¥Ð…¡•p¹‘•±•Ñ•p¡ÕÉ±p¤ímqÍqMuìÀ°ÄÈÁõ…Ý…¥Ð…¡•p¹ÁÕÑp¡ÕÉ°°•á¥ÍÑ¥¹p¹±½¹•p¡p¥p¤¼°€•áÁ±¥¥Ð½™™±¥¹”Í…Ù•ÌÉ•™É•Í …¡”•Ù¥Ñ¥½¸ÁÉ¥½É¥Ñäœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½¥˜p …‘‰p¤Ñ¡É½Ü¹•ÜÉÉ½Ép %¹‘•á•‘Õ¹…Ù…¥±…‰±”p¤ì¼°€‘ÕÉ…‰±”%¹‘•á•‘ÝÉ¥Ñ•Ì™…¥°¥¹ÍÑ•…½˜É•Á½ÉÑ¥¹œ™…­”ÍÕ•ÍÌœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½¥˜p¡Í•ÑÑ±•‘p¤qímqÍqMuìÀ°àÁõ‘‰p¹±½Í•p¡p¤ì¼°€±…Ñ”%¹‘•á•‘ÕÁÉ…‘”ÍÕ•ÍÌ±½Í•Ì½ÉÁ¡…¹•½¹¹•Ñ¥½¹Ìœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½‘‰p¹½¹±½Í”€ôp¡p¤€ôøqímqÍqMuìÀ°àÁõ‘‰AÉ½µ¥Í”€ô¹Õ±°ì¼°€Õ¹•áÁ•Ñ•%¹‘•á•‘±½ÍÕÉ”É•Í•ÑÌÑ¡”…¡•½¹¹•Ñ¥½¸œ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½½¹ÍÐ!}IQ]=I-}Q%5=UQ}5L€ô€ÄÈÀÀÀì¼°€½™™±¥¹”…ÉÑÝ½É¬…¡¥¹œ¡…Ì„µ½‰¥±”µ¹•ÑÝ½É¬Ñ¥µ•½ÕÐœ¤ì)É•ÅÕ¥É•5…Ñ ¡ÍÑ½É…”°€½Í¥¹…°è½¹ÑÉ½±±•Ép¹Í¥¹…°¼°€½™™±¥¹”…ÉÑÝ½É¬…¡”™•Ñ¡•Ì…É”…‰½ÉÑ…‰±”œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½‘‰•Ñ%µÁ½ÉÑ5•Ñ…‘…Ñ…p¡p¤¼°€1¥‰É…Éä¡å‘É…Ñ•Ì¥µÁ½ÉÐµ•Ñ…‘…Ñ„¥¹ÍÑ•…½˜‰±½‰Ìœ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ5a}MY}%5A=IQ}	eQL€ô€Èp¨€ÄÀÈÐp¨€ÄÀÈÐì¼°€MY¥µÁ½ÉÑÌ¡…Ù”„ÍÑÉ¥ÐÍ½ÕÉ”µÍ¥é”•¥±¥¹œœ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ5a}%5}A%a1L€ô€ÔÉ|ÀÀÁ|ÀÀÀì¼°€Í½ÕÉ”¥µ…”Á¥á•±Ì…É”‰½Õ¹‘•™½È¥A¡½¹”‘•½‘”Í…™•Ñäœ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ5a}%5}%59M%=8€ô€ÄÁ|ÀÀÀì¼°€Í½ÕÉ”¥µ…”‘¥µ•¹Í¥½¹Ì…É”‰½Õ¹‘•™½È¥A¡½¹”‘•½‘”Í…™•Ñäœ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½…Íå¹Œ™Õ¹Ñ¥½¸ÁÉ½‰•1½…±%µ…•¥µ•¹Í¥½¹Íp ¼°€½µµ½¸¥µ…”‘¥µ•¹Í¥½¹Ì…É”ÁÉ½‰•‰•™½É”™Õ±°‘•½‘”œ¤ì)É•ÅÕ¥É•5…Ñ  (€Á…”°(€€½…Íå¹Œ™Õ¹Ñ¥½¸ÁÉ•Á…É•1½…±%µ…•	±½‰p¡mqÍqMt¨ýÁÉ½‰•1½…±%µ…•¥µ•¹Í¥½¹Íp¡‰±½‰p¥mqÍqMt¨ý…ÍÍ•ÉÑM…™•M½ÕÉ•¥µ•¹Í¥½¹Íp¡ÁÉ½‰•‘¥µ•¹Í¥½¹Íp¥mqÍqMt¨ý‘•½‘•1½…±%µ…•	±½‰p¡‰±½‰p¤¼°(€€‘¥µ•¹Í¥½¸ÁÉ•™±¥¡ÐÉÕ¹Ì‰•™½É”¥µ…”‘•½‘¥¹œœ(¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½…Íå¹Œ™Õ¹Ñ¥½¸Ù…±¥‘…Ñ•M…™•MÙ	±½‰p ¼°€MY¥µÁ½ÉÑÌ…É”¥¹ÍÁ•Ñ•‰•™½É”É…ÍÑ•É¥é…Ñ¥½¸œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½ÁáqñÁÑqñÁqñ¥¹qñµqñµµqñÄ¼°€MY…‰Í½±ÕÑ”Õ¹¥ÑÌ…É”¹½Éµ…±¥é•‰•™½É”‘¥µ•¹Í¥½¸Í…™•Ñä¡•­Ìœ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½¥˜p¡9Õµ‰•Ép¹¥Í9…9p¡Ý¥‘Ñ¡p¤qñqð9Õµ‰•Ép¹¥Í9…9p¡¡•¥¡Ñp¥p¤É•ÑÕÉ¸¹Õ±°ì¼°€Õ¹ÍÕÁÁ½ÉÑ•MY‘¥µ•¹Í¥½¹Ì™…¥°Ù•É¥™¥…Ñ¥½¸œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½¥˜p¡ÍÙM½ÕÉ”€˜˜€…ÁÉ½‰•‘¥µ•¹Í¥½¹Íp¤¼°€Õ¹Ù•É¥™¥…‰±”MY‘¥µ•¹Í¥½¹Ì™…¥°±½Í•‰•™½É”É…ÍÑ•È‘•½‘”œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€¼ñqqÍp©ÍÉ¥ÁÑqqˆ¼°€MY…Ñ¥Ù”ÍÉ¥ÁÐ½¹Ñ•¹Ð¥ÌÉ•©•Ñ•œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€¼ñqqÍp©™½É•¥¹=‰©•Ñqqˆ¼°€MY™½É•¥¹=‰©•Ð½¹Ñ•¹Ð¥ÌÉ•©•Ñ•œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½Õ¹ÍÕÁÁ½ÉÑ•…Ñ¥Ù”½ÈÉ•µ½Ñ”½¹Ñ•¹Ð¼°€MYÉ•µ½Ñ”½È…Ñ¥Ù”½¹Ñ•¹Ð™…¥±Ì±½Í•œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ5a}MQ=I}%5}A%a1L€ô€ÄÉ|ÀÀÁ|ÀÀÀì¼°€±½…°¥µ…”Ý½É­¥¹œµÍ•ÐÁ¥á•±Ì…É”‰½Õ¹‘•œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ5a}MQ=I}%5}%59M%=8€ô€ÐÀäØì¼°€±½…°¥µ…”Ý½É­¥¹œµÍ•Ð‘¥µ•¹Í¥½¹Ì…É”‰½Õ¹‘•œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ5a}U9AI=	}%5}	eQL€ô€àp¨€ÄÀÈÐp¨€ÄÀÈÐì¼°€±…É”¥µ…•ÌÉ•ÅÕ¥É”ÁÉ”µ‘•½‘”‘¥µ•¹Í¥½¸Ù•É¥™¥…Ñ¥½¸œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½%µ…”‘¥µ•¹Í¥½¹Ì½Õ±¹½Ð‰”Ù•É¥™¥•Í…™•±ä¼°€±…É”Õ¹Ù•É¥™¥•¥µ…•Ì™…¥°±½Í•‰•™½É”‘•½‘”œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ5a}MQ=I}1eI}%5}A%a1L€ô€Ñ|ÀÀÁ|ÀÀÀì¼°€ÕÍÑ½´¥µ…”µ±…å•ÈÝ½É­¥¹œµÍ•ÐÁ¥á•±Ì…É”‰½Õ¹‘•Í•Á…É…Ñ•±äœ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ5a}MQ=I}1eI}%5}%59M%=8€ô€ÈÔØÀì¼°€ÕÍÑ½´¥µ…”µ±…å•È‘¥µ•¹Í¥½¹Ì…É”‰½Õ¹‘•Í•Á…É…Ñ•±äœ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ5a}Y%M%	1}%5}=}A%a1L€ô€ÈÑ|ÀÀÁ|ÀÀÀì¼°€Ù¥Í¥‰±”¥µ…”µ±…å•È‘•½‘•Á¥á•±Ì¡…Ù”„Ñ½Ñ…°¥A¡½¹”µ•µ½Éä‰Õ‘•Ðœ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½‘•½‘•‘A¥á•±Ìp¬Á¥á•±Ì€ø5a}Y%M%	1}%5}=}A%a1L¼°€¥µ…”µ±…å•È¡å‘É…Ñ¥½¸•¹™½É•ÌÑ¡”‘•½‘•µÁ¥á•°‰Õ‘•Ðœ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½Y¥Í¥‰±”¥µ…”±…å•ÉÌ•á••Ñ¡”Í…™”¥A¡½¹”µ•µ½Éä‰Õ‘•Ð¼°€¥µ…”µ±…å•Èµ•µ½ÉäÁÉ•ÍÍÕÉ”™…¥±ÌÝ¥Ñ „É•½Ù•É…‰±”•‘¥Ñ½Èµ•ÍÍ…”œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ5a}AIMQ}MMQL€ô5a}UMQ=5}1eILp¨€Èp¬€Èì¼°€ÁÉ•Í•Ð…ÍÍ•Ð…À¥¹±Õ‘•Ì•… ±…å•È°¥ÑÌ$µ…ÑÑ”°…¹Ñ¡”…É…ÉÑÝ½É¬œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½É•™Íp¹Í¥é”€ø5a}AIMQ}MMQL¼°€ÁÉ•Í•Ð•áÁ½ÉÐÕ…É‘Ì…ÍÍ•Ðµ½Õ¹ÐÉ½Õ¹µÑÉ¥À½µÁ…Ñ¥‰¥±¥Ñäœ¤ì)É•ÅÕ¥É•5…Ñ  (€Á…”°(€€½™½Èp¡½¹ÍÐqm…ÍÍ•Ñ%°…ÍÍ•Ñqt½˜ÁÉ•Í•ÑÍÍ•ÑÍp¥mqÍqMt¨ýÉ•™•É•¹•‘AÉ•Í•ÑÍÍ•Ñ%‘Íp¹¡…Íp¡…ÍÍ•Ñ%‘p¥mqÍqMt¨ý…ÍÍ•Ñp¹‘…Ñ„€ô€œmqÍqMt¨ýÁÉ•Í•ÑÍÍ•Ñ5…Áp¹‘•±•Ñ•p¡…ÍÍ•Ñ%‘p¤¼°(€€ÁÉ•Í•Ð¥µÁ½ÉÐÉ•±•…Í•ÌÕ¹É•™•É•¹••µ‰•‘‘•Á…å±½…‘Ìœ(¤ì)É•ÅÕ¥É•5…Ñ  (€Á…”°(€€½½¹ÍÐ‰±½ˆ€ô‘…Ñ…UÉ±Q½	±½‰p¡…ÍÍ•Ñp¹‘…Ñ…p¤ímqÍqMt¨ý…ÍÍ•Ñp¹‘…Ñ„€ô€œmqÍqMt¨ýÁÉ•Á…É•1½…±%µ…•	±½‰p ¼°(€€ÁÉ•Í•Ð¥µÁ½ÉÐÉ•±•…Í•Ì‰…Í”ØÐÍÑÉ¥¹Ì…™Ñ•È	±½ˆ½¹Ù•ÉÍ¥½¸œ(¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ%Q=I}AIY%]}\€ô€ÄÀÈÐì¼°€¥¹Ñ•É…Ñ¥Ù”•‘¥Ñ½È…¹Ù…ÌÕÍ•Ì„É•‘Õ•‰…­¥¹œÝ¥‘Ñ œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ%Q=I}AIY%]} €ô€ØÐØì¼°€¥¹Ñ•É…Ñ¥Ù”•‘¥Ñ½È…¹Ù…ÌÁÉ•Í•ÉÙ•ÌÑ¡”•á…Ð…ÉÉ…Ñ¥¼œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½Ý¥‘Ñ õqí%Q=I}AIY%]}]qô¼°€¥¹Ñ•É…Ñ¥Ù”…¹Ù…ÌÕÍ•ÌÑ¡”É•‘Õ•‰…­¥¹œÝ¥‘Ñ œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½¡•¥¡Ðõqí%Q=I}AIY%]}!qô¼°€¥¹Ñ•É…Ñ¥Ù”…¹Ù…ÌÕÍ•ÌÑ¡”É•‘Õ•‰…­¥¹œ¡•¥¡Ðœ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ5a}AIMQ}MMQL€ô5a}UMQ=5}1eILp¨€Èp¬€Èì¼°€ÁÉ•Í•Ð…ÍÍ•Ð…Á…¥Ñä½Ù•ÉÌ•… ¥µ…”µ…ÑÑ”…¹¥ÑÌÍ½ÕÉ”…ÉÐœ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ5a}AIMQ}%5A=IQ}	eQL€ô€Ðàp¨€ÄÀÈÐp¨€ÄÀÈÐì¼°€ÁÉ•Í•ÐÑÉ…¹Í™•ÈÍ¥é”¥Ì‰½Õ¹‘•™½È¥A¡½¹”µ•µ½ÉäÍ…™•Ñäœ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½…Íå¹Œ™Õ¹Ñ¥½¸ÁÉ•Á…É•1½…±%µ…•	±½‰p ¼°€½Ù•ÉÍ¥é•±½…°¥µ…•Ì…É”‘½Ý¹Í…µÁ±•‰•™½É”Á•ÉÍ¥ÍÑ•¹”œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½Ý•‰Áqñ…Ù¥™qñ¡•¥qñ¡•¥˜¼°€]•‰@°Y%°!%°…¹!%¥µÁ½ÉÑÌ…É”É…ÍÑ•Èµ¹½Éµ…±¥é•™½È‘•Ñ•Éµ¥¹¥ÍÑ¥Œ•áÁ½ÉÐœ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½µ…áA¥á•±Ìè5a}MQ=I}1eI}%5}A%a1L¼°€ÕÍÑ½´¥µ…”µ±…å•È¥µÁ½ÉÑÌÕÍ”Ñ¡”Íµ…±±•ÈÝ½É­¥¹œÍ•Ðœ¤ì)É•ÅÕ¥É•5…Ñ  (€Á…”°(€€½™Õ¹Ñ¥½¸¹½Éµ…±¥é•A•ÉÍ¥ÍÑ•‘ÉÑÝ½É­M½ÕÉ•p¡mqÍqMt¨ýÁÉ½áå%µ…•]¥‘Ñ¡p¡mqÍqMt¨ýÝ¥‘Ñ¡p¤¼°(€€É•ÍÑ½É•ÁÉ½á¥•…ÉÑÝ½É¬¥Ì¹½Éµ…±¥é•‰…¬Ñ¼Ý½É­¥¹œÉ•Í½±ÕÑ¥½¸œ(¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½Á…ÉÍ•‘p¹‰…­É½Õ¹€ô¹½Éµ…±¥é•A•ÉÍ¥ÍÑ•‘ÉÑÝ½É­M½ÕÉ•p¡Á…ÉÍ•‘p¹‰…­É½Õ¹°€ÌÀÜÉp¤¼°€±•…ä‘É…™Ð…ÉÑÝ½É¬¥ÌÕÁÉ…‘•¥¹ÍÑ•…½˜±•…É•œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½¥µÁ½ÉÑ•‘p¹‰…­É½Õ¹€ô¹½Éµ…±¥é•A•ÉÍ¥ÍÑ•‘ÉÑÝ½É­M½ÕÉ•p¡¥µÁ½ÉÑ•‘p¹‰…­É½Õ¹°€ÌÀÜÉp¤¼°€±•…äÁÉ•Í•Ð‰…­É½Õ¹…ÉÑÝ½É¬¥ÌÕÁÉ…‘•¥¹ÍÑ•…½˜±•…É•œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½¹½Éµ…±¥é•A•ÉÍ¥ÍÑ•‘ÉÑÝ½É­M½ÕÉ•p¡ÍÉŒ°5a}MQ=I}1eI}%5}%59M%=9p¤¼°€±•…äÁÉ•Í•Ð¥µ…”±…å•ÉÌ…É”ÕÁÉ…‘•¥¹ÍÑ•…½˜±•…É•œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ‘•½‘•‘	åM½ÕÉ”€ô¹•Ü5…Áp¡p¤ì¼°€‘ÕÁ±¥…Ñ”¥µ…”±…å•ÉÌÍ¡…É”‘•½‘•Í½ÕÉ•Ìœ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ…¹¥µ…Ñ•‘=ÉY•Ñ½ÉM½ÕÉ”€ô¼°€…¹¥µ…Ñ•…¹Ù•Ñ½È¥µÁ½ÉÑÌ…É”¹½Éµ…±¥é•œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½¡Õ¹­QåÁ”€ôôô€…Q0œ¼°€A9…¹¥µ…Ñ¥½¸¥Ì‘•Ñ•Ñ•™É½´Ñ¡”A9…¹¥µ…Ñ¥½¸µ½¹ÑÉ½°¡Õ¹¬œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½	½½±•…¹p¡ÁÉ½‰•‘¥µ•¹Í¥½¹Ípýp¹…¹¥µ…Ñ•‘p¤¼°€½É‘¥¹…Éä¥µ…•p½Á¹œA9™¥±•Ì…É”É…ÍÑ•Èµ¹½Éµ…±¥é•‘•Ñ•Éµ¥¹¥ÍÑ¥…±±äœ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½¥™qñ…Á¹qñÍÙqqp­áµ°¼°€A9°%°…¹MY¥µÁ½ÉÑÌÕÍ”‘•Ñ•Éµ¥¹¥ÍÑ¥ŒÉ…ÍÑ•É¥é…Ñ¥½¸œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½¹ÍÐ•¹½‘•…¹Ù…Ì€ôp¡ÑåÁ”°ÅÕ…±¥Ñåp¤¼°€¥µ…”½ÁÑ¥µ¥é…Ñ¥½¸¡…Ì…¸•¹½‘•È™…±±‰…¬Á…Ñ œ¤ì)É•ÅÕ¥É•5…Ñ ¡Á…”°€½½ÁÑ¥µ¥é•‘	±½‰p¹Í¥é”€ø5a}%5}%5A=IQ}	eQL¼°€½ÁÑ¥µ¥é•¥µ…”‰±½‰Ì…¹¹½Ð•á••Ñ¡”¥µÁ½ÉÐÍÑ½É…”•¥±¥¹œœ¤ì)¥˜€ ½‘‰•Ñ±±p ¥µÁ½ÉÑÌp¤¼¹Ñ•ÍÐ¡Á…”¤¤ì(€Ñ¡É½Ü¹•ÜÉÉ½È ‘¥Ñ½È½¹ÑÉ…Ð™…¥±•è1¥‰É…ÉäµÕÍÐ¹½Ð¡å‘É…Ñ”™Õ±°¥µÁ½ÉÐ‰±½‰Ì¥¹Ñ¼I•…ÐÍÑ…Ñ”œ¤ì)ô()½¹Í½±”¹±½œ AML•‘¥Ñ½ÈÉ•É•ÍÍ¥½¸½¹ÑÉ…Ðœ¤ì(()É•ÅÕ¥É•5…Ñ ¡¥µ…•I½ÕÑ”°€½5…Ñ¡p¹µ¥¹p ÌÀÜÈ°5…Ñ¡p¹™±½½Ép¡É•ÅÕ•ÍÑ•‘]¥‘Ñ¡p¥p¤¼°€¥µ…”ÁÉ½áä‰½Õ¹‘ÌÝ½É­¥¹œ…ÉÑÝ½É¬Ý¥‘Ñ œ¤ì()½¹ÍÐÁÉ½áåM•ÕÉ¥Ñå¡•­Ì€ôl(€m¥µ…•I½ÕÑ”°€½Á…ÉÍ•±±½Ý•‘I•µ½Ñ•%µ…•UÉ°¼°€¥µ…”ÁÉ½áäÍ¡…É•ÌÑ¡”…¹½¹¥…°É•µ½Ñ”µ¡½ÍÐÁ½±¥ät°(€m¥µ…•I½ÕÑ”°€½É•‘¥É•ÐéqÌ¨µ…¹Õ…°œ¼°€¥µ…”ÁÉ½áäÙ…±¥‘…Ñ•ÌÉ•‘¥É•ÑÌ‰•™½É”™½±±½Ý¥¹œÑ¡•´t°(€m¥µ…•I½ÕÑ”°€½M}%5}QeAL¼°€¥µ…”ÁÉ½áäÉ•©•ÑÌÕ¹Í…™”¥µ…”™½Éµ…ÑÌt°(€m¥µ…•I½ÕÑ”°€½É•…‘1¥µ¥Ñ•‘	½‘åp ¼°€¥µ…”ÁÉ½áäÍÑÉ•…´µ±¥µ¥ÑÌÉ•ÍÁ½¹Í”‰½‘¥•Ìt°(€m¥µ…•I½ÕÑ”°€½½¹ÍÐ5a}AI=ae}=UQAUQ}	eQL€ô€ÄÔp¨€ÄÀÈÐp¨€ÄÀÈÐì¼°€¥µ…”ÁÉ½áä‰½Õ¹‘Ì¹½Éµ…±¥é•½ÕÑÁÕÐÍ¥é”t°(€m¥µ…•I½ÕÑ”°€½AÉ½•ÍÍ•¥µ…”Ñ½¼±…É”¼°€½Ù•ÉÍ¥é•¹½Éµ…±¥é•ÁÉ½áä½ÕÑÁÕÐ™…¥±Ì±½Í•t°(€m¥µ…•I½ÕÑ”°€½¥µÁ½ÉÐÍ¡…ÉÀ™É½´€Í¡…ÉÀœ¼°€¥µ…”ÁÉ½áä…¸É•Í¥é”¹½¸µ8…ÉÑÝ½É¬Í•ÉÙ•ÈµÍ¥‘”t°(€m¥µ…•I½ÕÑ”°€½±¥µ¥Ñ%¹ÁÕÑA¥á•±Ìè5a}=}%5}A%a1L¼°€ÁÉ½áä‘•½‘¥¹œ¡…Ì„Á¥á•°Í…™•Ñä‰½Õ¹t°(€m¥µ…•I½ÕÑ”°€½½¹ÍÐÍ¡½Õ±‘9½Éµ…±¥é”€ôÝ¥‘Ñ €øô€ÄØÀqñqð	½½±•…¹p¡É½ÁI•Ñp¤ì¼°€•Ù•ÉäÉ•ÅÕ•ÍÑ•ÁÉ½áäÝ¥‘Ñ ¥Ì•¹™½É•Í•ÉÙ•ÈµÍ¥‘”t°(€m¥µ…•I½ÕÑ”°€½p¹É•Í¥é•p¡qímqÍqMt©Ý¥‘Ñ ±mqÍqMt©Ý¥Ñ¡½ÕÑ¹±…É•µ•¹ÐèÑÉÕ”½Ì°€ÁÉ½áäÝ¥‘Ñ É•ÅÕ•ÍÑÌ…É”•¹™½É•Í•ÉÙ•ÈµÍ¥‘”t°(€m¥µ…•I½ÕÑ”°€½É•ÍÁ½¹Í•QåÁ”€ô€¥µ…•p½Ý•‰Àœ¼°€¹½Éµ…±¥é•ÁÉ½áä¥µ…•ÌÉ•ÑÕÉ¸„‘•Ñ•Éµ¥¹¥ÍÑ¥ŒÝ•ˆ™½Éµ…Ðt°(€m¥¹ÍÁ•ÑI½ÕÑ”°€½É•‘¥É•ÐéqÌ¨µ…¹Õ…°œ¼°€…ÉÑÝ½É¬¥¹ÍÁ•Ñ½ÈÙ…±¥‘…Ñ•ÌÉ•‘¥É•ÑÌ‰•™½É”™½±±½Ý¥¹œÑ¡•´t°(€m¥¹ÍÁ•ÑI½ÕÑ”°€½M}%5}QeAL¼°€…ÉÑÝ½É¬¥¹ÍÁ•Ñ½ÈÉ•©•ÑÌÕ¹Í…™”¥µ…”™½Éµ…ÑÌt°(€m¥¹ÍÁ•ÑI½ÕÑ”°€½½¹ÍÐ5a}91eM%M}A%a1L€ô€ÐÁ|ÀÀÁ|ÀÀÀì¼°€…ÉÑÝ½É¬¥¹ÍÁ•Ñ½È‰½Õ¹‘Ì‘•½‘•Á¥á•±Ìt°(€m¥¹ÍÁ•ÑI½ÕÑ”°€½±¥µ¥Ñ%¹ÁÕÑA¥á•±Ìè5a}91eM%M}A%a1L¼°€…ÉÑÝ½É¬¥¹ÍÁ•Ñ½È•¹™½É•ÌÑ¡”‘•½‘•µÁ¥á•°‰½Õ¹t°(€m¥¹ÍÁ•ÑI½ÕÑ”°€½p¹É½Ñ…Ñ•p¡p¤¼°€…ÉÑÝ½É¬¥¹ÍÁ•Ñ½È¡½¹½ÉÌa%½É¥•¹Ñ…Ñ¥½¸‰•™½É”Á¥á•°…¹…±åÍ¥Ìt°(€m¥¹ÍÁ•ÑI½ÕÑ”°€½É•…‘1¥µ¥Ñ•‘	½‘åp ¼°€…ÉÑÝ½É¬¥¹ÍÁ•Ñ½ÈÍÑÉ•…´µ±¥µ¥ÑÌÉ•ÍÁ½¹Í”‰½‘¥•Ìt)tì()™½È€¡½¹ÍÐmÍ½ÕÉ”°Á…ÑÑ•É¸°±…‰•±t½˜ÁÉ½áåM•ÕÉ¥Ñå¡•­Ì¤ì(€É•ÅÕ¥É•5…Ñ ¡Í½ÕÉ”°Á…ÑÑ•É¸°±…‰•°¤ì)ô(
