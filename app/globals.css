@@ -2552,3 +2552,11 @@ body:has(.studio.isStudioEditor){
 @media(prefers-reduced-motion:reduce){
   .isStudioEditor .studioContextCard{animation:none}
 }
+
+/* Studio panel dismissal and primary text-layer actions */
+.isStudioEditor.studioPanelClosed .studioContextCard{display:none!important}
+.isStudioEditor .contextPanelHeader .studioPanelDone{width:44px;min-width:44px;height:44px;min-height:44px;justify-self:end;display:grid;place-items:center;border:0;border-radius:12px;background:transparent;color:#56adff;font-size:21px;line-height:1}
+.isStudioEditor .textLayerQuickActions{padding:2px 14px 10px}
+.isStudioEditor .textLayerQuickActions button{width:100%;min-height:44px;border:1px solid rgba(255,59,48,.35);border-radius:11px;background:rgba(255,59,48,.09);color:#ff6961;font-size:14px;font-weight:650}
+.isStudioEditor .textLayerQuickActions button:disabled{opacity:.45}
+.isStudioEditor .layerSingleAction{grid-template-columns:1fr}
