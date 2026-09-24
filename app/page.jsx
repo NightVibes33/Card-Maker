@@ -1183,6 +1183,9 @@ function IOSIcon({ name, size = 24 }) {
   if (name === 'compare') {
     return <svg {...common}><path d="M4 6h16M4 18h16"/><path d="M9 4v16M15 4v16"/></svg>;
   }
+  if (name === 'guides') {
+    return <svg {...common}><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M12 3v18M3 12h18"/></svg>;
+  }
   if (name === 'crop') {
     return <svg {...common}><path d="M7 3v14a2 2 0 0 0 2 2h12"/><path d="M3 7h14a2 2 0 0 1 2 2v12"/></svg>;
   }
@@ -6843,6 +6846,18 @@ export default function Page() {
             }}
           >
             Done
+          </button>
+        ) : null}
+        {tab === 'studio' ? (
+          <button
+            type="button"
+            className={'beforeAfterButton studioGuidesButton' + (guidesEnabled ? ' isActive' : '')}
+            aria-label={guidesEnabled ? 'Hide alignment guides' : 'Show alignment guides'}
+            aria-pressed={guidesEnabled}
+            title={guidesEnabled ? 'Hide alignment guides' : 'Show alignment guides'}
+            onClick={() => setGuidesEnabled((value) => !value)}
+          >
+            <IOSIcon name="guides" size={18}/>
           </button>
         ) : null}
         {tab === 'studio' ? (

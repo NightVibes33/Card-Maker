@@ -2043,7 +2043,7 @@ button:disabled{opacity:.38}
   min-height:48px;
   margin:0 0 28px;
   display:grid;
-  grid-template-columns:44px 1fr auto auto;
+  grid-template-columns:44px minmax(0,1fr) auto 40px 40px 40px;
   align-items:center;
   gap:4px;
 }
@@ -2065,6 +2065,24 @@ button:disabled{opacity:.38}
 .isStudioEditor .studioPreview .beforeAfterButton svg{display:none}
 .isStudioEditor .studioPreview .beforeAfterButton span{font-size:0;overflow:visible}
 .isStudioEditor .studioPreview .beforeAfterButton span:after{content:"•••";font-size:18px;letter-spacing:2px}
+.isStudioEditor .studioPreview .studioGuidesButton,
+.isStudioEditor .studioPreview .studioLayersButton{
+  width:40px;min-width:40px;height:44px;min-height:44px;padding:0;
+  display:grid;place-items:center;border-radius:12px;background:transparent!important;
+  box-shadow:none!important;color:#f5f5f7;
+}
+.isStudioEditor .studioPreview .studioGuidesButton{grid-column:4}
+.isStudioEditor .studioPreview .studioLayersButton{grid-column:5}
+.isStudioEditor .studioPreview .studioOverflowWrap{grid-column:6}
+.isStudioEditor .studioPreview .studioGuidesButton svg,
+.isStudioEditor .studioPreview .studioLayersButton svg{display:block}
+.isStudioEditor .studioPreview .studioGuidesButton.isActive{
+  color:#56adff;background:rgba(22,140,255,.18)!important;
+  box-shadow:inset 0 0 0 1px rgba(57,157,255,.48)!important;
+}
+.isStudioEditor .studioPreview .studioGuidesButton:focus-visible{
+  outline:2px solid #56adff;outline-offset:1px;
+}
 .isStudioEditor .cardFrame{
   width:min(100%,430px);
   margin:0 auto;
