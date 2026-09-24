@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import {
   blobToDataUrl,
   cacheArtwork,
@@ -15,6 +16,12 @@ import {
 } from './lib/storage';
 import { IMAGE_PROXY_VERSION, parseAllowedRemoteImageUrl } from './lib/imagePolicy';
 import { adjustedImage } from './lib/pixelAdjust';
+import { createAICutoutMask } from './lib/aiCutout.mjs';
+
+const ThreeCardPreview = dynamic(() => import('./components/ThreeCardPreview'), {
+  ssr: false,
+  loading: () => null
+});
 
 const OUT_W = 1536;
 const OUT_H = 969;
@@ -39,7 +46,10 @@ const MAX_CUSTOM_LAYERS = 200;
 const MAX_SAVED_PROJECTS = 200;
 const MAX_VISIBLE_IMAGE_LAYERS = 12;
 const MAX_VISIBLE_IMAGE_DECODE_PIXELS = 24_000_000;
-const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS + 1;
+const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS * 2 + 2;
+const MAX_MASK_STROKES = 80;
+const MAX_MASK_POINTS_PER_STROKE = 240;
+const MAX_IMPORTED_FONT_BYTES = 12 * 1024 * 1024;
 const MAX_IMAGE_PIXELS = 52_000_000;
 const MAX_IMAGE_DIMENSION = 10_000;
 const MAX_STORED_IMAGE_PIXELS = 12_000_000;
@@ -62,7 +72,9 @@ const CONTINUOUS_LAYER_HISTORY_KEYS = new Set([
   'fontSize',
   'weight',
   'letterSpacing',
-  'lineHeight'
+  'lineHeight',
+  'outlineWidth',
+  'curve'
 ]);
 
 const CUCU_CATEGORIES = [
@@ -152,6 +164,8 @@ const DEFAULTS = {
   fade: 0,
   effectTint: '#7b61ff',
   effectTintStrength: 0,
+  backgroundMaskStrokes: [],
+  backgroundMaskSource: '',
   chip: true,
   chipTone: 'gold',
   chipX: 0.105,
@@ -549,6 +563,46 @@ function normalizeImageAdjustments(value) {
   };
 }
 
+function normalizeMaskStrokes(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(-MAX_MASK_STROKES).map((rawStroke) => {
+    if (!rawStroke || typeof rawStroke !== 'object') return null;
+    const points = (Array.isArray(rawStroke.points) ? rawStroke.points : [])
+      .slice(-MAX_MASK_POINTS_PER_STROKE)
+      .map((point) => ({
+        x: finiteClamp(point?.x, -1, 0, 1),
+        y: finiteClamp(point?.y, -1, 0, 1)
+      }));
+    if (!points.length) return null;
+    return {
+      mode: rawStroke.mode === 'restore' ? 'restore' : 'erase',
+      radius: finiteClamp(rawStroke.radius, 0.012, 0.001, 0.18),
+      softness: finiteClamp(rawStroke.softness, 0, 0, 0.12),
+      points
+    };
+  }).filter(Boolean);
+}
+
+function importedFontFamilyName(id) {
+  const safeId = /^[a-zA-Z0-9_-]{1,96}$/.test(String(id || '')) ? String(id) : '';
+  return safeId ? 'AirCardFont_' + safeId : '';
+}
+
+async function registerImportedFont(record) {
+  if (typeof document === 'undefined' || typeof FontFace === 'undefined') return null;
+  const family = importedFontFamilyName(record?.id);
+  if (!family || !(record?.blob instanceof Blob)) return null;
+  const font = new FontFace(family, await record.blob.arrayBuffer());
+  await font.load();
+  document.fonts.add(font);
+  return {
+    id: String(record.id),
+    name: safeDisplayText(record.name, 'Imported font', 100),
+    family,
+    createdAt: finiteNumber(record.createdAt, Date.now())
+  };
+}
+
 function normalizeCustomLayer(layer) {
   if (!layer || typeof layer !== 'object' || !layer.id) return null;
   const id = splitGraphemes(layer.id).slice(0, 120).join('');
@@ -579,11 +633,17 @@ function normalizeCustomLayer(layer) {
     normalized.fontFamily = ['system', 'rounded', 'serif', 'mono'].includes(layer.fontFamily)
       ? layer.fontFamily
       : 'system';
+    normalized.fontId = /^[a-zA-Z0-9_-]{1,96}$/.test(String(layer.fontId || ''))
+      ? String(layer.fontId)
+      : '';
     normalized.weight = Math.round(finiteClamp(layer.weight, 700, 100, 900) / 100) * 100;
     normalized.letterSpacing = finiteClamp(layer.letterSpacing, 0, -4, 30);
-    normalized.lineHeight = finiteClamp(layer.lineHeight, 1.18, 0.8, 2);
+    normalized.lineHeight = finiteClamp(layer.lineHeight, 1.18, 0.65, 2.4);
     normalized.align = ['left', 'center', 'right'].includes(layer.align) ? layer.align : 'center';
     normalized.shadow = Boolean(layer.shadow);
+    normalized.outlineColor = normalizeHexColor(layer.outlineColor, '#000000');
+    normalized.outlineWidth = finiteClamp(layer.outlineWidth, 0, 0, 24);
+    normalized.curve = finiteClamp(layer.curve, 0, -240, 240);
   } else if (type === 'shape') {
     normalized.shape = layer.shape === 'ellipse' ? 'ellipse' : 'rectangle';
     normalized.width = finiteClamp(layer.width, 280, 20, 1200);
@@ -600,6 +660,10 @@ function normalizeCustomLayer(layer) {
     normalized.crop = normalizeCrop(layer.crop, 0.1);
     normalized.originalCrop = normalizeCrop(layer.originalCrop, 0.1);
     normalized.adjustments = normalizeImageAdjustments(layer.adjustments);
+    normalized.maskStrokes = normalizeMaskStrokes(layer.maskStrokes);
+    normalized.maskSource = normalized.src
+      ? normalizeImportArtworkSource(layer.maskSource)
+      : '';
   } else if (type === 'chip') {
     normalized.tone = ['gold', 'silver', 'black', 'rose'].includes(layer.tone) ? layer.tone : 'gold';
   } else if (type === 'contactless') {
@@ -642,6 +706,10 @@ function normalizeDesignState(value) {
   next.fade = finiteClamp(raw.fade, DEFAULTS.fade, 0, 1);
   next.effectTint = normalizeHexColor(raw.effectTint, DEFAULTS.effectTint);
   next.effectTintStrength = finiteClamp(raw.effectTintStrength, DEFAULTS.effectTintStrength, 0, 1);
+  next.backgroundMaskStrokes = normalizeMaskStrokes(raw.backgroundMaskStrokes);
+  next.backgroundMaskSource = next.background
+    ? normalizeImportArtworkSource(raw.backgroundMaskSource)
+    : '';
 
   next.chip = raw.chip == null ? DEFAULTS.chip : Boolean(raw.chip);
   next.chipTone = ['gold', 'silver', 'black', 'rose'].includes(raw.chipTone) ? raw.chipTone : DEFAULTS.chipTone;
@@ -779,6 +847,8 @@ function hexToRgb(hex = '#000000') {
 
 let textMeasureCanvas = null;
 let grainTileCanvas = null;
+let maskedLayerCanvas = null;
+let maskStencilCanvas = null;
 let graphemeSegmenter = null;
 
 function fillGrain(ctx, x, y, width, height, opacity) {
@@ -818,6 +888,142 @@ function fillGrain(ctx, x, y, width, height, opacity) {
   ctx.restore();
 }
 
+function reusableCanvas(current, width, height) {
+  const canvas = current || document.createElement('canvas');
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
+  return canvas;
+}
+
+function drawMaskedImageLayer(ctx, adjustedSource, source, crop, settings, layer, aiMaskImage, w, h, scale, renderPixelScale) {
+  if (typeof document === 'undefined' || !adjustedSource || !source) return;
+  const targetScale = Math.max(0.05, Math.min(3, scale * renderPixelScale, 2048 / Math.max(1, w), 2048 / Math.max(1, h)));
+  const targetWidth = Math.max(1, Math.min(2048, Math.ceil(w * targetScale)));
+  const targetHeight = Math.max(1, Math.min(2048, Math.ceil(h * targetScale)));
+  maskedLayerCanvas = reusableCanvas(maskedLayerCanvas, targetWidth, targetHeight);
+  maskStencilCanvas = reusableCanvas(maskStencilCanvas, targetWidth, targetHeight);
+  const imageCtx = maskedLayerCanvas.getContext('2d');
+  const stencilCtx = maskStencilCanvas.getContext('2d');
+  if (!imageCtx || !stencilCtx) return;
+
+  imageCtx.clearRect(0, 0, targetWidth, targetHeight);
+  imageCtx.imageSmoothingEnabled = true;
+  imageCtx.imageSmoothingQuality = 'high';
+  imageCtx.globalCompositeOperation = 'source-over';
+  imageCtx.globalAlpha = 1;
+  imageCtx.drawImage(adjustedSource, 0, 0, targetWidth, targetHeight);
+
+  const fillEffect = (operation, opacity, color) => {
+    imageCtx.save();
+    imageCtx.globalCompositeOperation = operation;
+    imageCtx.globalAlpha = clamp(opacity, 0, 1);
+    imageCtx.fillStyle = color;
+    imageCtx.fillRect(0, 0, targetWidth, targetHeight);
+    imageCtx.restore();
+  };
+  const shadows = Number(settings.shadows || 0);
+  if (shadows) fillEffect(shadows > 0 ? 'screen' : 'multiply', Math.abs(shadows) * 0.22, shadows > 0 ? '#6f7890' : '#10141c');
+  const highlights = Number(settings.highlights || 0);
+  if (highlights) fillEffect(highlights > 0 ? 'screen' : 'multiply', Math.abs(highlights) * 0.16, highlights > 0 ? '#fff7ec' : '#7d8794');
+  const temperature = Number(settings.temperature || 0);
+  if (temperature) fillEffect('soft-light', Math.abs(temperature) * 0.24, temperature > 0 ? '#ff8a3d' : '#438cff');
+  const tint = Number(settings.tint || 0);
+  if (tint) fillEffect('soft-light', Math.abs(tint) * 0.2, tint > 0 ? '#d34cff' : '#38d887');
+
+  if (Number(settings.overlay || 0) > 0) {
+    const overlay = imageCtx.createLinearGradient(0, 0, targetWidth, targetHeight);
+    overlay.addColorStop(0, 'rgba(0,0,0,' + Number(settings.overlay) * 0.55 + ')');
+    overlay.addColorStop(0.55, 'rgba(0,0,0,0)');
+    overlay.addColorStop(1, 'rgba(0,0,0,' + Number(settings.overlay) + ')');
+    imageCtx.fillStyle = overlay;
+    imageCtx.fillRect(0, 0, targetWidth, targetHeight);
+  }
+  if (Number(settings.vignette || 0) > 0) {
+    const vignette = imageCtx.createRadialGradient(
+      targetWidth / 2, targetHeight / 2, Math.min(targetWidth, targetHeight) * 0.14,
+      targetWidth / 2, targetHeight / 2, Math.max(targetWidth, targetHeight) * 0.66
+    );
+    vignette.addColorStop(0, 'rgba(0,0,0,0)');
+    vignette.addColorStop(1, 'rgba(0,0,0,' + Number(settings.vignette) + ')');
+    imageCtx.fillStyle = vignette;
+    imageCtx.fillRect(0, 0, targetWidth, targetHeight);
+  }
+  if (Number(settings.gloss || 0) > 0) {
+    const gloss = imageCtx.createLinearGradient(0, 0, targetWidth, targetHeight);
+    gloss.addColorStop(0, 'rgba(255,255,255,' + Number(settings.gloss) * 0.42 + ')');
+    gloss.addColorStop(0.22, 'rgba(255,255,255,' + Number(settings.gloss) * 0.08 + ')');
+    gloss.addColorStop(0.5, 'rgba(255,255,255,0)');
+    imageCtx.fillStyle = gloss;
+    imageCtx.fillRect(0, 0, targetWidth, targetHeight);
+  }
+  if (Number(settings.grain || 0) > 0) fillGrain(imageCtx, 0, 0, targetWidth, targetHeight, settings.grain);
+  if (Number(settings.fade || 0) > 0) fillEffect('screen', clamp(Number(settings.fade), 0, 1) * 0.34, '#f6efe6');
+  if (Number(settings.effectTintStrength || 0) > 0) {
+    const [r, g, b] = hexToRgb(settings.effectTint || '#7b61ff');
+    fillEffect('soft-light', clamp(Number(settings.effectTintStrength), 0, 1) * 0.52, 'rgb(' + r + ',' + g + ',' + b + ')');
+  }
+
+  const cropX = crop ? clamp(crop.x, 0, 1) * source.width : 0;
+  const cropY = crop ? clamp(crop.y, 0, 1) * source.height : 0;
+  const cropWidth = crop ? clamp(crop.w, 0.01, 1) * source.width : source.width;
+  const cropHeight = crop ? clamp(crop.h, 0.01, 1) * source.height : source.height;
+  stencilCtx.clearRect(0, 0, targetWidth, targetHeight);
+  stencilCtx.globalCompositeOperation = 'source-over';
+  stencilCtx.globalAlpha = 1;
+  if (aiMaskImage) {
+    stencilCtx.imageSmoothingEnabled = true;
+    stencilCtx.imageSmoothingQuality = 'high';
+    stencilCtx.drawImage(aiMaskImage, 0, 0, targetWidth, targetHeight);
+  } else {
+    stencilCtx.fillStyle = '#fff';
+    stencilCtx.fillRect(0, 0, targetWidth, targetHeight);
+  }
+
+  for (const stroke of Array.isArray(layer.maskStrokes) ? layer.maskStrokes : []) {
+    const radius = Math.max(0.75, stroke.radius * source.width * targetWidth / Math.max(1, cropWidth));
+    const feather = Math.max(0, stroke.softness * source.width * targetWidth / Math.max(1, cropWidth));
+    const points = stroke.points.map((point) => ({
+      x: clamp((point.x * source.width - cropX) / Math.max(1, cropWidth), 0, 1) * targetWidth,
+      y: clamp((point.y * source.height - cropY) / Math.max(1, cropHeight), 0, 1) * targetHeight
+    }));
+    if (!points.length) continue;
+    stencilCtx.save();
+    stencilCtx.globalCompositeOperation = stroke.mode === 'restore' ? 'source-over' : 'destination-out';
+    stencilCtx.globalAlpha = 1;
+    stencilCtx.strokeStyle = stroke.mode === 'restore' ? '#fff' : '#000';
+    stencilCtx.fillStyle = stroke.mode === 'restore' ? '#fff' : '#000';
+    stencilCtx.lineCap = 'round';
+    stencilCtx.lineJoin = 'round';
+    stencilCtx.lineWidth = radius * 2;
+    stencilCtx.shadowColor = stroke.mode === 'restore' ? 'rgba(255,255,255,.95)' : 'rgba(0,0,0,.95)';
+    stencilCtx.shadowBlur = feather * 1.75;
+    if (points.length === 1) {
+      stencilCtx.beginPath();
+      stencilCtx.arc(points[0].x, points[0].y, radius, 0, Math.PI * 2);
+      stencilCtx.fill();
+    } else {
+      stencilCtx.beginPath();
+      stencilCtx.moveTo(points[0].x, points[0].y);
+      for (let index = 1; index < points.length - 1; index += 1) {
+        const midpoint = {
+          x: (points[index].x + points[index + 1].x) / 2,
+          y: (points[index].y + points[index + 1].y) / 2
+        };
+        stencilCtx.quadraticCurveTo(points[index].x, points[index].y, midpoint.x, midpoint.y);
+      }
+      stencilCtx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+      stencilCtx.stroke();
+    }
+    stencilCtx.restore();
+  }
+
+  imageCtx.save();
+  imageCtx.globalCompositeOperation = 'destination-in';
+  imageCtx.drawImage(maskStencilCanvas, 0, 0);
+  imageCtx.restore();
+  ctx.drawImage(maskedLayerCanvas, -w / 2, -h / 2, w, h);
+}
+
 const CONTACTLESS_BOUNDS = {
   left: 14,
   top: -58,
@@ -844,7 +1050,9 @@ function singleLineCardText(value, maxLength) {
   return splitGraphemes(normalized).slice(0, maxLength).join('');
 }
 
-function textLayerFontFamily(fontFamily) {
+function textLayerFontFamily(fontFamily, fontId = '') {
+  const customFamily = importedFontFamilyName(fontId);
+  if (customFamily) return '"' + customFamily + '", -apple-system, BlinkMacSystemFont, sans-serif';
   return {
     system: '-apple-system, BlinkMacSystemFont, sans-serif',
     rounded: 'ui-rounded, -apple-system, BlinkMacSystemFont, sans-serif',
@@ -856,7 +1064,7 @@ function textLayerFontFamily(fontFamily) {
 function textLayerFontCss(layer) {
   const size = clamp(Number(layer?.fontSize ?? 58), 10, 240);
   const weight = clamp(Number(layer?.weight ?? 700), 100, 900);
-  return weight + ' ' + size + 'px ' + textLayerFontFamily(layer?.fontFamily);
+  return weight + ' ' + size + 'px ' + textLayerFontFamily(layer?.fontFamily, layer?.fontId);
 }
 
 function textLayerLines(layer) {
@@ -865,7 +1073,7 @@ function textLayerLines(layer) {
 
 function textLayerLineAdvance(layer) {
   const size = clamp(Number(layer?.fontSize ?? 58), 10, 240);
-  return size * clamp(Number(layer?.lineHeight ?? 1.18), 0.8, 2);
+  return size * clamp(Number(layer?.lineHeight ?? 1.18), 0.65, 2.4);
 }
 
 function measureTrackedText(ctx, text, tracking = 0) {
@@ -881,15 +1089,60 @@ function measureTrackedText(ctx, text, tracking = 0) {
     Math.max(0, chars.length - 1) * spacing;
 }
 
-function drawTrackedText(ctx, text, x, y, tracking = 0) {
+function drawTrackedText(ctx, text, x, y, tracking = 0, style = {}) {
   const chars = splitGraphemes(text);
+  if (!chars.length) return;
+
+  const outlineWidth = clamp(Number(style.outlineWidth || 0), 0, 24);
+  const outlineColor = style.outlineColor || '#000000';
+  const curve = clamp(Number(style.curve || 0), -240, 240);
+  const drawGlyph = (glyph, gx, gy) => {
+    if (outlineWidth > 0) {
+      ctx.lineJoin = 'round';
+      ctx.miterLimit = 2;
+      ctx.lineWidth = outlineWidth;
+      ctx.strokeStyle = outlineColor;
+      ctx.strokeText(glyph, gx, gy);
+    }
+    ctx.fillText(glyph, gx, gy);
+  };
+
+  const totalWidth = measureTrackedText(ctx, chars.join(''), tracking);
+  if (Math.abs(curve) > 1 && totalWidth > 0) {
+    const angle = (Math.abs(curve) * Math.PI) / 180;
+    const radius = totalWidth / angle;
+    const align = ctx.textAlign || 'center';
+    const alignShift = align === 'left' || align === 'start'
+      ? totalWidth / 2
+      : align === 'right' || align === 'end'
+        ? -totalWidth / 2
+        : 0;
+    const direction = Math.sign(curve);
+    let cursor = 0;
+    ctx.save();
+    ctx.textAlign = 'center';
+    for (const char of chars) {
+      const advance = ctx.measureText(char).width;
+      const theta = ((cursor + advance / 2 - totalWidth / 2) / radius);
+      const gx = x + Math.sin(theta) * radius + alignShift;
+      const gy = y + direction * radius * (1 - Math.cos(theta));
+      ctx.save();
+      ctx.translate(gx, gy);
+      ctx.rotate(direction * theta);
+      drawGlyph(char, 0, 0);
+      ctx.restore();
+      cursor += advance + tracking;
+    }
+    ctx.restore();
+    return;
+  }
+
   if (!tracking || chars.length < 2) {
-    ctx.fillText(chars.join(''), x, y);
+    drawGlyph(chars.join(''), x, y);
     return;
   }
 
   const originalAlign = ctx.textAlign || 'start';
-  const totalWidth = measureTrackedText(ctx, chars.join(''), tracking);
   let cursor = x;
   if (originalAlign === 'center') cursor -= totalWidth / 2;
   else if (originalAlign === 'right' || originalAlign === 'end') cursor -= totalWidth;
@@ -897,7 +1150,7 @@ function drawTrackedText(ctx, text, x, y, tracking = 0) {
   ctx.save();
   ctx.textAlign = 'left';
   for (const char of chars) {
-    ctx.fillText(char, cursor, y);
+    drawGlyph(char, cursor, y);
     cursor += ctx.measureText(char).width + tracking;
   }
   ctx.restore();
@@ -1007,15 +1260,20 @@ function customLayerBounds(layer, layerImage) {
   }
 
   const shadowPad = layer.shadow ? 16 : 0;
+  const outlinePad = clamp(Number(layer.outlineWidth || 0), 0, 24) / 2;
+  const curveAngle = Math.abs(clamp(Number(layer.curve || 0), -240, 240)) * Math.PI / 180;
+  const curveRadius = curveAngle > 0.01 ? measuredWidth / curveAngle : 0;
+  const curveSag = curveRadius > 0 ? curveRadius * (1 - Math.cos(curveAngle / 2)) : 0;
+  const edgePad = shadowPad + outlinePad;
   const align = layer.align || 'center';
   const left = align === 'left' ? 0 : align === 'right' ? -measuredWidth : -measuredWidth / 2;
   const firstBaseline = -((lines.length - 1) * lineAdvance) / 2;
   const lastBaseline = firstBaseline + (lines.length - 1) * lineAdvance;
   return {
-    left: left - shadowPad,
-    top: firstBaseline - ascent - shadowPad,
-    right: left + measuredWidth + shadowPad,
-    bottom: lastBaseline + descent + shadowPad
+    left: left - edgePad - (align === 'left' && curveSag ? measuredWidth / 2 : 0),
+    top: firstBaseline - ascent - edgePad - curveSag,
+    right: left + measuredWidth + edgePad + (align === 'right' && curveSag ? measuredWidth / 2 : 0),
+    bottom: lastBaseline + descent + edgePad + curveSag
   };
 }
 
@@ -2754,8 +3012,37 @@ function importListItem(asset = {}) {
     id: safeDisplayText(asset.id, '', 160),
     name: safeDisplayText(asset.name, 'Imported image', 160),
     type: safeDisplayText(asset.type, 'image/*', 80),
+    role: asset.role === 'ai-mask' ? 'ai-mask' : 'image',
     createdAt: finiteNumber(asset.createdAt, Date.now())
   };
+}
+
+function addDesignImportRefs(design, refs) {
+  if (!design || typeof design !== 'object' || !(refs instanceof Set)) return;
+  const addSource = (source) => {
+    const match = String(source || '').match(/^idb:\/\/imports\/([A-Za-z0-9._:-]{1,200})$/);
+    if (match) refs.add(match[1]);
+  };
+
+  addSource(design.background);
+  addSource(design.backgroundMaskSource);
+  for (const layer of Array.isArray(design.customLayers) ? design.customLayers : []) {
+    addSource(layer?.src);
+    addSource(layer?.maskSource);
+  }
+}
+
+function remapImportSource(source, idMap) {
+  const match = String(source || '').match(/^idb:\/\/imports\/([A-Za-z0-9._:-]{1,200})$/);
+  if (!match) return '';
+  const nextId = idMap?.[match[1]];
+  return nextId ? 'idb://imports/' + nextId : '';
+}
+
+function layerMaskSourceKeyForDesign(value) {
+  return JSON.stringify(
+    visibleImageLayers(value).map((layer) => ({ id: layer.id, src: layer.maskSource || '' }))
+  );
 }
 
 function visibleImageLayers(value) {
@@ -2814,6 +3101,10 @@ export default function Page() {
   const [projectBusyIds, setProjectBusyIds] = useState(new Set());
   const [projectSaveInProgress, setProjectSaveInProgress] = useState(false);
   const [imports, setImports] = useState([]);
+  const [customFonts, setCustomFonts] = useState([]);
+  const [textStyles, setTextStyles] = useState([]);
+  const [textStyleName, setTextStyleName] = useState('');
+  const [fontImportBusy, setFontImportBusy] = useState(false);
   const [cleanupInProgress, setCleanupInProgress] = useState(false);
   const [presetTransferInProgress, setPresetTransferInProgress] = useState(false);
   const [exportInProgress, setExportInProgress] = useState(false);
@@ -2823,6 +3114,14 @@ export default function Page() {
   const [activeGuides, setActiveGuides] = useState({ x: null, y: null });
   const [selectedElement, setSelectedElement] = useState('artwork');
   const [previewMode, setPreviewMode] = useState('flat');
+  const [threePreviewReady, setThreePreviewReady] = useState(false);
+  const [canvasRevision, setCanvasRevision] = useState(0);
+  const [fontVersion, setFontVersion] = useState(0);
+  const [maskMode, setMaskMode] = useState('erase');
+  const [maskBrushSize, setMaskBrushSize] = useState(28);
+  const [maskFeather, setMaskFeather] = useState(0);
+  const [aiCutoutBusy, setAiCutoutBusy] = useState(false);
+  const [aiCutoutStatus, setAiCutoutStatus] = useState('');
   const [showOriginal, setShowOriginal] = useState(false);
   const [showExportPreview, setShowExportPreview] = useState(false);
   const [menuItem, setMenuItem] = useState(null);
@@ -2844,6 +3143,10 @@ export default function Page() {
   const [autosaveReady, setAutosaveReady] = useState(false);
   const [layerImages, setLayerImages] = useState({});
   const [loadedImageLayerSourceKey, setLoadedImageLayerSourceKey] = useState('[]');
+  const [backgroundMaskImage, setBackgroundMaskImage] = useState(null);
+  const [loadedBackgroundMaskSourceKey, setLoadedBackgroundMaskSourceKey] = useState('');
+  const [layerMaskImages, setLayerMaskImages] = useState({});
+  const [loadedLayerMaskSourceKey, setLoadedLayerMaskSourceKey] = useState('[]');
   const [backgroundLoadError, setBackgroundLoadError] = useState('');
   const [layerLoadError, setLayerLoadError] = useState('');
   const [imageImportInProgress, setImageImportInProgress] = useState(false);
@@ -2852,6 +3155,7 @@ export default function Page() {
   const uploadRef = useRef(null);
   const uploadIntentRef = useRef('replace-artwork');
   const layerUploadRef = useRef(null);
+  const fontUploadRef = useRef(null);
   const presetImportRef = useRef(null);
   const loadMoreRef = useRef(null);
   const pointers = useRef(new Map());
@@ -2887,6 +3191,8 @@ export default function Page() {
   const chipSelectionRef = useRef(null);
   const contactlessSelectionRef = useRef(null);
   const layerSelectionRef = useRef(null);
+  const activeMaskStrokeRef = useRef(null);
+  const threeTextureRefreshTimerRef = useRef(null);
   const finishActiveGestureRef = useRef(null);
 
   const updateActiveGuides = useCallback((x, y) => {
@@ -2910,24 +3216,48 @@ export default function Page() {
     () => GRADIENTS.find((item) => item.id === design.gradient) || GRADIENTS[0],
     [design.gradient]
   );
+  const visibleImports = useMemo(
+    () => imports.filter((asset) => asset.role !== 'ai-mask'),
+    [imports]
+  );
 
   const imageLayerSourceKey = useMemo(
     () => imageLayerSourceKeyForDesign(design),
     [design]
   );
+  const layerMaskSourceKey = useMemo(
+    () => layerMaskSourceKeyForDesign(design),
+    [design]
+  );
 
   const assetsReadyForDesign = useCallback((candidate) => {
     if (candidate.background && (!image || loadedBackgroundKey !== candidate.background)) return false;
+    if (
+      candidate.backgroundMaskSource &&
+      (loadedBackgroundMaskSourceKey !== candidate.backgroundMaskSource || !backgroundMaskImage)
+    ) return false;
     const candidateLayerKey = imageLayerSourceKeyForDesign(candidate);
     if (loadedImageLayerSourceKey !== candidateLayerKey) return false;
+    const candidateMaskKey = layerMaskSourceKeyForDesign(candidate);
+    if (loadedLayerMaskSourceKey !== candidateMaskKey) return false;
     return (candidate.customLayers || []).every(
       (layer) =>
         layer.hidden ||
         layer.type !== 'image' ||
         !layer.src ||
-        Boolean(layerImages[layer.id])
+        Boolean(layerImages[layer.id]) &&
+        (!layer.maskSource || Boolean(layerMaskImages[layer.id]))
     );
-  }, [image, layerImages, loadedBackgroundKey, loadedImageLayerSourceKey]);
+  }, [
+    backgroundMaskImage,
+    image,
+    layerImages,
+    layerMaskImages,
+    loadedBackgroundKey,
+    loadedBackgroundMaskSourceKey,
+    loadedImageLayerSourceKey,
+    loadedLayerMaskSourceKey
+  ]);
 
   const renderAssetsReady = useMemo(
     () => assetsReadyForDesign(design),
@@ -2993,7 +3323,22 @@ export default function Page() {
     }
 
     const current = designRef.current;
-    const delta = typeof next === 'function' ? next(current) : next;
+    let delta = typeof next === 'function' ? next(current) : next;
+    if (
+      delta &&
+      Object.prototype.hasOwnProperty.call(delta, 'background') &&
+      delta.background !== current.background
+    ) {
+      delta = {
+        ...delta,
+        backgroundMaskStrokes: Object.prototype.hasOwnProperty.call(delta, 'backgroundMaskStrokes')
+          ? delta.backgroundMaskStrokes
+          : [],
+        backgroundMaskSource: Object.prototype.hasOwnProperty.call(delta, 'backgroundMaskSource')
+          ? delta.backgroundMaskSource
+          : ''
+      };
+    }
     const deltaKeys = Object.keys(delta || {});
     if (!deltaKeys.length) return current;
 
@@ -3042,6 +3387,10 @@ export default function Page() {
       if (pendingDesignFrameRef.current) {
         window.cancelAnimationFrame(pendingDesignFrameRef.current);
         pendingDesignFrameRef.current = 0;
+      }
+      if (threeTextureRefreshTimerRef.current != null) {
+        window.clearTimeout(threeTextureRefreshTimerRef.current);
+        threeTextureRefreshTimerRef.current = null;
       }
       pendingVisualDesignRef.current = null;
     };
@@ -3515,6 +3864,65 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    if (!hydrated) return undefined;
+    let cancelled = false;
+
+    Promise.all([
+      dbGetAll('fonts').catch(() => []),
+      dbGet('kv', 'text-styles').catch(() => null)
+    ]).then(async ([records, storedStyles]) => {
+      const validRecords = (Array.isArray(records) ? records : [])
+        .filter((record) => importedFontFamilyName(record?.id) && record?.blob instanceof Blob)
+        .map((record) => ({
+          id: String(record.id),
+          name: safeDisplayText(record.name, 'Imported font', 100),
+          family: importedFontFamilyName(record.id),
+          createdAt: finiteNumber(record.createdAt, Date.now())
+        }));
+      const validStyles = Array.isArray(storedStyles?.styles)
+        ? storedStyles.styles
+            .filter((style) => style && typeof style.id === 'string' && style.settings && typeof style.settings === 'object')
+            .slice(0, 40)
+            .map((style) => ({
+              id: safeDisplayText(style.id, '', 100),
+              name: safeDisplayText(style.name, 'Text Style', 60),
+              settings: normalizeCustomLayer({ id: 'text-style', type: 'text', ...style.settings })
+            }))
+            .filter((style) => style.id && style.settings)
+        : [];
+
+      if (cancelled) return;
+      setCustomFonts(validRecords);
+      setTextStyles(validStyles);
+
+      const neededFontIds = new Set(
+        (designRef.current.customLayers || [])
+          .filter((layer) => layer.type === 'text' && layer.fontId)
+          .map((layer) => layer.fontId)
+      );
+      const recordsById = new Map((Array.isArray(records) ? records : []).map((record) => [String(record?.id || ''), record]));
+      await Promise.all([...neededFontIds].map(async (id) => {
+        const record = recordsById.get(id);
+        if (!record) return;
+        try { await registerImportedFont(record); } catch {}
+      }));
+      if (!cancelled) setFontVersion((version) => version + 1);
+    });
+
+    return () => { cancelled = true; };
+  }, [hydrated]);
+
+  useEffect(() => {
+    if (previewMode !== 'physical') {
+      setThreePreviewReady(false);
+      if (threeTextureRefreshTimerRef.current != null) {
+        window.clearTimeout(threeTextureRefreshTimerRef.current);
+        threeTextureRefreshTimerRef.current = null;
+      }
+    }
+  }, [previewMode]);
+
+  useEffect(() => {
     if (!hydrated || !autosaveReady) return undefined;
 
     setSaveStatus('Editing…');
@@ -3666,6 +4074,86 @@ export default function Page() {
   }, [design.background]);
 
   useEffect(() => {
+    let objectUrl = '';
+    let cancelled = false;
+    const source = design.backgroundMaskSource || '';
+
+    async function loadBackgroundMask() {
+      setBackgroundMaskImage(null);
+      setLoadedBackgroundMaskSourceKey('');
+      if (!source) {
+        setLoadedBackgroundMaskSourceKey('');
+        return;
+      }
+
+      try {
+        const id = source.slice('idb://imports/'.length);
+        const asset = await dbGet('imports', id);
+        if (cancelled) return;
+        if (!asset?.blob) throw new Error('AI mask asset is missing');
+        objectUrl = URL.createObjectURL(asset.blob);
+        const mask = await loadSearchImage(objectUrl);
+        if (cancelled) return;
+        setBackgroundMaskImage(mask);
+        setLoadedBackgroundMaskSourceKey(source);
+      } catch {
+        if (cancelled) return;
+        setLoadedBackgroundMaskSourceKey(source);
+        setMessage('AI cutout mask could not load. The original artwork is still available.');
+      }
+    }
+
+    loadBackgroundMask();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [design.backgroundMaskSource]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const urls = [];
+
+    async function loadLayerMasks() {
+      const next = {};
+      const entries = JSON.parse(layerMaskSourceKey || '[]')
+        .filter((entry) => entry?.src);
+      setLayerMaskImages({});
+      setLoadedLayerMaskSourceKey('[]');
+
+      try {
+        for (const entry of entries) {
+          const id = String(entry.src).slice('idb://imports/'.length);
+          const asset = await dbGet('imports', id);
+          if (cancelled) return;
+          if (!asset?.blob) throw new Error('AI layer mask asset is missing');
+          const url = URL.createObjectURL(asset.blob);
+          urls.push(url);
+          next[entry.id] = await loadSearchImage(url);
+          if (cancelled) return;
+        }
+
+        if (!cancelled) {
+          setLayerMaskImages(next);
+          setLoadedLayerMaskSourceKey(layerMaskSourceKey);
+        }
+      } catch {
+        if (!cancelled) {
+          setLayerMaskImages(next);
+          setLoadedLayerMaskSourceKey(layerMaskSourceKey);
+          setMessage('An AI layer mask could not load. The original image is still available.');
+        }
+      }
+    }
+
+    loadLayerMasks();
+    return () => {
+      cancelled = true;
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [layerMaskSourceKey]);
+
+  useEffect(() => {
     let cancelled = false;
     const urls = [];
 
@@ -3792,6 +4280,10 @@ export default function Page() {
       ? { a: renderDesign.backgroundColor, b: renderDesign.backgroundColor, c: renderDesign.backgroundColor }
       : (GRADIENTS.find((item) => item.id === renderDesign.gradient) || GRADIENTS[0]);
     const renderImageLayerSourceKey = imageLayerSourceKeyForDesign(renderDesign);
+    const renderLayerMaskSourceKey = layerMaskSourceKeyForDesign(renderDesign);
+    const renderBackgroundMask = loadedBackgroundMaskSourceKey === renderDesign.backgroundMaskSource
+      ? backgroundMaskImage
+      : null;
     const originalTarget = options.originalTarget || (options.original ? 'all' : null);
     const artworkOriginal = originalTarget === 'all' || originalTarget === 'artwork';
     const renderPixelScale = Math.max(
@@ -3812,6 +4304,7 @@ export default function Page() {
     ctx.fillRect(0, 0, OUT_W, OUT_H);
 
     let artworkEffectClip = null;
+    let artworkMasked = false;
 
     if (image && loadedBackgroundKey === renderDesign.background) {
       const crop = renderDesign.sourceCrop;
@@ -3843,6 +4336,9 @@ export default function Page() {
         height: ih,
         rotation: renderDesign.rotate
       };
+      artworkMasked = !artworkOriginal && Boolean(
+        renderBackgroundMask || renderDesign.backgroundMaskStrokes?.length
+      );
       const artworkSource = artworkOriginal
         ? image
         : adjustedImage(image, { x: sx, y: sy, w: sw, h: sh }, renderDesign,
@@ -3856,10 +4352,25 @@ export default function Page() {
       ctx.rect(-iw / 2, -ih / 2, iw, ih);
       ctx.clip();
       if (artworkOriginal) ctx.drawImage(image, sx, sy, sw, sh, -iw / 2, -ih / 2, iw, ih);
+      else if (artworkMasked) {
+        drawMaskedImageLayer(
+          ctx,
+          artworkSource,
+          image,
+          crop,
+          renderDesign,
+          { maskStrokes: renderDesign.backgroundMaskStrokes },
+          renderBackgroundMask,
+          iw,
+          ih,
+          1,
+          renderPixelScale
+        );
+      }
       else ctx.drawImage(artworkSource, -iw / 2, -ih / 2, iw, ih);
       ctx.restore();
 
-      if (!artworkOriginal) {
+      if (!artworkOriginal && !artworkMasked) {
         const shadows = Number(renderDesign.shadows || 0);
         if (shadows !== 0) {
           ctx.save();
@@ -3934,7 +4445,7 @@ export default function Page() {
       }
     }
 
-    if (!artworkOriginal && artworkEffectClip && renderDesign.overlay > 0) {
+    if (!artworkOriginal && !artworkMasked && artworkEffectClip && renderDesign.overlay > 0) {
       ctx.save();
       clipTransformedRect(
         ctx,
@@ -3953,7 +4464,7 @@ export default function Page() {
       ctx.restore();
     }
 
-    if (!artworkOriginal && artworkEffectClip && renderDesign.vignette > 0) {
+    if (!artworkOriginal && !artworkMasked && artworkEffectClip && renderDesign.vignette > 0) {
       ctx.save();
       clipTransformedRect(
         ctx,
@@ -3978,7 +4489,7 @@ export default function Page() {
       ctx.restore();
     }
 
-    if (!artworkOriginal && artworkEffectClip && renderDesign.gloss > 0) {
+    if (!artworkOriginal && !artworkMasked && artworkEffectClip && renderDesign.gloss > 0) {
       ctx.save();
       clipTransformedRect(
         ctx,
@@ -3997,7 +4508,7 @@ export default function Page() {
       ctx.restore();
     }
 
-    if (!artworkOriginal && artworkEffectClip && renderDesign.grain > 0) {
+    if (!artworkOriginal && !artworkMasked && artworkEffectClip && renderDesign.grain > 0) {
       ctx.save();
       clipTransformedRect(
         ctx,
@@ -4011,7 +4522,7 @@ export default function Page() {
       ctx.restore();
     }
 
-    if (!artworkOriginal && artworkEffectClip && renderDesign.fade > 0) {
+    if (!artworkOriginal && !artworkMasked && artworkEffectClip && renderDesign.fade > 0) {
       ctx.save();
       clipTransformedRect(
         ctx,
@@ -4028,7 +4539,7 @@ export default function Page() {
       ctx.restore();
     }
 
-    if (!artworkOriginal && artworkEffectClip && renderDesign.effectTintStrength > 0) {
+    if (!artworkOriginal && !artworkMasked && artworkEffectClip && renderDesign.effectTintStrength > 0) {
       const [r, g, b] = hexToRgb(renderDesign.effectTint);
       ctx.save();
       clipTransformedRect(
@@ -4143,7 +4654,12 @@ export default function Page() {
             line,
             0,
             firstBaseline + index * lineAdvance,
-            Number(layer.letterSpacing ?? 0)
+            Number(layer.letterSpacing ?? 0),
+            {
+              outlineColor: layer.outlineColor || '#000000',
+              outlineWidth: Number(layer.outlineWidth || 0),
+              curve: Number(layer.curve || 0)
+            }
           );
         });
       } else if (layer.type === 'shape') {
@@ -4165,6 +4681,9 @@ export default function Page() {
             : null;
         if (layerImage) {
           const layerOriginal = originalTarget === 'all' || originalTarget === layer.id;
+          const layerMaskImage = loadedLayerMaskSourceKey === renderLayerMaskSourceKey
+            ? layerMaskImages[layer.id]
+            : null;
           const settings = { ...IMAGE_LAYER_DEFAULTS, ...(layer.adjustments || {}) };
           const crop = layer.crop;
           const sx = crop ? clamp(crop.x, 0, 1) * layerImage.width : 0;
@@ -4179,6 +4698,9 @@ export default function Page() {
             : adjustedImage(layerImage, { x: sx, y: sy, w: sw, h: sh }, settings,
               Math.max(1, w * scale * renderPixelScale), Math.max(1, h * scale * renderPixelScale), renderPixelScale);
 
+          if (!layerOriginal && (layerMaskImage || layer.maskStrokes?.length)) {
+            drawMaskedImageLayer(ctx, adjustedLayerSource, layerImage, crop, settings, layer, layerMaskImage, w, h, scale, renderPixelScale);
+          } else {
           ctx.save();
           ctx.beginPath();
           ctx.rect(-w / 2, -h / 2, w, h);
@@ -4284,6 +4806,7 @@ export default function Page() {
 
             ctx.restore();
           }
+          }
         }
       } else if (layer.type === 'contactless') {
         drawContactlessLayerAtOrigin(ctx, layer.color || '#ffffff');
@@ -4300,8 +4823,13 @@ export default function Page() {
     imageLayerSourceKey,
     chipArtwork,
     layerImages,
+    backgroundMaskImage,
     loadedBackgroundKey,
-    loadedImageLayerSourceKey
+    loadedImageLayerSourceKey,
+    loadedBackgroundMaskSourceKey,
+    layerMaskImages,
+    loadedLayerMaskSourceKey,
+    fontVersion
   ]);
 
   renderCardRef.current = renderCard;
@@ -4329,10 +4857,16 @@ export default function Page() {
       if (showExportPreview && fullPreviewCanvasRef.current) {
         renderCard(fullPreviewCanvasRef.current.getContext('2d'), OUT_W, OUT_H);
       }
+      if (previewMode === 'physical' && threeTextureRefreshTimerRef.current == null) {
+        threeTextureRefreshTimerRef.current = window.setTimeout(() => {
+          threeTextureRefreshTimerRef.current = null;
+          setCanvasRevision((revision) => revision + 1);
+        }, 80);
+      }
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [design.customLayers, renderCard, selectedElement, showOriginal, showExportPreview, tab]);
+  }, [design.customLayers, renderCard, selectedElement, showOriginal, showExportPreview, tab, previewMode]);
 
   const loadCucu = useCallback(async (
     nextPage = 1,
@@ -5092,9 +5626,13 @@ export default function Page() {
           color: '#ffffff',
           fontSize: 58,
           fontFamily: 'system',
+          fontId: '',
           weight: 700,
           letterSpacing: 0,
           lineHeight: 1.18,
+          outlineColor: '#000000',
+          outlineWidth: 0,
+          curve: 0,
           align: 'center',
           shadow: true,
           locked: false
@@ -5105,6 +5643,100 @@ export default function Page() {
     setStudioTool('text');
     setStudioSubtool('');
     setMessage('Text layer added');
+  }
+
+  async function ensureCustomFontLoaded(fontId) {
+    const family = importedFontFamilyName(fontId);
+    if (!family) return false;
+    try {
+      if (document.fonts.check('16px "' + family + '"')) return true;
+      const record = await dbGet('fonts', fontId);
+      const metadata = await registerImportedFont(record);
+      if (!metadata) return false;
+      setCustomFonts((current) => [metadata, ...current.filter((font) => font.id !== metadata.id)]);
+      setFontVersion((version) => version + 1);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function importTextFont(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const extension = String(file.name || '').split('.').pop()?.toLowerCase();
+    if (!['ttf', 'otf', 'woff', 'woff2'].includes(extension)) {
+      setMessage('Choose a TTF, OTF, WOFF, or WOFF2 font file.');
+      return;
+    }
+    if (file.size <= 0 || file.size > MAX_IMPORTED_FONT_BYTES) {
+      setMessage('Font file must be smaller than 12 MB.');
+      return;
+    }
+
+    setFontImportBusy(true);
+    try {
+      const id = makeId('font');
+      const name = safeDisplayText(String(file.name || 'Imported font').replace(/\.[^.]+$/, ''), 'Imported font', 100);
+      const record = { id, name, blob: file, createdAt: Date.now() };
+      await dbPut('fonts', record);
+      let metadata;
+      try {
+        metadata = await registerImportedFont(record);
+      } catch (error) {
+        await dbDelete('fonts', id).catch(() => {});
+        throw error;
+      }
+      if (!metadata) throw new Error('This browser could not load that font file.');
+      setCustomFonts((current) => [metadata, ...current.filter((font) => font.id !== id)]);
+      setFontVersion((version) => version + 1);
+      const currentLayer = (designRef.current.customLayers || []).find((layer) => layer.id === selectedElement);
+      if (currentLayer?.type === 'text') {
+        updateLayer(currentLayer.id, { fontId: id });
+      }
+      setMessage(name + ' added to Text fonts');
+    } catch (error) {
+      setMessage(error?.message || 'Font import failed. Try another font file.');
+    } finally {
+      setFontImportBusy(false);
+    }
+  }
+
+  async function saveTextStyle() {
+    const layer = (designRef.current.customLayers || []).find((entry) => entry.id === selectedElement && entry.type === 'text');
+    const name = safeDisplayText(textStyleName, '', 60);
+    if (!layer) return;
+    if (!name) {
+      setMessage('Enter a name for this text style.');
+      return;
+    }
+    const keys = ['fontSize', 'fontFamily', 'fontId', 'weight', 'letterSpacing', 'lineHeight', 'align', 'color', 'shadow', 'outlineColor', 'outlineWidth', 'curve', 'opacity'];
+    const settings = Object.fromEntries(keys.map((key) => [key, layer[key]]));
+    const saved = { id: makeId('text-style'), name, settings };
+    const next = [saved, ...textStyles].slice(0, 40);
+    setTextStyles(next);
+    setTextStyleName('');
+    await dbPut('kv', { id: 'text-styles', styles: next }).catch(() => {
+      setMessage('Style is saved for this session, but local storage is unavailable.');
+    });
+    setMessage('Text style saved');
+  }
+
+  async function applyTextStyle(style) {
+    if (!style?.settings) return;
+    const fontId = String(style.settings.fontId || '');
+    if (fontId) await ensureCustomFontLoaded(fontId);
+    const keys = ['fontSize', 'fontFamily', 'fontId', 'weight', 'letterSpacing', 'lineHeight', 'align', 'color', 'shadow', 'outlineColor', 'outlineWidth', 'curve', 'opacity'];
+    const settings = Object.fromEntries(keys.filter((key) => style.settings[key] !== undefined).map((key) => [key, style.settings[key]]));
+    updateLayer(selectedElement, settings);
+    setMessage(style.name + ' applied');
+  }
+
+  async function deleteTextStyle(id) {
+    const next = textStyles.filter((style) => style.id !== id);
+    setTextStyles(next);
+    await dbPut('kv', { id: 'text-styles', styles: next }).catch(() => {});
   }
 
   function addShapeLayer() {
@@ -5178,6 +5810,18 @@ export default function Page() {
     ) {
       setMessage('Visible image layer limit reached. Hide another image layer before showing this one.');
       return;
+    }
+
+    if (
+      currentLayer?.type === 'image' &&
+      Object.prototype.hasOwnProperty.call(delta || {}, 'src') &&
+      delta.src !== currentLayer.src
+    ) {
+      delta = {
+        ...delta,
+        maskSource: Object.prototype.hasOwnProperty.call(delta, 'maskSource') ? delta.maskSource : '',
+        maskStrokes: Object.prototype.hasOwnProperty.call(delta, 'maskStrokes') ? delta.maskStrokes : []
+      };
     }
 
     const deltaKeys = Object.keys(delta || {});
@@ -5595,22 +6239,7 @@ export default function Page() {
 
       const referenced = new Set();
   
-      const addDesignRefs = (value) => {
-        if (!value || typeof value !== 'object') return;
-
-        const background = typeof value.background === 'string' ? value.background : '';
-        if (background.startsWith('idb://imports/')) {
-          referenced.add(background.slice('idb://imports/'.length));
-        }
-
-        const layers = Array.isArray(value.customLayers) ? value.customLayers : [];
-        for (const layer of layers) {
-          const src = typeof layer?.src === 'string' ? layer.src : '';
-          if (src.startsWith('idb://imports/')) {
-            referenced.add(src.slice('idb://imports/'.length));
-          }
-        }
-      };
+      const addDesignRefs = (value) => addDesignImportRefs(value, referenced);
   
       addDesignRefs(designRef.current);
       for (const snapshot of undoRef.current) addDesignRefs(snapshot);
@@ -5655,12 +6284,12 @@ export default function Page() {
   
       const unused = storedImports.filter((asset) => asset?.id && !referenced.has(asset.id));
       if (!unused.length) {
-        setMessage('No unused imported images to clean up');
+        setMessage('No unused imported assets to clean up');
         return;
       }
   
       if (!window.confirm(
-        'Permanently remove ' + unused.length + ' unused imported image' +
+        'Permanently remove ' + unused.length + ' unused imported asset' +
         (unused.length === 1 ? '' : 's') + '?'
       )) return;
 
@@ -5726,7 +6355,7 @@ export default function Page() {
       setMessage(
         failed.length
           ? 'Removed ' + removed.size + ' unused imports; ' + failed.length + ' could not be removed'
-          : 'Removed ' + removed.size + ' unused imported image' + (removed.size === 1 ? '' : 's')
+          : 'Removed ' + removed.size + ' unused imported asset' + (removed.size === 1 ? '' : 's')
       );
     } finally {
       cleanupInFlightRef.current = false;
@@ -5744,14 +6373,7 @@ export default function Page() {
     };
 
     const refs = new Set();
-    if (currentDesign.background?.startsWith('idb://imports/')) {
-      refs.add(currentDesign.background.slice('idb://imports/'.length));
-    }
-    for (const layer of currentDesign.customLayers || []) {
-      if (layer.src?.startsWith('idb://imports/')) {
-        refs.add(layer.src.slice('idb://imports/'.length));
-      }
-    }
+    addDesignImportRefs(currentDesign, refs);
 
     if (refs.size > MAX_PRESET_ASSETS) {
       throw new Error('This design references too many imported image assets for a preset');
@@ -5781,7 +6403,8 @@ export default function Page() {
       assets.push({
         id,
         name: safeDisplayText(asset.name, 'Preset asset', 160),
-        type: safeDisplayText(asset.type, 'image/*', 80)
+        type: safeDisplayText(asset.type, 'image/*', 80),
+        role: asset.role === 'ai-mask' ? 'ai-mask' : 'image'
       });
     }
 
@@ -5939,15 +6562,7 @@ export default function Page() {
       const normalizedIncomingDesign = normalizeDesignState(payload.design);
       const referencedPresetAssetIds = new Set();
       const rawBackground = String(normalizedIncomingDesign.background || '');
-      if (rawBackground.startsWith('idb://imports/')) {
-        referencedPresetAssetIds.add(rawBackground.slice('idb://imports/'.length));
-      }
-      for (const layer of normalizedIncomingDesign.customLayers || []) {
-        const src = String(layer?.src || '');
-        if (layer?.type === 'image' && src.startsWith('idb://imports/')) {
-          referencedPresetAssetIds.add(src.slice('idb://imports/'.length));
-        }
-      }
+      addDesignImportRefs(normalizedIncomingDesign, referencedPresetAssetIds);
       if (referencedPresetAssetIds.size > MAX_PRESET_ASSETS) {
         throw new Error('Preset references too many embedded assets');
       }
@@ -6018,6 +6633,7 @@ export default function Page() {
           id: newId,
           name: safeDisplayText(asset.name, 'Preset asset', 160),
           type: safeDisplayText(preparedImage.blob.type || asset.type, 'image/*', 80),
+          role: asset.role === 'ai-mask' ? 'ai-mask' : 'image',
           blob: preparedImage.blob,
           createdAt: Date.now()
         });
@@ -6033,17 +6649,17 @@ export default function Page() {
       } else {
         imported.background = normalizePersistedArtworkSource(imported.background, 3072);
       }
+      imported.backgroundMaskSource = remapImportSource(imported.backgroundMaskSource, idMap);
 
       imported.customLayers = (Array.isArray(imported.customLayers) ? imported.customLayers : []).map((layer) => {
         if (!layer || layer.type !== 'image') return layer;
         const src = String(layer.src || '');
-        if (src.startsWith('idb://imports/')) {
-          const oldId = src.slice('idb://imports/'.length);
-          return { ...layer, src: idMap[oldId] ? 'idb://imports/' + idMap[oldId] : '' };
-        }
         return {
           ...layer,
-          src: normalizePersistedArtworkSource(src, MAX_STORED_LAYER_IMAGE_DIMENSION)
+          src: src.startsWith('idb://imports/')
+            ? remapImportSource(src, idMap)
+            : normalizePersistedArtworkSource(src, MAX_STORED_LAYER_IMAGE_DIMENSION),
+          maskSource: remapImportSource(layer.maskSource, idMap)
         };
       });
 
@@ -6226,6 +6842,260 @@ export default function Page() {
     return 'artwork';
   }
 
+  function maskPointForLayer(event, layer) {
+    if (!layer || layer.type !== 'image' || layer.locked) return null;
+    const source = layerImages[layer.id];
+    if (!source?.width || !source?.height) return null;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const px = ((event.clientX - rect.left) / Math.max(1, rect.width)) * OUT_W;
+    const py = ((event.clientY - rect.top) / Math.max(1, rect.height)) * OUT_H;
+    const crop = layer.crop;
+    const sx = crop ? clamp(crop.x, 0, 1) * source.width : 0;
+    const sy = crop ? clamp(crop.y, 0, 1) * source.height : 0;
+    const sw = crop ? clamp(crop.w, 0.01, 1) * source.width : source.width;
+    const sh = crop ? clamp(crop.h, 0.01, 1) * source.height : source.height;
+    const width = clamp(Number(layer.width || 640), 20, 1800);
+    const height = width / Math.max(0.1, sw / Math.max(1, sh));
+    const scale = clamp(Number(layer.scale || 1), 0.1, 6);
+    const dx = px - Number(layer.x ?? 0.5) * OUT_W;
+    const dy = py - Number(layer.y ?? 0.5) * OUT_H;
+    const angle = (Number(layer.rotation || 0) * Math.PI) / 180;
+    let localX = (dx * Math.cos(angle) + dy * Math.sin(angle)) / scale;
+    const localY = (-dx * Math.sin(angle) + dy * Math.cos(angle)) / scale;
+    if (Math.abs(localX) > width / 2 || Math.abs(localY) > height / 2) return null;
+    let u = localX / width + 0.5;
+    if (layer.flipX) u = 1 - u;
+    const v = localY / height + 0.5;
+    if (u < 0 || u > 1 || v < 0 || v > 1) return null;
+    const sourcePixelsPerCssPixel = (OUT_W / Math.max(1, rect.width)) * (sw / Math.max(1, width * scale));
+    return {
+      x: clamp((sx + u * sw) / source.width, 0, 1),
+      y: clamp((sy + v * sh) / source.height, 0, 1),
+      radius: clamp((maskBrushSize * 0.5 * sourcePixelsPerCssPixel) / source.width, 0.001, 0.18),
+      softness: clamp((maskFeather * sourcePixelsPerCssPixel) / source.width, 0, 0.12)
+    };
+  }
+
+  function maskPointForArtwork(event) {
+    const current = designRef.current;
+    const source = image;
+    if (!source?.width || !source?.height || !current.background || loadedBackgroundKey !== current.background) return null;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const px = ((event.clientX - rect.left) / Math.max(1, rect.width)) * OUT_W;
+    const py = ((event.clientY - rect.top) / Math.max(1, rect.height)) * OUT_H;
+    const crop = current.sourceCrop;
+    const sx = crop ? clamp(crop.x, 0, 1) * source.width : 0;
+    const sy = crop ? clamp(crop.y, 0, 1) * source.height : 0;
+    const sw = crop ? clamp(crop.w, 0.01, 1) * source.width : source.width;
+    const sh = crop ? clamp(crop.h, 0.01, 1) * source.height : source.height;
+    const ratio = sw / Math.max(1, sh);
+    let width;
+    let height;
+
+    if ((current.fit === 'cover' && ratio > CARD_RATIO) || (current.fit === 'contain' && ratio < CARD_RATIO)) {
+      height = OUT_H;
+      width = height * ratio;
+    } else {
+      width = OUT_W;
+      height = width / ratio;
+    }
+    width *= current.zoom;
+    height *= current.zoom;
+
+    const x = (OUT_W - width) / 2 + current.x * OUT_W;
+    const y = (OUT_H - height) / 2 + current.y * OUT_H;
+    const dx = px - (x + width / 2);
+    const dy = py - (y + height / 2);
+    const angle = (Number(current.rotate || 0) * Math.PI) / 180;
+    let localX = dx * Math.cos(angle) + dy * Math.sin(angle);
+    const localY = -dx * Math.sin(angle) + dy * Math.cos(angle);
+    if (current.flipX) localX = -localX;
+    if (Math.abs(localX) > width / 2 || Math.abs(localY) > height / 2) return null;
+
+    const u = localX / width + 0.5;
+    const v = localY / height + 0.5;
+    const sourcePixelsPerCssPixel =
+      (OUT_W / Math.max(1, rect.width)) * (sw / Math.max(1, width));
+    return {
+      x: clamp((sx + u * sw) / source.width, 0, 1),
+      y: clamp((sy + v * sh) / source.height, 0, 1),
+      radius: clamp((maskBrushSize * 0.5 * sourcePixelsPerCssPixel) / source.width, 0.001, 0.18),
+      softness: clamp((maskFeather * sourcePixelsPerCssPixel) / source.width, 0, 0.12)
+    };
+  }
+
+  function appendMaskStrokePoint(targetId, event, isStart = false) {
+    const layer = targetId === 'artwork'
+      ? null
+      : (designRef.current.customLayers || []).find((entry) => entry.id === targetId && entry.type === 'image');
+    const point = targetId === 'artwork'
+      ? maskPointForArtwork(event)
+      : maskPointForLayer(event, layer);
+    if (!point) return false;
+
+    if (isStart) {
+      recordGestureHistory();
+      activeMaskStrokeRef.current = {
+        targetId,
+        pointerId: event.pointerId,
+        stroke: {
+          mode: maskMode === 'restore' ? 'restore' : 'erase',
+          radius: point.radius,
+          softness: point.softness,
+          points: [point]
+        }
+      };
+    } else if (activeMaskStrokeRef.current?.targetId === targetId && activeMaskStrokeRef.current.pointerId === event.pointerId) {
+      const active = activeMaskStrokeRef.current;
+      const previous = active.stroke.points[active.stroke.points.length - 1];
+      if (previous && Math.hypot(point.x - previous.x, point.y - previous.y) < 0.00035) return false;
+      let points = [...active.stroke.points, point];
+      if (points.length > MAX_MASK_POINTS_PER_STROKE) {
+        points = points.filter((_, index) => index % 2 === 0).slice(-MAX_MASK_POINTS_PER_STROKE + 1);
+        points.push(point);
+      }
+      active.stroke = { ...active.stroke, points };
+    } else {
+      return false;
+    }
+
+    const activeStroke = activeMaskStrokeRef.current?.stroke;
+    if (!activeStroke) return false;
+    patch((current) => {
+      if (targetId === 'artwork') {
+        const existing = Array.isArray(current.backgroundMaskStrokes) ? current.backgroundMaskStrokes : [];
+        const strokes = isStart
+          ? [...existing.slice(-(MAX_MASK_STROKES - 1)), activeStroke]
+          : [...existing.slice(0, -1), activeStroke];
+        return { backgroundMaskStrokes: strokes };
+      }
+      const layers = current.customLayers || [];
+      const index = layers.findIndex((entry) => entry.id === targetId && entry.type === 'image');
+      if (index < 0) return {};
+      const existing = Array.isArray(layers[index].maskStrokes) ? layers[index].maskStrokes : [];
+      const strokes = isStart
+        ? [...existing.slice(-(MAX_MASK_STROKES - 1)), activeStroke]
+        : [...existing.slice(0, -1), activeStroke];
+      const nextLayers = layers.slice();
+      nextLayers[index] = { ...layers[index], maskStrokes: strokes };
+      return { customLayers: nextLayers };
+    }, false);
+    return true;
+  }
+
+  async function applyAICutout() {
+    if (!maskTargetAvailable || !activeImageEditable || aiCutoutBusy) return;
+    const targetId = selectedImageLayer?.id || 'artwork';
+    const targetSource = selectedImageLayer?.src || designRef.current.background;
+    const targetName = activeImageLabel || 'Artwork';
+    if (!targetSource) {
+      setMessage('Choose an image before using AI Cutout.');
+      return;
+    }
+
+    setAiCutoutBusy(true);
+    setAiCutoutStatus('Preparing image…');
+    try {
+      await withImageImportLock(async (isCurrent) => {
+        try {
+          let sourceBlob;
+          const sourceMatch = String(targetSource).match(/^idb:\/\/imports\/([A-Za-z0-9._:-]{1,200})$/);
+          if (sourceMatch) {
+            const asset = await dbGet('imports', sourceMatch[1]);
+            if (!asset?.blob) throw new Error('The selected imported image is missing.');
+            sourceBlob = asset.blob;
+          } else {
+            const response = await fetch(targetSource, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error('Could not read the selected image for AI Cutout.');
+            sourceBlob = await response.blob();
+          }
+
+          if (!sourceBlob?.type?.startsWith('image/')) {
+            throw new Error('The selected image format cannot be used for AI Cutout.');
+          }
+          if (sourceBlob.size > MAX_IMAGE_IMPORT_BYTES) {
+            throw new Error('This image is too large for reliable AI cutout on an iPhone.');
+          }
+          if (!isCurrent()) return;
+
+          let lastModelProgress = -1;
+          const maskBlob = await createAICutoutMask(sourceBlob, (progress) => {
+            if (progress?.status === 'progress' && Number.isFinite(Number(progress.progress))) {
+              const percentage = Math.max(0, Math.min(100, Math.round(Number(progress.progress))));
+              if (percentage === 100 || percentage - lastModelProgress >= 5) {
+                lastModelProgress = percentage;
+                setAiCutoutStatus('Loading AI model · ' + percentage + '%');
+              }
+            } else if (progress?.status === 'loading' || progress?.status === 'initiate' || progress?.status === 'download') {
+              setAiCutoutStatus('Loading AI model…');
+            } else if (progress?.status === 'segmenting') {
+              setAiCutoutStatus('Finding the subject…');
+            }
+          });
+          if (!isCurrent()) return;
+
+          const current = designRef.current;
+          const currentLayer = targetId === 'artwork'
+            ? null
+            : (current.customLayers || []).find((layer) => layer.id === targetId && layer.type === 'image');
+          if (
+            (targetId === 'artwork' && current.background !== targetSource) ||
+            (targetId !== 'artwork' && (currentLayer?.src !== targetSource || currentLayer.hidden || currentLayer.locked))
+          ) {
+            setMessage('The selected image changed before AI Cutout finished. Try again.');
+            return;
+          }
+
+          const id = makeId('ai-mask');
+          const asset = {
+            id,
+            name: 'AI cutout mask · ' + safeDisplayText(targetName, 'Image', 120),
+            type: 'image/png',
+            role: 'ai-mask',
+            blob: maskBlob,
+            createdAt: Date.now()
+          };
+          await dbPut('imports', asset);
+          if (!isCurrent()) {
+            await dbDelete('imports', id).catch(() => {});
+            return;
+          }
+          const maskSource = 'idb://imports/' + id;
+          setImports((items) => [importListItem(asset), ...items.filter((entry) => entry.id !== id)]);
+          if (targetId === 'artwork') {
+            patch({ backgroundMaskSource: maskSource });
+          } else {
+            updateLayer(targetId, { maskSource });
+          }
+
+          const applied = targetId === 'artwork'
+            ? designRef.current.backgroundMaskSource === maskSource
+            : (designRef.current.customLayers || []).some(
+                (layer) => layer.id === targetId && layer.maskSource === maskSource
+              );
+          if (!applied) {
+            await dbDelete('imports', id).catch(() => {});
+            setImports((items) => items.filter((entry) => entry.id !== id));
+            setMessage('AI Cutout could not be applied to the selected image.');
+            return;
+          }
+          setMessage('AI cutout ready · refine edges with Erase and Restore');
+        } catch (error) {
+          const text = String(error?.message || '');
+          setMessage(
+            /fetch|network|download|load failed/i.test(text)
+              ? 'Could not load the AI model. Connect to the internet and try again.'
+              : text || 'AI Cutout could not finish on this device.'
+          );
+        }
+      });
+    } finally {
+      setAiCutoutBusy(false);
+      setAiCutoutStatus('');
+    }
+  }
+
   function recordGestureHistory() {
     if (gestureHistoryRecorded.current || !gestureStartDesign.current) return;
     undoRef.current = [...undoRef.current.slice(-49), gestureStartDesign.current];
@@ -6241,6 +7111,7 @@ export default function Page() {
     // additional touches so an accidental third finger cannot stale the
     // pinch baseline and cause a jump when it lifts.
     if (pointers.current.size >= 2) return;
+    if (pointers.current.size > 0 && (gestureTarget.current?.startsWith('mask:') || gestureTarget.current === 'mask-idle')) return;
 
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -6248,12 +7119,26 @@ export default function Page() {
 
     if (pointers.current.size === 0) {
       historyGroupRef.current = { key: '', at: 0 };
-      const target = hitTestElement(event);
+      const maskToolActive = studioTool === 'effects' && studioSubtool === 'mask';
+      const maskLayer = maskToolActive
+        ? (designRef.current.customLayers || []).find((layer) => layer.id === selectedElement && layer.type === 'image')
+        : null;
+      const target = maskToolActive
+        ? (
+            maskLayer && maskPointForLayer(event, maskLayer)
+              ? 'mask:' + maskLayer.id
+              : selectedElement === 'artwork' && maskPointForArtwork(event)
+                ? 'mask:artwork'
+                : 'mask-idle'
+          )
+        : hitTestElement(event);
       gestureTarget.current = target;
       gestureStartDesign.current = designRef.current;
       gestureHistoryRecorded.current = false;
 
-      if (target === 'card-text') {
+      if (target.startsWith('mask:') || target === 'mask-idle') {
+        activeMaskStrokeRef.current = null;
+      } else if (target === 'card-text') {
         setSelectedElement('card-text');
         setStudioTool('card');
         setStudioSubtool('number');
@@ -6271,6 +7156,8 @@ export default function Page() {
           else if (tappedLayer?.type === 'image' || tappedLayer?.type === 'shape' || tappedLayer?.type === 'contactless') { setStudioTool('crop'); setStudioSubtool('transform'); }
         }
       }
+
+      if (target.startsWith('mask:')) appendMaskStrokePoint(target.slice('mask:'.length), event, true);
     }
 
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -6326,6 +7213,16 @@ export default function Page() {
     event.preventDefault();
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     const target = gestureTarget.current || selectedElement;
+
+    if (target === 'mask-idle') {
+      lastPoint.current = { x: event.clientX, y: event.clientY };
+      return;
+    }
+    if (target.startsWith('mask:')) {
+      appendMaskStrokePoint(target.slice('mask:'.length), event);
+      lastPoint.current = { x: event.clientX, y: event.clientY };
+      return;
+    }
 
     if (pointers.current.size === 1 && lastPoint.current) {
       const rect = event.currentTarget.getBoundingClientRect();
@@ -6577,6 +7474,7 @@ export default function Page() {
   }
 
   function pointerUp(event) {
+    if (!pointers.current.has(event.pointerId)) return;
     pointers.current.delete(event.pointerId);
 
     if (pointers.current.size === 1) {
@@ -6595,6 +7493,7 @@ export default function Page() {
       if (gestureHistoryRecorded.current) {
         replaceDesign(designRef.current);
       }
+      activeMaskStrokeRef.current = null;
       setActiveGuides({ x: null, y: null });
       gestureStartDesign.current = null;
       gestureHistoryRecorded.current = false;
@@ -6846,6 +7745,20 @@ export default function Page() {
   const activeImageLabel = selectedImageLayer
     ? (selectedImageLayer.name || 'Image Layer')
     : 'Artwork';
+  const maskTargetAvailable = activeImageEditable && (
+    Boolean(selectedImageLayer) ||
+    (selectedElement === 'artwork' && Boolean(design.background))
+  );
+  const activeMaskStrokes = selectedImageLayer
+    ? selectedImageLayer.maskStrokes || []
+    : selectedElement === 'artwork'
+      ? design.backgroundMaskStrokes || []
+      : [];
+  const activeAIMaskSource = selectedImageLayer
+    ? selectedImageLayer.maskSource || ''
+    : selectedElement === 'artwork'
+      ? design.backgroundMaskSource || ''
+      : '';
   const activeEffectThumbnail = selectedImageLayer
     ? layerImages[selectedImageLayer.id]?.src
     : image?.src;
@@ -6992,7 +7905,7 @@ export default function Page() {
         )}
       </div>
 
-      <div className={'cardFrame ' + (previewMode === 'physical' ? 'physicalCard' : '') + (tab === 'studio' && previewMode === 'flat' && guidesEnabled ? ' cardGuidesVisible' : '')}>
+      <div className={'cardFrame ' + (previewMode === 'physical' ? 'physicalCard' : '') + (previewMode === 'physical' && threePreviewReady ? ' physicalThreeReady' : '') + (tab === 'studio' && previewMode === 'flat' && guidesEnabled ? ' cardGuidesVisible' : '')}>
         <canvas
           ref={canvasRef}
           width={EDITOR_PREVIEW_W}
@@ -7013,6 +7926,10 @@ export default function Page() {
               : 'Physical card preview. Tap to return to Flat editing mode.'
           }
         />
+
+        {previewMode === 'physical' && canvasRef.current ? (
+          <ThreeCardPreview sourceCanvas={canvasRef.current} revision={canvasRevision} onReady={() => setThreePreviewReady(true)} />
+        ) : null}
 
         {tab === 'studio' && previewMode === 'flat' && guidesEnabled ? (
           <div className="cardGuides" aria-hidden="true">
@@ -7349,15 +8266,18 @@ export default function Page() {
                 <div className="contextPanelHeader">{studioSubtool ? <button type="button" className="contextBack" onClick={()=>setStudioSubtool('')}>‹</button> : <span/>}<strong>{studioSubtool ? ({font:'Font',style:'Style',color:'Color',shadow:'Shadow',spacing:'Spacing',align:'Align',layer:'Layer'}[studioSubtool] || 'Text') : 'Text'}</strong><button type="button" className="studioPanelDone" aria-label="Close Text panel" title="Close Text panel" onClick={closeStudioPanel}>✓</button></div>
                 {selectedLayer?.type === 'text' ? <>
                   {!studioSubtool ? <><textarea className="capcutTextInput iosTextArea" rows={3} disabled={Boolean(selectedLayer.locked)} value={selectedLayer.text||''} aria-label="Layer text" onChange={(e)=>updateLayer(selectedLayer.id,{text:splitGraphemes(e.target.value).slice(0,500).join('')})}/><div className="textLayerQuickActions"><button type="button" className="destructive" disabled={Boolean(selectedLayer.locked)} onClick={()=>deleteLayer(selectedLayer.id)}>Delete Text</button></div><div className="capcutSubtools">
-                    {['font','style','color','shadow','spacing','align','layer'].map((key)=><button type="button" key={key} onClick={()=>setStudioSubtool(key)}><span className={key==='color'?'textColorToolIcon':''} style={key==='color'?{'--selected-text-color':selectedLayer.color||'#ffffff'}:undefined}>{{font:'Aa',style:'B',color:'',shadow:'◔',spacing:'≡',align:'☰',layer:'≡'}[key]}</span><small>{key[0].toUpperCase()+key.slice(1)}</small></button>)}
+                    {['font','style','outline','curve','color','shadow','spacing','align','saved','layer'].map((key)=><button type="button" key={key} className={studioSubtool===key?'active':''} onClick={()=>setStudioSubtool(key)}><span className={key==='color'?'textColorToolIcon':''} style={key==='color'?{'--selected-text-color':selectedLayer.color||'#ffffff'}:undefined}>{{font:'Aa',style:'B',outline:'◉',curve:'⌒',color:'',shadow:'◔',spacing:'≡',align:'☰',saved:'★',layer:'≡'}[key]}</span><small>{{font:'Font',style:'Style',outline:'Outline',curve:'Curve',color:'Color',shadow:'Shadow',spacing:'Spacing',align:'Align',saved:'Saved',layer:'Layer'}[key]}</small></button>)}
                   </div></> : null}
                   <fieldset disabled={Boolean(selectedLayer.locked)} style={{border:0,padding:0,margin:0,minWidth:0}}>
-                  {studioSubtool==='font'?<><div className="segmentedControl capcutSegmented">{[['system','System'],['rounded','Rounded'],['serif','Serif'],['mono','Mono']].map(([v,l])=><button type="button" key={v} className={selectedLayer.fontFamily===v?'selected':''} onClick={()=>updateLayer(selectedLayer.id,{fontFamily:v})}>{l}</button>)}</div><SliderRow label="Size" value={selectedLayer.fontSize||58} min={10} max={240} step={1} onChange={(v)=>updateLayer(selectedLayer.id,{fontSize:v})}/></>:null}
+                  {studioSubtool==='font'?<><div className="segmentedControl capcutSegmented">{[['system','System'],['rounded','Rounded'],['serif','Serif'],['mono','Mono']].map(([v,l])=><button type="button" key={v} className={!selectedLayer.fontId&&selectedLayer.fontFamily===v?'selected':''} onClick={()=>updateLayer(selectedLayer.id,{fontFamily:v,fontId:''})}>{l}</button>)}</div>{customFonts.length?<div className="textFontRail">{customFonts.map((font)=><button type="button" key={font.id} className={selectedLayer.fontId===font.id?'selected':''} onClick={async()=>{await ensureCustomFontLoaded(font.id);updateLayer(selectedLayer.id,{fontId:font.id})}}>{font.name}</button>)}</div>:null}<button type="button" className="capcutPrimaryTile textFontImport" disabled={fontImportBusy} onClick={()=>fontUploadRef.current?.click()}>{fontImportBusy?'Loading Font…':'Import Font · TTF / OTF / WOFF'}</button><input ref={fontUploadRef} type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" hidden onChange={importTextFont}/><p className="textFontRightsHint">Make sure you have rights to use uploaded fonts.</p><SliderRow label="Size" value={selectedLayer.fontSize||58} min={10} max={240} step={1} onChange={(v)=>updateLayer(selectedLayer.id,{fontSize:v})}/></>:null}
                   {studioSubtool==='style'?<><div className="capcutSubtools"><button type="button" className={Number(selectedLayer.weight||700)>=700?'active':''} onClick={()=>updateLayer(selectedLayer.id,{weight:Number(selectedLayer.weight||700)>=700?400:800})}><span>B</span><small>Bold</small></button></div><SliderRow label="Weight" value={selectedLayer.weight||700} min={100} max={900} step={100} onChange={(v)=>updateLayer(selectedLayer.id,{weight:v})}/></>:null}
+                  {studioSubtool==='outline'?<><label className="capcutColorPicker"><input aria-label="Text outline color" type="color" value={selectedLayer.outlineColor||'#000000'} onChange={(e)=>updateLayer(selectedLayer.id,{outlineColor:e.target.value})}/><span>Outline · {selectedLayer.outlineColor||'#000000'}</span></label><SliderRow label="Outline Width" value={selectedLayer.outlineWidth??0} min={0} max={24} step={0.5} onChange={(v)=>updateLayer(selectedLayer.id,{outlineWidth:v})}/></>:null}
+                  {studioSubtool==='curve'?<><SliderRow label="Curve" value={selectedLayer.curve??0} min={-180} max={180} step={1} suffix="°" onChange={(v)=>updateLayer(selectedLayer.id,{curve:v})}/><button type="button" className="settingsResetButton" onClick={()=>updateLayer(selectedLayer.id,{curve:0})}>Straighten Text</button></>:null}
                   {studioSubtool==='color'?<><div className="backgroundSwatches">{['#ffffff','#000000','#ff375f','#ff9f0a','#ffd60a','#30d158','#64d2ff','#0a84ff','#5e5ce6','#bf5af2'].map((v)=><button type="button" key={v} aria-label={'Text color '+v} style={{background:v}} onClick={()=>updateLayer(selectedLayer.id,{color:v})}/>)}</div><label className="capcutColorPicker"><input aria-label="Custom text color" type="color" value={selectedLayer.color||'#ffffff'} onChange={(e)=>updateLayer(selectedLayer.id,{color:e.target.value})}/><span>Custom · {selectedLayer.color||'#ffffff'}</span></label></>:null}
                   {studioSubtool==='shadow'?<SwitchRow label="Shadow" value={Boolean(selectedLayer.shadow)} onChange={(v)=>updateLayer(selectedLayer.id,{shadow:v})}/>:null}
-                  {studioSubtool==='spacing'?<><SliderRow label="Letter Spacing" value={selectedLayer.letterSpacing||0} min={-4} max={30} step={0.1} onChange={(v)=>updateLayer(selectedLayer.id,{letterSpacing:v})}/><SliderRow label="Line Height" value={selectedLayer.lineHeight||1.18} min={0.7} max={2.4} step={0.01} onChange={(v)=>updateLayer(selectedLayer.id,{lineHeight:v})}/></>:null}
+                  {studioSubtool==='spacing'?<><SliderRow label="Tracking" value={selectedLayer.letterSpacing||0} min={-4} max={30} step={0.1} onChange={(v)=>updateLayer(selectedLayer.id,{letterSpacing:v})}/><SliderRow label="Line Spacing" value={selectedLayer.lineHeight||1.18} min={0.65} max={2.4} step={0.01} onChange={(v)=>updateLayer(selectedLayer.id,{lineHeight:v})}/></>:null}
                   {studioSubtool==='align'?<div className="segmentedControl capcutSegmented">{['left','center','right'].map(v=><button type="button" key={v} className={selectedLayer.align===v?'selected':''} onClick={()=>updateLayer(selectedLayer.id,{align:v})}>{v}</button>)}</div>:null}
+                  {studioSubtool==='saved'?<><div className="textStyleComposer"><input className="iosTextField" aria-label="Text style name" placeholder="Name this style" value={textStyleName} onChange={(e)=>setTextStyleName(splitGraphemes(e.target.value).slice(0,60).join(''))}/><button type="button" onClick={saveTextStyle}>Save Current Style</button></div>{textStyles.length?<div className="textStyleRail">{textStyles.map((style)=><div className="textStyleItem" key={style.id}><button type="button" onClick={()=>applyTextStyle(style)}>{style.name}</button><button type="button" aria-label={'Delete '+style.name} onClick={()=>deleteTextStyle(style.id)}>×</button></div>)}</div>:<p className="textStyleEmpty">Saved text looks will appear here.</p>}</>:null}
                   </fieldset>
                   {studioSubtool==='layer'?<><SliderRow label="Opacity" value={selectedLayer.opacity??1} min={0} max={1} step={0.01} disabled={Boolean(selectedLayer.locked)} onChange={(v)=>updateLayer(selectedLayer.id,{opacity:v})}/><SwitchRow label="Show Layer" value={!selectedLayer.hidden} onChange={(v)=>updateLayer(selectedLayer.id,{hidden:!v})}/><SwitchRow label="Lock Layer" value={Boolean(selectedLayer.locked)} onChange={(v)=>updateLayer(selectedLayer.id,{locked:v})}/><div className="layerActionGrid layerSingleAction"><button type="button" onClick={()=>duplicateLayer(selectedLayer.id)}>Duplicate</button></div></>:null}
                 </> : <button type="button" className="capcutPrimaryTile" onClick={addTextLayer}>+ Add Text</button>}
@@ -7416,7 +8336,7 @@ export default function Page() {
                 </div>:null}
                 {studioSubtool==='color'?<><div className="backgroundSwatches">{['#000000','#ffffff','#1c1c1e','#3a3a3c','#ff375f','#ff9f0a','#ffd60a','#30d158','#64d2ff','#0a84ff','#5e5ce6','#bf5af2'].map(v=><button type="button" key={v} aria-label={'Background '+v} style={{background:v}} onClick={()=>patch({background:'',backgroundColor:v,gradient:''})}/>)}</div><label className="capcutColorPicker"><input aria-label="Custom background color" type="color" value={design.backgroundColor||'#000000'} onChange={(e)=>patch({background:'',backgroundColor:e.target.value,gradient:''})}/><span>Custom · {design.backgroundColor||'#000000'}</span></label></>:null}
                 {studioSubtool==='gradient'?<div className="presetScroller capcutPresetStrip">{GRADIENTS.map(g=><button type="button" key={g.id} onClick={()=>patch({background:'',backgroundColor:'',gradient:g.id})}>{g.name||g.id}</button>)}</div>:null}
-                {studioSubtool==='image'?<><div className="backgroundImportActions"><button type="button" className="capcutPrimaryTile" disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={()=>{uploadIntentRef.current='replace-artwork';uploadRef.current?.click()}}><IOSIcon name="photo" size={20}/> Replace Artwork</button><button type="button" className="capcutPrimaryTile" disabled={imageImportInProgress||presetTransferInProgress||cleanupInProgress} onClick={()=>layerUploadRef.current?.click()}><IOSIcon name="photo" size={20}/> Add Image / Logo</button></div>{imports.length ? <div className="studioImportedArtwork"><strong>My Imports</strong>{imports.slice(0,12).map(asset=><button type="button" key={asset.id} disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={()=>replaceWithImportedArtwork(asset)}><IOSIcon name="photo" size={18}/><span>{asset.name}</span></button>)}</div> : null}<div className="backgroundRecentRail">{recent.slice(0,8).map((item,i)=><button type="button" key={item.id||item.image||i} onClick={()=>item.image&&replaceWithRecentArtwork(item)}>{item.image?<img src={item.image} alt=""/>:<span>Image</span>}</button>)}</div></>:null}
+                {studioSubtool==='image'?<><div className="backgroundImportActions"><button type="button" className="capcutPrimaryTile" disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={()=>{uploadIntentRef.current='replace-artwork';uploadRef.current?.click()}}><IOSIcon name="photo" size={20}/> Replace Artwork</button><button type="button" className="capcutPrimaryTile" disabled={imageImportInProgress||presetTransferInProgress||cleanupInProgress} onClick={()=>layerUploadRef.current?.click()}><IOSIcon name="photo" size={20}/> Add Image / Logo</button></div>{visibleImports.length ? <div className="studioImportedArtwork"><strong>My Imports</strong>{visibleImports.slice(0,12).map(asset=><button type="button" key={asset.id} disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={()=>replaceWithImportedArtwork(asset)}><IOSIcon name="photo" size={18}/><span>{asset.name}</span></button>)}</div> : null}<div className="backgroundRecentRail">{recent.slice(0,8).map((item,i)=><button type="button" key={item.id||item.image||i} onClick={()=>item.image&&replaceWithRecentArtwork(item)}>{item.image?<img src={item.image} alt=""/>:<span>Image</span>}</button>)}</div></>:null}
                 {studioSubtool==='blur'?<SliderRow label="Blur" value={design.blur} min={0} max={1} step={0.01} onChange={(v)=>patch({blur:v})}/>:null}
               </section>
             ) : null}
@@ -7692,8 +8612,32 @@ export default function Page() {
                 <div className="editingTargetBar"><span><strong>Editing {activeImageLabel}</strong><small>Effects affect this image only</small></span>{selectedImageLayer || (design.customLayers || []).some((layer) => layer.type === 'image' && !layer.hidden) ? <button type="button" onClick={() => setSelectedElement(selectedImageLayer ? 'artwork' : ((design.customLayers || []).find((layer) => layer.type === 'image' && !layer.hidden)?.id || 'artwork'))}>{selectedImageLayer ? 'Artwork' : 'Image Layer'}</button> : null}</div>
                 <div className="effectTileRail">
                     <button type="button" disabled={!activeImageEditable} onClick={() => patchImageTarget({vignette:0,grain:0,gloss:0,overlay:0,fade:0,effectTintStrength:0})}><i className="effectNone"/><small>None</small></button>
-                    {[['gloss','Gloss'],['grain','Grain'],['vignette','Vignette'],['fade','Film'],['overlay','Dark'],['tintfx','Tint']].map(([key,label]) => <button type="button" key={key} className={studioSubtool===key?'active':''} onClick={() => setStudioSubtool(key)}><i className={'effectSwatch '+key}>{activeEffectThumbnail ? <img src={activeEffectThumbnail} alt=""/> : null}</i><small>{label}</small></button>)}
+                    {[['gloss','Gloss'],['grain','Grain'],['vignette','Vignette'],['fade','Film'],['overlay','Dark'],['tintfx','Tint'],['mask','Mask']].map(([key,label]) => <button type="button" key={key} disabled={key==='mask'&&!maskTargetAvailable} className={studioSubtool===key?'active':''} onClick={() => setStudioSubtool(key)}><i className={'effectSwatch '+key}>{key!=='mask'&&activeEffectThumbnail ? <img src={activeEffectThumbnail} alt=""/> : key==='mask'?'◌':null}</i><small>{label}</small></button>)}
                 </div>
+                {studioSubtool === 'mask' ? (
+                  maskTargetAvailable ? <>
+                    <button
+                      type="button"
+                      className="capcutPrimaryTile aiCutoutButton"
+                      disabled={!activeImageEditable || aiCutoutBusy || imageImportInProgress || presetTransferInProgress || cleanupInProgress}
+                      aria-busy={aiCutoutBusy}
+                      onClick={applyAICutout}
+                    >
+                      <IOSIcon name="effects" size={19}/>
+                      <span>{aiCutoutBusy ? (aiCutoutStatus || 'Preparing AI Cutout…') : activeAIMaskSource ? 'Run AI Cutout Again' : 'AI Cutout'}</span>
+                    </button>
+                    <p className="aiCutoutHint">Runs on your device. First use downloads a 44–88 MB model. Use Erase and Restore to refine edges.</p>
+                    {activeAIMaskSource ? <button type="button" className="settingsResetButton" disabled={aiCutoutBusy} onClick={()=>selectedImageLayer ? updateLayer(selectedImageLayer.id,{maskSource:''}) : patch({backgroundMaskSource:''})}>Reset AI Cutout</button> : null}
+                    <div className="maskModeSwitch" role="group" aria-label="Image mask brush mode">
+                      <button type="button" className={maskMode==='erase'?'selected':''} aria-pressed={maskMode==='erase'} onClick={()=>setMaskMode('erase')}>Erase</button>
+                      <button type="button" className={maskMode==='restore'?'selected':''} aria-pressed={maskMode==='restore'} onClick={()=>setMaskMode('restore')}>Restore</button>
+                    </div>
+                    <SliderRow label="Brush Size" value={maskBrushSize} min={4} max={96} step={1} suffix=" px" onChange={setMaskBrushSize}/>
+                    <SliderRow label="Edge Softness" value={maskFeather} min={0} max={32} step={1} suffix=" px" onChange={setMaskFeather}/>
+                    <p className="maskHelpText">Paint on {selectedImageLayer ? activeImageLabel : 'card artwork'}. Strokes stay editable, and the imported image stays intact.</p>
+                    <button type="button" className="settingsResetButton" disabled={!activeMaskStrokes.length} onClick={()=>selectedImageLayer ? updateLayer(selectedImageLayer.id,{maskStrokes:[]}) : patch({backgroundMaskStrokes:[]})}>Clear Mask</button>
+                  </> : <p className="maskHelpText">Select the card artwork or an unlocked Image / Logo layer to mask it.</p>
+                ) : null}
                 {studioSubtool ? <>
                     {studioSubtool === 'gloss' ? <SliderRow label="Gloss" value={activeImageSettings.gloss} min={0} max={0.8} step={0.01} disabled={!activeImageEditable} onChange={(value)=>patchImageTarget({gloss:value})}/> : null}
                     {studioSubtool === 'grain' ? <SliderRow label="Grain" value={activeImageSettings.grain} min={0} max={0.22} step={0.005} disabled={!activeImageEditable} onChange={(value)=>patchImageTarget({grain:value})}/> : null}
@@ -7857,10 +8801,10 @@ export default function Page() {
             />
 
             <section className="browseSection">
-              <div className="browseHeading"><h2>Imports</h2><span>{imports.length}</span></div>
-              {imports.length ? (
+              <div className="browseHeading"><h2>Imports</h2><span>{visibleImports.length}</span></div>
+              {visibleImports.length ? (
                 <div className="importList">
-                  {imports.map((asset) => (
+                  {visibleImports.map((asset) => (
                     <button
                       type="button"
                       className="actionRow"

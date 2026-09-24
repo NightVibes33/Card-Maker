@@ -17,6 +17,8 @@ const storage = read('app/lib/storage.js');
 const imageRoute = read('app/api/image/route.js');
 const inspectRoute = read('app/api/cucu/inspect/route.js');
 const imagePolicy = read('app/lib/imagePolicy.js');
+const aiCutout = read('app/lib/aiCutout.mjs');
+const threePreview = read('app/components/ThreeCardPreview.jsx');
 
 const pageChecks = [
   [/const \[studioPanelOpen, setStudioPanelOpen\] = useState\(true\);/, 'Studio context panel starts open'],
@@ -61,6 +63,31 @@ const pageChecks = [
   [/loadedImageLayerSourceKey === imageLayerSourceKey/, 'image layers are source-key gated'],
   [/loadedBackgroundKey === renderDesign\.background/, 'background rendering is source-key gated'],
   [/label="Corner Radius"/, 'shape corner-radius control exists'],
+  [/normalized\.fontId =/, 'text layers retain an optional imported font ID'],
+  [/normalized\.outlineWidth = finiteClamp\(layer\.outlineWidth/, 'text outline width is safely bounded'],
+  [/normalized\.curve = finiteClamp\(layer\.curve/, 'text curve is safely bounded'],
+  [/drawTrackedText\([\s\S]{0,360}outlineColor:[\s\S]{0,120}curve:/, 'text outlines and curves render into the same card artwork'],
+  [/MAX_IMPORTED_FONT_BYTES = 12 \* 1024 \* 1024/, 'custom font imports have a size bound'],
+  [/accept="\.ttf,\.otf,\.woff,\.woff2/, 'custom font imports use browser-supported font formats'],
+  [/dbPut\('kv', \{ id: 'text-styles', styles: next \}\)/, 'reusable text styles persist locally'],
+  [/normalized\.maskStrokes = normalizeMaskStrokes\(layer\.maskStrokes\)/, 'mask strokes are sanitized when image layers enter design state'],
+  [/normalized\.maskSource = normalized\.src[\s\S]{0,120}normalizeImportArtworkSource\(layer\.maskSource\)/, 'AI layer mattes persist with their image layers'],
+  [/next\.backgroundMaskStrokes = normalizeMaskStrokes\(raw\.backgroundMaskStrokes\)/, 'main artwork masks survive draft and project restoration'],
+  [/next\.backgroundMaskSource = next\.background[\s\S]{0,120}normalizeImportArtworkSource\(raw\.backgroundMaskSource\)/, 'AI artwork mattes persist with the card design'],
+  [/delta\.background !== current\.background[\s\S]{0,430}backgroundMaskStrokes:[\s\S]{0,180}backgroundMaskSource:/, 'replacing the source artwork clears masks tied to the previous image'],
+  [/function maskPointForArtwork\(event\)[\s\S]{0,2200}current\.flipX[\s\S]{0,600}maskBrushSize/, 'artwork mask coordinates follow crop, fit, zoom, rotation, and flip'],
+  [/selectedElement === 'artwork' && maskPointForArtwork\(event\)[\s\S]{0,80}'mask:artwork'/, 'the mask brush can target imported card artwork'],
+  [/backgroundMaskStrokes: strokes/, 'main artwork mask strokes use the same live gesture and history path as image layers'],
+  [/drawMaskedImageLayer\([\s\S]{0,250}renderDesign\.backgroundMaskStrokes/, 'main artwork masks render through the shared PNG export renderer'],
+  [/activeMaskStrokes\.length[\s\S]{0,240}backgroundMaskStrokes:\[\]/, 'the clear-mask action clears the currently selected artwork target'],
+  [/ctx\.drawImage\(maskedLayerCanvas, -w \/ 2, -h \/ 2, w, h\)/, 'masked image layers still use the shared card renderer and export path'],
+  [/stencilCtx\.drawImage\(aiMaskImage, 0, 0, targetWidth, targetHeight\)/, 'AI alpha mattes render through the shared card/export mask compositor'],
+  [/drawMaskedImageLayer\([\s\S]{0,340}layerMaskImage/, 'image layer AI mattes and brush strokes share one editable mask path'],
+  [/addDesignImportRefs\(value, referenced\)/, 'AI masks stay protected during unused-import cleanup'],
+  [/addDesignImportRefs\(currentDesign, refs\)/, 'AI masks are included in exported design presets'],
+  [/pointerId: event\.pointerId/, 'mask gestures record the active finger ID'],
+  [/activeMaskStrokeRef\.current\.pointerId === event\.pointerId/, 'mask painting stays on one captured finger'],
+  [/quadraticCurveTo\(points\[index\]\.x, points\[index\]\.y, midpoint\.x, midpoint\.y\)/, 'mask brush strokes are smoothed between touch samples'],
   [/label="Show Layer"/, 'hidden layers remain recoverable'],
   [/Clean Unused Imports/, 'unused import cleanup exists'],
   [/renderAssetsReady/, 'exports are gated on decoded assets'],
@@ -77,7 +104,7 @@ const pageChecks = [
   [/target === 'card-text'[\s\S]{0,500}patch\(\{ cardTextOffsetX: nextX, cardTextOffsetY: nextY \}, false\)/, 'built-in card text can move freely on the canvas'],
   [/renderCardRef\.current\(context, EDITOR_PREVIEW_W, EDITOR_PREVIEW_H, \{\s*design: pending\s*\}\)[\s\S]{0,100}gestureRenderedDesignRef\.current = \{ design: pending, canvas \}/, 'gesture preview records which canvas received its frame'],
   [/gestureRender\.canvas === canvas/, 'a newly mounted canvas is never treated as already painted'],
-  [/showExportPreview, tab\]/, 'tab changes schedule a fresh canvas draw when re-entering Studio'],
+  [/showExportPreview, tab, previewMode\]/, 'tab changes schedule a fresh canvas draw when re-entering Studio'],
   [/function syncSelectionOutline\(target\)/, 'selection overlays have a direct manipulation update path'],
   [/syncSelectionOutline\(target\);/, 'selection outlines stay attached to objects during direct canvas movement'],
   [/function pointerUp\(event\)[\s\S]{0,1400}replaceDesign\(designRef\.current\)/, 'final finger position commits to React state, history, and autosave'],
@@ -107,7 +134,7 @@ const pageChecks = [
   [/function pointInBuiltinText\(/, 'built-in card text is directly tappable'],
   [/return 'card-text';/, 'built-in text hit testing routes to card controls'],
   [/setStudioTool\('card'\)/, 'tapping built-in text opens the Card tool'],
-  [/label="Line Height"/, 'multiline text has line-height controls'],
+  [/label="Line Spacing"/, 'multiline text has line-spacing controls'],
   [/<textarea[\s\S]*aria-label="Layer text"/, 'text layers use a multiline editor'],
   [/designRef\.current === startupDesign/, 'startup hydration does not overwrite newer edits'],
   [/async function saveProject\([\s\S]*?if \(!hydrated\)/, 'named project saves wait for Library hydration before enforcing project limits'],
@@ -153,7 +180,7 @@ const pageChecks = [
   [/const fallbackDraft = localStorage\.getItem\('aircard-sticker-fvp-v3'\)/, 'cleanup protects local fallback draft assets'],
   [/storedImports = await dbGetImportMetadata\(\)/, 'import cleanup verifies authoritative IndexedDB metadata'],
   [/Could not verify the fallback draft, so no imported images were removed\./, 'import cleanup fails closed if fallback draft verification fails'],
-  [/const layers = Array\.isArray\(value\.customLayers\) \? value\.customLayers : \[\];/, 'import cleanup tolerates malformed legacy customLayers'],
+  [/for \(const layer of Array\.isArray\(design\.customLayers\) \? design\.customLayers : \[\]\)/, 'import cleanup tolerates malformed legacy customLayers'],
   [/for \(const layer of currentDesign\.customLayers \|\| \[\]\)/, 'project saving scans custom layers for remote artwork'],
   [/some remote art is not cached offline/, 'project saving reports incomplete offline artwork caching'],
   [/const referencedPresetAssetIds = new Set\(\)/, 'preset import tracks only referenced embedded assets'],
@@ -207,6 +234,16 @@ const pageChecks = [
 ];
 
 for (const [pattern, label] of pageChecks) requireMatch(page, pattern, label);
+requireMatch(
+  aiCutout,
+  /function createAICutoutMask\([\s\S]{0,600}const devices = canUseWebGPU \? \['webgpu', 'wasm'\] : \['wasm'\]/,
+  'AI cutouts use WebGPU on supported iPhones with a WASM fallback'
+);
+requireMatch(
+  aiCutout,
+  /dtype: device === 'webgpu' \? 'fp16' : 'q8'/,
+  'AI cutouts use higher precision on the iPhone GPU path'
+);
 
 requireMatch(imagePolicy, /url\.protocol !== 'https:'/, 'persisted proxy targets require HTTPS');
 requireMatch(
@@ -214,6 +251,11 @@ requireMatch(
   /url\.username \|\|[\s\S]{0,80}url\.password/,
   'persisted proxy targets reject embedded credentials'
 );
+requireMatch(storage, /const DB_VERSION = 3;[\s\S]{0,140}const STORES = \[[^\]]*'fonts'/, 'custom fonts have a versioned local IndexedDB store');
+requireMatch(page, /dynamic\(\(\) => import\('\.\/components\/ThreeCardPreview'\), \{\s*ssr: false/, '3D preview stays lazy-loaded and client-only');
+requireMatch(threePreview, /new THREE\.CanvasTexture\(sourceCanvas\)/, '3D card uses the existing 2D artwork as its texture');
+requireMatch(threePreview, /texture\.needsUpdate = true/, '3D texture refreshes when card artwork changes');
+requireMatch(threePreview, /prefers-reduced-motion: reduce/, '3D motion respects the device reduced-motion setting');
 
 requireMatch(page, /onChange=\{emit\}/, 'range sliders use React controlled onChange');
 requireMatch(page, /type=\{Number\(min\) < 0 \? 'text' : 'number'\}/, 'signed Expert Mode fields remain typeable on iPhone');
@@ -289,7 +331,7 @@ requireMatch(sw, /if \(response\.status >= 500\)/, 'navigation falls back to cac
 requireMatch(sw, /requestedWidth > 0 && requestedWidth <= 800/, 'thumbnail cache routing is width-bounded');
 requireMatch(page, /proxyImageWidth\(item\.image, 3072\)/, 'editor artwork uses a bounded high-resolution working copy');
 
-requireMatch(storage, /const DB_VERSION = 2;/, 'IndexedDB schema includes import metadata migration');
+requireMatch(storage, /const DB_VERSION = 3;/, 'IndexedDB schema includes import metadata migration and custom fonts');
 requireMatch(storage, /'importMeta'/, 'import metadata store exists');
 requireMatch(storage, /export async function dbGetImportMetadata\(/, 'metadata-only import listing exists');
 requireMatch(storage, /async function serializeImportRecord\(/, 'imported image payloads detach from live File objects before IndexedDB storage');
@@ -338,7 +380,7 @@ requireMatch(page, /const MAX_STORED_LAYER_IMAGE_DIMENSION = 2560;/, 'custom ima
 requireMatch(page, /const MAX_VISIBLE_IMAGE_DECODE_PIXELS = 24_000_000;/, 'visible image-layer decoded pixels have a total iPhone memory budget');
 requireMatch(page, /decodedPixels \+ pixels > MAX_VISIBLE_IMAGE_DECODE_PIXELS/, 'image-layer hydration enforces the decoded-pixel budget');
 requireMatch(page, /Visible image layers exceed the safe iPhone memory budget/, 'image-layer memory pressure fails with a recoverable editor message');
-requireMatch(page, /const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS \+ 1;/, 'preset asset cap includes the background plus every custom layer');
+requireMatch(page, /const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS \* 2 \+ 2;/, 'preset asset cap includes each layer, its AI matte, and the card artwork');
 requireMatch(page, /refs\.size > MAX_PRESET_ASSETS/, 'preset export guards asset-count round-trip compatibility');
 requireMatch(
   page,
@@ -354,7 +396,7 @@ requireMatch(page, /const EDITOR_PREVIEW_W = 1024;/, 'interactive editor canvas 
 requireMatch(page, /const EDITOR_PREVIEW_H = 646;/, 'interactive editor canvas preserves the exact card ratio');
 requireMatch(page, /width=\{EDITOR_PREVIEW_W\}/, 'interactive canvas uses the reduced backing width');
 requireMatch(page, /height=\{EDITOR_PREVIEW_H\}/, 'interactive canvas uses the reduced backing height');
-requireMatch(page, /const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS \+ 1;/, 'preset asset capacity covers every custom layer plus the imported background');
+requireMatch(page, /const MAX_PRESET_ASSETS = MAX_CUSTOM_LAYERS \* 2 \+ 2;/, 'preset asset capacity covers each image matte and its source art');
 requireMatch(page, /const MAX_PRESET_IMPORT_BYTES = 48 \* 1024 \* 1024;/, 'preset transfer size is bounded for iPhone memory safety');
 requireMatch(page, /async function prepareLocalImageBlob\(/, 'oversized local images are downsampled before persistence');
 requireMatch(page, /webp\|avif\|heic\|heif/, 'WebP, AVIF, HEIC, and HEIF imports are raster-normalized for deterministic export');
@@ -366,7 +408,7 @@ requireMatch(
 );
 requireMatch(page, /parsed\.background = normalizePersistedArtworkSource\(parsed\.background, 3072\)/, 'legacy draft artwork is upgraded instead of cleared');
 requireMatch(page, /imported\.background = normalizePersistedArtworkSource\(imported\.background, 3072\)/, 'legacy preset background artwork is upgraded instead of cleared');
-requireMatch(page, /src: normalizePersistedArtworkSource\(src, MAX_STORED_LAYER_IMAGE_DIMENSION\)/, 'legacy preset image layers are upgraded instead of cleared');
+requireMatch(page, /normalizePersistedArtworkSource\(src, MAX_STORED_LAYER_IMAGE_DIMENSION\)/, 'legacy preset image layers are upgraded instead of cleared');
 requireMatch(page, /const decodedBySource = new Map\(\);/, 'duplicate image layers share decoded sources');
 requireMatch(page, /const animatedOrVectorSource =/, 'animated and vector imports are normalized');
 requireMatch(page, /chunkType === 'acTL'/, 'APNG animation is detected from the PNG animation-control chunk');

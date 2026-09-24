@@ -3,8 +3,8 @@
 import { parseAllowedRemoteImageUrl } from './imagePolicy';
 
 const DB_NAME = 'aircard-studio-v2';
-const DB_VERSION = 2;
-const STORES = ['kv', 'favorites', 'projects', 'imports', 'importMeta', 'exports'];
+const DB_VERSION = 3;
+const STORES = ['kv', 'favorites', 'projects', 'imports', 'importMeta', 'exports', 'fonts'];
 
 let metadataSegmenter = null;
 
@@ -31,11 +31,13 @@ function importMetadata(value = {}) {
   const type = truncateMetadataText(value.type, 80);
   const rawCreatedAt = Number(value.createdAt);
   const createdAt = Number.isFinite(rawCreatedAt) ? rawCreatedAt : Date.now();
+  const role = value.role === 'ai-mask' ? 'ai-mask' : 'image';
 
   return {
     id,
     name: name || 'Imported image',
     type: type || 'image/*',
+    role,
     createdAt
   };
 }

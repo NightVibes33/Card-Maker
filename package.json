@@ -7,13 +7,17 @@
     "build": "next build",
     "start": "next start",
     "verify:v2": "node scripts/verify-v2-contract.mjs",
-    "verify:editor": "node scripts/verify-editor-contract.mjs"
+    "verify:editor": "node scripts/verify-editor-contract.mjs",
+    "verify:ai-cutout": "node scripts/verify-ai-cutout.mjs"
   },
   "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "@react-three/fiber": "^9.8.0",
     "next": "^16.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "sharp": "^0.34.4"
+    "sharp": "^0.34.4",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "yaml": "^2.8.1"
