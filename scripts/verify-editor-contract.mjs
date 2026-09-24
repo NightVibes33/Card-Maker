@@ -19,6 +19,11 @@ const inspectRoute = read('app/api/cucu/inspect/route.js');
 const imagePolicy = read('app/lib/imagePolicy.js');
 
 const pageChecks = [
+  [/const \[studioPanelOpen, setStudioPanelOpen\] = useState\(true\);/, 'Studio context panel starts open'],
+  [/const closeStudioPanel = useCallback\(\(\) => \{[\s\S]{0,180}setStudioPanelOpen\(false\)/, 'Studio context panels have an explicit close action'],
+  [/aria-label="Close Edit panel"/, 'Edit panel close action is accessible'],
+  [/aria-label="Layers"[\s\S]{0,180}activateStudioTool\('layers'\)/, 'Layers is directly reachable from the Studio header'],
+  [/className="textLayerQuickActions"[\s\S]{0,260}Delete Text/, 'text deletion is visible on the main Text panel'],
   [/function normalizeDesignState\(/, 'restored designs are normalized'],
   [/next\.backgroundColor = raw\.backgroundColor \? normalizeHexColor\(raw\.backgroundColor, DEFAULTS\.backgroundColor\) : '';/, 'chosen background colors survive draft and project normalization'],
   [/next\.contactlessColor = normalizeHexColor\(/, 'card Contactless retains custom color across saves'],
