@@ -80,6 +80,61 @@ export function fitCutoutDimensions(width, height, maxEdge = MAX_CUTOUT_EDGE) {
   };
 }
 
+function otsuThreshold(alpha) {
+  const histogram = new Uint32Array(256);
+  let totalSum = 0;
+  for (const value of alpha) {
+    histogram[value] += 1;
+    totalSum += value;
+  }
+
+  const total = alpha.length;
+  let backgroundWeight = 0;
+  let backgroundSum = 0;
+  let bestVariance = -1;
+  let threshold = 0;
+  for (let value = 0; value < 255; value += 1) {
+    backgroundWeight += histogram[value];
+    if (!backgroundWeight) continue;
+    const foregroundWeight = total - backgroundWeight;
+    if (!foregroundWeight) break;
+    backgroundSum += value * histogram[value];
+    const backgroundMean = backgroundSum / backgroundWeight;
+    const foregroundMean = (totalSum - backgroundSum) / foregroundWeight;
+    const weight = backgroundWeight / total;
+    const variance = weight * (1 - weight) * (backgroundMean - foregroundMean) ** 2;
+    if (variance > bestVariance) {
+      bestVariance = variance;
+      threshold = value;
+    }
+  }
+  return threshold;
+}
+
+export function refineMatteAlpha(alpha) {
+  if (!(alpha instanceof Uint8Array || alpha instanceof Uint8ClampedArray) || !alpha.length) {
+    throw new Error('The AI model returned an invalid cutout mask.');
+  }
+
+  const threshold = otsuThreshold(alpha);
+  // A threshold near either extreme means the model already returned a clean,
+  // high-contrast cutout. Leave its antialiased edge pixels untouched.
+  if (threshold <= 12 || threshold >= 243) return new Uint8ClampedArray(alpha);
+
+  // ORMBG can return a very low-contrast matte on artwork. Push uncertain
+  // background pixels toward transparent and confident subject pixels toward
+  // opaque, while retaining a narrow smooth transition for hair and edges.
+  const low = Math.max(0, threshold - 8);
+  const high = Math.min(255, threshold + 48);
+  const span = Math.max(1, high - low);
+  const refined = new Uint8ClampedArray(alpha.length);
+  for (let index = 0; index < alpha.length; index += 1) {
+    const value = Math.max(0, Math.min(1, (alpha[index] - low) / span));
+    refined[index] = Math.round(value * value * (3 - 2 * value) * 255);
+  }
+  return refined;
+}
+
 export function extractMattePixels(output) {
   const width = Number(output?.width || 0);
   const height = Number(output?.height || 0);
@@ -158,6 +213,7 @@ function readSourceAlpha(canvas, width, height) {
 
 async function matteBlob(output, sourceCanvas) {
   const matte = extractMattePixels(output);
+  const refinedAlpha = refineMatteAlpha(matte.alpha);
   const scale = Math.min(1, 2048 / Math.max(matte.width, matte.height));
   const width = Math.max(1, Math.round(matte.width * scale));
   const height = Math.max(1, Math.round(matte.height * scale));
@@ -178,8 +234,8 @@ async function matteBlob(output, sourceCanvas) {
       const x0 = Math.floor(sourceX);
       const x1 = Math.min(matte.width - 1, x0 + 1);
       const fx = sourceX - x0;
-      const top = matte.alpha[y0 * matte.width + x0] * (1 - fx) + matte.alpha[y0 * matte.width + x1] * fx;
-      const bottom = matte.alpha[y1 * matte.width + x0] * (1 - fx) + matte.alpha[y1 * matte.width + x1] * fx;
+      const top = refinedAlpha[y0 * matte.width + x0] * (1 - fx) + refinedAlpha[y0 * matte.width + x1] * fx;
+      const bottom = refinedAlpha[y1 * matte.width + x0] * (1 - fx) + refinedAlpha[y1 * matte.width + x1] * fx;
       const offset = (y * width + x) * 4;
       imageData.data[offset] = 255;
       imageData.data[offset + 1] = 255;

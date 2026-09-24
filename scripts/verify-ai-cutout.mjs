@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { extractMattePixels, fitCutoutDimensions, isAppleMobileBrowser } from '../app/lib/aiCutout.mjs';
+import { extractMattePixels, fitCutoutDimensions, isAppleMobileBrowser, refineMatteAlpha } from '../app/lib/aiCutout.mjs';
 
 const cutoutSource = readFileSync(new URL('../app/lib/aiCutout.mjs', import.meta.url), 'utf8');
 assert.match(
@@ -31,6 +31,25 @@ assert.equal(
   true,
   'iPadOS desktop mode is treated as Apple mobile'
 );
+
+const lowContrastMatte = new Uint8ClampedArray([
+  ...Array(40).fill(90),
+  ...Array(40).fill(190),
+  ...Array(6).fill(110),
+  ...Array(6).fill(120),
+  ...Array(6).fill(130),
+  ...Array(6).fill(140),
+  ...Array(6).fill(150),
+  ...Array(6).fill(160)
+]);
+const sharpenedMatte = refineMatteAlpha(lowContrastMatte);
+assert.ok(sharpenedMatte[0] <= 8, 'low-confidence background pixels are made transparent');
+assert.ok(sharpenedMatte[40] >= 247, 'confident subject pixels are made opaque');
+const edgeIndex = lowContrastMatte.indexOf(150);
+assert.ok(sharpenedMatte[edgeIndex] > 32 && sharpenedMatte[edgeIndex] < 224, 'edge pixels retain a smooth alpha transition');
+
+const cleanMatte = new Uint8ClampedArray([0, 0, 0, 0, 255, 255, 255, 255]);
+assert.deepEqual([...refineMatteAlpha(cleanMatte)], [...cleanMatte], 'already crisp mattes are left unchanged');
 
 const input = {
   width: 2,
