@@ -26,6 +26,7 @@ required_files:
   - app/api/cucu/inspect/route.js
   - app/api/image/route.js
   - app/lib/storage.js
+  - public/emv-chip.png
   - public/sw.js
   - app/manifest.js
 
@@ -255,16 +256,23 @@ features:
     contains:
       - "fontFamily"
       - "opacity"
-  custom_layer_types:
+  custom_layers_and_card_hardware:
     file: app/page.jsx
     contains:
-      - "addChipLayer"
+      - "ensureCardChip"
       - "mergeCustomContactlessLayer"
-      - "drawChipLayerAtOrigin"
       - "drawContactlessLayerAtOrigin"
       - "Bring Forward"
       - "Duplicate"
       - "Delete"
+  canonical_chip_artwork:
+    file: app/page.jsx
+    contains:
+      - "const CHIP_ART_WIDTH = 255;"
+      - "const CHIP_ART_HEIGHT = 188;"
+      - "const CHIP_ART_URL = '/emv-chip.png';"
+      - "drawChipArtwork"
+      - ".filter((layer) => layer.type !== 'chip')"
   unified_z_stack:
     file: app/page.jsx
     contains:

@@ -18,6 +18,15 @@ import { adjustedImage } from './lib/pixelAdjust';
 
 const OUT_W = 1536;
 const OUT_H = 969;
+const CHIP_ART_WIDTH = 255;
+const CHIP_ART_HEIGHT = 188;
+const CHIP_ART_URL = '/emv-chip.png';
+const chipToneCanvasCache = new WeakMap();
+const CHIP_TONE_OVERLAYS = {
+  silver: 'rgba(194, 202, 209, 0.7)',
+  black: 'rgba(34, 37, 42, 0.72)',
+  rose: 'rgba(201, 119, 103, 0.62)'
+};
 const EDITOR_PREVIEW_W = 1024;
 const EDITOR_PREVIEW_H = 646;
 const CARD_RATIO = OUT_W / OUT_H;
@@ -671,13 +680,39 @@ function normalizeDesignState(value) {
   next.shadow = raw.shadow == null ? DEFAULTS.shadow : Boolean(raw.shadow);
 
   const seen = new Set();
-  next.customLayers = (Array.isArray(raw.customLayers) ? raw.customLayers : [])
+  const normalizedLayers = (Array.isArray(raw.customLayers) ? raw.customLayers : [])
     .map(normalizeCustomLayer)
     .filter((layer) => {
       if (!layer || seen.has(layer.id)) return false;
       seen.add(layer.id);
       return true;
-    })
+    });
+
+  // The card has one canonical EMV chip. Older projects could contain extra
+  // custom chip layers beside the built-in chip; migrate a lone custom chip
+  // into the built-in slot when needed, then discard duplicates.
+  const legacyChip = normalizedLayers.find((layer) => layer.type === 'chip' && !layer.hidden);
+  if (!next.chip && legacyChip) {
+    next.chip = true;
+    next.chipTone = legacyChip.tone || next.chipTone;
+    next.chipScale = finiteClamp(legacyChip.scale, 1, 0.5, 2);
+    next.chipX = finiteClamp(
+      Number(legacyChip.x) - (CHIP_ART_WIDTH * next.chipScale) / (2 * OUT_W),
+      DEFAULTS.chipX,
+      0,
+      0.82
+    );
+    next.chipY = finiteClamp(
+      Number(legacyChip.y) - (CHIP_ART_HEIGHT * next.chipScale) / (2 * OUT_H),
+      DEFAULTS.chipY,
+      0,
+      0.8
+    );
+    next.chipRotation = finiteClamp(legacyChip.rotation, 0, -45, 45);
+  }
+
+  next.customLayers = normalizedLayers
+    .filter((layer) => layer.type !== 'chip')
     .slice(0, MAX_CUSTOM_LAYERS);
   next.layerOrder = normalizeLayerOrder({
     ...next,
@@ -925,7 +960,6 @@ function customLayerBounds(layer, layerImage) {
     return { left: -w / 2, top: -h / 2, right: w / 2, bottom: h / 2 };
   }
 
-  if (layer.type === 'chip') return { left: -127.5, top: -94, right: 127.5, bottom: 94 };
   if (layer.type === 'contactless') return CONTACTLESS_BOUNDS;
 
   const size = clamp(Number(layer.fontSize ?? 58), 10, 240);
@@ -1231,127 +1265,62 @@ function IOSIcon({ name, size = 24 }) {
   return null;
 }
 
-function drawChip(ctx, d, pixelScale = 1) {
-  const palettes = {
-    gold: ['#fff0a0', '#d8b24a', '#9e7421'],
-    silver: ['#f5f7f8', '#b8c0c6', '#6f777d'],
-    black: ['#696b70', '#242528', '#08090b'],
-    rose: ['#ffd0c5', '#d88978', '#8e4a40']
-  };
-  const p = palettes[d.chipTone] || palettes.gold;
-  const w = 255 * d.chipScale;
-  const h = 188 * d.chipScale;
-  const x = d.chipX * OUT_W;
-  const y = d.chipY * OUT_H;
-  const r = 30 * d.chipScale;
-  const inset = 9 * d.chipScale;
+function chipArtworkForTone(chipImage, tone) {
+  if (!chipImage) return null;
+  const source = chipImage.gold || chipImage;
+  if (tone === 'gold' || !CHIP_TONE_OVERLAYS[tone]) return source;
+
+  let variants = chipToneCanvasCache.get(source);
+  if (!variants) {
+    variants = new Map();
+    chipToneCanvasCache.set(source, variants);
+  }
+  if (variants.has(tone)) return variants.get(tone);
+
+  const width = source.naturalWidth || source.width;
+  const height = source.naturalHeight || source.height;
+  if (!width || !height || typeof document === 'undefined') return source;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const toneContext = canvas.getContext('2d');
+  if (!toneContext) return source;
+
+  toneContext.drawImage(source, 0, 0);
+  // This scratch canvas has a transparent background, so source-atop confines
+  // the finish tint to the chip's alpha mask, including its internal gaps.
+  toneContext.globalCompositeOperation = 'source-atop';
+  toneContext.fillStyle = CHIP_TONE_OVERLAYS[tone];
+  toneContext.fillRect(0, 0, width, height);
+  variants.set(tone, canvas);
+  return canvas;
+}
+
+function drawChipArtwork(ctx, chipImage, x, y, width, height, tone = 'gold', pixelScale = 1) {
+  const artwork = chipArtworkForTone(chipImage, tone);
+  if (!artwork || !(artwork.naturalWidth || artwork.width)) return;
 
   ctx.save();
-  ctx.translate(x + w / 2, y + h / 2);
-  ctx.rotate((d.chipRotation * Math.PI) / 180);
-  ctx.translate(-(x + w / 2), -(y + h / 2));
-
-  ctx.shadowColor = 'rgba(0,0,0,.4)';
-  ctx.shadowBlur = 24 * pixelScale;
-  ctx.shadowOffsetY = 10 * pixelScale;
-
-  const g = ctx.createLinearGradient(x, y, x + w, y + h);
-  g.addColorStop(0, p[0]);
-  g.addColorStop(0.45, p[1]);
-  g.addColorStop(1, p[2]);
-
-  roundRect(ctx, x, y, w, h, r);
-  ctx.fillStyle = g;
-  ctx.fill();
-
-  ctx.shadowColor = 'transparent';
-  ctx.lineWidth = 7 * d.chipScale;
-  ctx.strokeStyle = 'rgba(60,45,10,.45)';
-  ctx.stroke();
-
-  const cx = x + w / 2;
-  const cy = y + h / 2;
-  ctx.strokeStyle = 'rgba(70,48,10,.52)';
-  ctx.lineWidth = 6 * d.chipScale;
-  ctx.beginPath();
-  ctx.moveTo(cx, y + inset);
-  ctx.lineTo(cx, y + h - inset);
-  ctx.moveTo(x + inset, cy);
-  ctx.lineTo(x + w - inset, cy);
-  ctx.stroke();
-
-  [0.25, 0.75].forEach((q) => {
-    ctx.beginPath();
-    ctx.moveTo(x + w * q, y + inset);
-    ctx.lineTo(x + w * q, y + h * 0.3);
-    ctx.quadraticCurveTo(cx, y + h * 0.36, cx, cy);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(x + w * q, y + h - inset);
-    ctx.lineTo(x + w * q, y + h * 0.7);
-    ctx.quadraticCurveTo(cx, y + h * 0.64, cx, cy);
-    ctx.stroke();
-  });
-
+  ctx.shadowColor = 'rgba(0,0,0,.34)';
+  ctx.shadowBlur = 16 * pixelScale;
+  ctx.shadowOffsetY = 5 * pixelScale;
+  ctx.drawImage(artwork, x, y, width, height);
   ctx.restore();
 }
 
-function drawChipLayerAtOrigin(ctx, tone = 'gold', pixelScale = 1) {
-  const palettes = {
-    gold: ['#fff0a0', '#d8b24a', '#9e7421'],
-    silver: ['#f5f7f8', '#b8c0c6', '#6f777d'],
-    black: ['#696b70', '#242528', '#08090b'],
-    rose: ['#ffd0c5', '#d88978', '#8e4a40']
-  };
-  const p = palettes[tone] || palettes.gold;
-  const w = 255;
-  const h = 188;
-  const x = -w / 2;
-  const y = -h / 2;
-  const r = 30;
-  const inset = 9;
+function drawChip(ctx, design, chipImage, pixelScale = 1) {
+  const scale = Number(design.chipScale || 1);
+  const width = CHIP_ART_WIDTH * scale;
+  const height = CHIP_ART_HEIGHT * scale;
+  const x = design.chipX * OUT_W;
+  const y = design.chipY * OUT_H;
 
-  ctx.shadowColor = 'rgba(0,0,0,.4)';
-  ctx.shadowBlur = 24 * pixelScale;
-  ctx.shadowOffsetY = 10 * pixelScale;
-
-  const g = ctx.createLinearGradient(x, y, x + w, y + h);
-  g.addColorStop(0, p[0]);
-  g.addColorStop(0.45, p[1]);
-  g.addColorStop(1, p[2]);
-
-  roundRect(ctx, x, y, w, h, r);
-  ctx.fillStyle = g;
-  ctx.fill();
-
-  ctx.shadowColor = 'transparent';
-  ctx.lineWidth = 7;
-  ctx.strokeStyle = 'rgba(60,45,10,.45)';
-  ctx.stroke();
-
-  ctx.strokeStyle = 'rgba(70,48,10,.52)';
-  ctx.lineWidth = 6;
-  ctx.beginPath();
-  ctx.moveTo(0, y + 9);
-  ctx.lineTo(0, y + h - 9);
-  ctx.moveTo(x + 9, 0);
-  ctx.lineTo(x + w - 9, 0);
-  ctx.stroke();
-
-  [0.25, 0.75].forEach((q) => {
-    ctx.beginPath();
-    ctx.moveTo(x + w * q, y + inset);
-    ctx.lineTo(x + w * q, y + h * 0.3);
-    ctx.quadraticCurveTo(0, y + h * 0.36, 0, 0);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(x + w * q, y + h - inset);
-    ctx.lineTo(x + w * q, y + h * 0.7);
-    ctx.quadraticCurveTo(0, y + h * 0.64, 0, 0);
-    ctx.stroke();
-  });
+  ctx.save();
+  ctx.translate(x + width / 2, y + height / 2);
+  ctx.rotate((Number(design.chipRotation || 0) * Math.PI) / 180);
+  drawChipArtwork(ctx, chipImage, -width / 2, -height / 2, width, height, design.chipTone, pixelScale);
+  ctx.restore();
 }
 
 function drawContactlessLayerAtOrigin(ctx, color = '#ffffff') {
@@ -2804,6 +2773,7 @@ export default function Page() {
   }, [tab]);
   const [design, setDesign] = useState(DEFAULTS);
   const [image, setImage] = useState(null);
+  const [chipArtwork, setChipArtwork] = useState(null);
   const [loadedBackgroundKey, setLoadedBackgroundKey] = useState('');
   const [recent, setRecent] = useState([]);
   const [message, setMessage] = useState('Ready');
@@ -2885,6 +2855,13 @@ export default function Page() {
   const pendingVisualDesignRef = useRef(null);
   const gesturePreviewFrameRef = useRef(0);
   const finishActiveGestureRef = useRef(null);
+
+  useEffect(() => {
+    const artwork = new window.Image();
+    artwork.decoding = 'async';
+    artwork.onload = () => setChipArtwork(artwork);
+    artwork.src = CHIP_ART_URL;
+  }, []);
 
   const gradient = useMemo(
     () => GRADIENTS.find((item) => item.id === design.gradient) || GRADIENTS[0],
@@ -4054,7 +4031,7 @@ export default function Page() {
 
     for (const stackId of stackOrder) {
       if (stackId === 'builtin-chip') {
-        if (renderDesign.chip) drawChip(ctx, renderDesign, renderPixelScale);
+        if (renderDesign.chip) drawChip(ctx, renderDesign, chipArtwork, renderPixelScale);
         continue;
       }
 
@@ -4243,8 +4220,6 @@ export default function Page() {
             ctx.restore();
           }
         }
-      } else if (layer.type === 'chip') {
-        drawChipLayerAtOrigin(ctx, layer.tone || 'gold', renderPixelScale);
       } else if (layer.type === 'contactless') {
         drawContactlessLayerAtOrigin(ctx, layer.color || '#ffffff');
       }
@@ -4258,6 +4233,7 @@ export default function Page() {
     gradient,
     image,
     imageLayerSourceKey,
+    chipArtwork,
     layerImages,
     loadedBackgroundKey,
     loadedImageLayerSourceKey
@@ -5105,34 +5081,13 @@ export default function Page() {
     setMessage('Shape layer added');
   }
 
-  function addChipLayer() {
-    if ((designRef.current.customLayers || []).length >= MAX_CUSTOM_LAYERS) {
-      setMessage('Layer limit reached. Delete a layer before adding another.');
-      return;
-    }
-    const id = makeId('layer');
-    patch((current) => ({
-      layerOrder: insertCustomLayerBelowHardware(current, id),
-      customLayers: [
-        ...(current.customLayers || []),
-        {
-          id,
-          type: 'chip',
-          name: 'EMV Chip',
-          x: 0.19,
-          y: 0.44,
-          scale: 1,
-          rotation: 0,
-          opacity: 1,
-          tone: 'gold',
-          locked: false
-        }
-      ]
-    }));
-    setSelectedElement(id);
-    setStudioTool('crop');
-    setStudioSubtool('transform');
-    setMessage('Chip layer added');
+  function ensureCardChip() {
+    const wasVisible = Boolean(designRef.current.chip);
+    patch({ chip: true });
+    setSelectedElement('chip');
+    setStudioTool('card');
+    setStudioSubtool('chip');
+    setMessage(wasVisible ? 'Card chip selected' : 'Chip added');
   }
 
   function mergeCustomContactlessLayer(id) {
@@ -6105,8 +6060,8 @@ export default function Page() {
       }
 
       if (stackId === 'builtin-chip' && currentDesign.chip) {
-        const chipW = 255 * Number(currentDesign.chipScale || 1);
-        const chipH = 188 * Number(currentDesign.chipScale || 1);
+        const chipW = CHIP_ART_WIDTH * Number(currentDesign.chipScale || 1);
+        const chipH = CHIP_ART_HEIGHT * Number(currentDesign.chipScale || 1);
         const cx = currentDesign.chipX * OUT_W + chipW / 2;
         const cy = currentDesign.chipY * OUT_H + chipH / 2;
         if (
@@ -6253,7 +6208,7 @@ export default function Page() {
         } else {
           const tappedLayer = (designRef.current.customLayers || []).find((layer) => layer.id === target);
           if (tappedLayer?.type === 'text') { setStudioTool('text'); setStudioSubtool(''); }
-          else if (tappedLayer?.type === 'image' || tappedLayer?.type === 'shape' || tappedLayer?.type === 'chip' || tappedLayer?.type === 'contactless') { setStudioTool('crop'); setStudioSubtool('transform'); }
+          else if (tappedLayer?.type === 'image' || tappedLayer?.type === 'shape' || tappedLayer?.type === 'contactless') { setStudioTool('crop'); setStudioSubtool('transform'); }
         }
       }
     }
@@ -6938,8 +6893,8 @@ export default function Page() {
             style={{
               left: (design.chipX * 100) + '%',
               top: (design.chipY * 100) + '%',
-              width: ((255 * design.chipScale / OUT_W) * 100) + '%',
-              height: ((188 * design.chipScale / OUT_H) * 100) + '%',
+              width: ((CHIP_ART_WIDTH * design.chipScale / OUT_W) * 100) + '%',
+              height: ((CHIP_ART_HEIGHT * design.chipScale / OUT_H) * 100) + '%',
               transform: 'rotate(' + Number(design.chipRotation || 0) + 'deg)'
             }}
           />
@@ -6966,8 +6921,8 @@ export default function Page() {
             style={{
               left: (design.chipX * 100) + '%',
               top: (design.chipY * 100) + '%',
-              width: ((255 * design.chipScale / OUT_W) * 100) + '%',
-              height: ((188 * design.chipScale / OUT_H) * 100) + '%',
+              width: ((CHIP_ART_WIDTH * design.chipScale / OUT_W) * 100) + '%',
+              height: ((CHIP_ART_HEIGHT * design.chipScale / OUT_H) * 100) + '%',
               '--chip-rotation': Number(design.chipRotation || 0) + 'deg'
             }}
           />
@@ -7194,7 +7149,6 @@ export default function Page() {
                   <SliderRow label="Rotation" value={selectedLayer.rotation || 0} min={-180} max={180} step={1} suffix="°" disabled={Boolean(selectedLayer.locked)} onChange={(value) => updateLayer(selectedLayer.id,{rotation:value})}/>
                   {selectedLayer.type === 'image' ? <><SliderRow label="Image Width" value={selectedLayer.width ?? 640} min={20} max={1800} step={1} disabled={Boolean(selectedLayer.locked)} onChange={(value)=>updateLayer(selectedLayer.id,{width:value})}/><SwitchRow label="Flip Image" value={Boolean(selectedLayer.flipX)} onChange={(value)=>updateLayer(selectedLayer.id,{flipX:value})}/></> : null}
                   {selectedLayer.type === 'shape' ? <><div className="segmentedControl capcutSegmented"><button type="button" className={selectedLayer.shape!=='ellipse'?'selected':''} onClick={()=>updateLayer(selectedLayer.id,{shape:'rectangle'})}>Rectangle</button><button type="button" className={selectedLayer.shape==='ellipse'?'selected':''} onClick={()=>updateLayer(selectedLayer.id,{shape:'ellipse'})}>Ellipse</button></div><SliderRow label="Width" value={selectedLayer.width??280} min={20} max={1200} step={1} onChange={(value)=>updateLayer(selectedLayer.id,{width:value})}/><SliderRow label="Height" value={selectedLayer.height??120} min={20} max={800} step={1} onChange={(value)=>updateLayer(selectedLayer.id,{height:value})}/>{selectedLayer.shape!=='ellipse'?<SliderRow label="Corner Radius" value={selectedLayer.radius??28} min={0} max={Math.max(0,Math.floor(Math.min(Number(selectedLayer.width??280),Number(selectedLayer.height??120))/2))} step={1} onChange={(value)=>updateLayer(selectedLayer.id,{radius:value})}/>:null}<label className="colorRow"><span>Shape Color</span><input type="color" value={selectedLayer.color||'#ffffff'} onChange={(e)=>updateLayer(selectedLayer.id,{color:e.target.value})}/></label></> : null}
-                  {selectedLayer.type === 'chip' ? <div className="tonePicker">{['gold','silver','black','rose'].map((tone)=><button type="button" key={tone} className={selectedLayer.tone===tone?'selected':''} onClick={()=>updateLayer(selectedLayer.id,{tone})}><i className={'chipTone '+tone}/><span>{tone}</span></button>)}</div> : null}
                   {selectedLayer.type === 'contactless' ? <label className="colorRow"><span>Contactless Color</span><input type="color" value={selectedLayer.color||'#ffffff'} onChange={(e)=>updateLayer(selectedLayer.id,{color:e.target.value})}/></label> : null}
                   <SliderRow label="Opacity" value={selectedLayer.opacity ?? 1} min={0} max={1} step={0.01} disabled={Boolean(selectedLayer.locked)} onChange={(value)=>updateLayer(selectedLayer.id,{opacity:value})}/>
                   </fieldset>
@@ -7287,7 +7241,7 @@ export default function Page() {
                   <button type="button" onClick={addTextLayer}><span>T</span><small>Text</small></button>
                   <button type="button" disabled={imageImportInProgress || presetTransferInProgress || cleanupInProgress} onClick={() => layerUploadRef.current?.click()}><IOSIcon name="photo" size={22}/><small>Image / Logo</small></button>
                   <button type="button" onClick={addShapeLayer}><IOSIcon name="shape" size={22}/><small>Shape</small></button>
-                  <button type="button" onClick={addChipLayer}><IOSIcon name="chip" size={22}/><small>Chip Layer</small></button>
+                  <button type="button" onClick={ensureCardChip}><IOSIcon name="chip" size={22}/><small>Chip</small></button>
                 </div>
               </section>
             ) : null}
