@@ -1035,26 +1035,27 @@ button:disabled{opacity:.38}
   mix-blend-mode:screen;
 }
 .cardGuides,.selectionOutline{position:absolute;inset:0;pointer-events:none}
+.cardGuides{z-index:4;overflow:visible}
 .guide,.snapGuide{position:absolute;display:block;pointer-events:none}
 .safeEdge{
-  inset:4%;
+  inset:5.56% 3.5%;
   border:1px dashed rgba(255,255,255,.48);
-  border-radius:12px;
+  border-radius:1.2% / 1.9%;
 }
 .textSafe{
-  left:8%;right:8%;top:13%;bottom:13%;
+  left:8.18%;right:8.18%;top:12.97%;bottom:12.97%;
   border:1px dashed rgba(255,214,10,.42);
-  border-radius:10px;
+  border-radius:1.9% / 3%;
 }
 .chipZone{
-  left:7%;top:31%;width:23%;height:27%;
+  left:7%;top:29.44%;width:23.61%;height:30.52%;
   border:1px solid rgba(48,209,88,.45);
-  border-radius:10px;
+  border-radius:1.9% / 3%;
 }
 .contactlessZone{
-  left:23%;top:34%;width:13%;height:25%;
+  left:27.43%;top:33.87%;width:8.53%;height:18.27%;
   border:1px solid rgba(10,132,255,.45);
-  border-radius:10px;
+  border-radius:1.9% / 3%;
 }
 .snapGuide.vertical{top:0;bottom:0;left:50%;width:1px;background:#ff2d55}
 .snapGuide.horizontal{left:0;right:0;top:50%;height:1px;background:#ff2d55}
@@ -1395,9 +1396,9 @@ button:disabled{opacity:.38}
 }
 
 .bleedEdge{
-  inset:1.5%;
+  inset:-5.56% -3.5%;
   border:1px dashed rgba(255,59,48,.46);
-  border-radius:16px;
+  border-radius:6.75% / 10.3%;
 }
 .physicalCard{
   animation:physicalTilt 5.5s ease-in-out infinite alternate;
@@ -1492,9 +1493,9 @@ button:disabled{opacity:.38}
 }
 
 .cropBoundary{
-  inset:.6%;
+  inset:0;
   border:1px solid rgba(255,255,255,.68);
-  border-radius:18px;
+  border-radius:3.5% / 5.5%;
   box-shadow:0 0 0 .5px rgba(0,0,0,.2);
 }
 .numericInputWrap{
@@ -2092,6 +2093,8 @@ button:disabled{opacity:.38}
   border-radius:15px;
   box-shadow:0 16px 40px rgba(0,0,0,.55),0 0 0 .5px rgba(255,255,255,.18);
 }
+.isStudioEditor .cardFrame.cardGuidesVisible{overflow:visible}
+.isStudioEditor .cardFrame.cardGuidesVisible canvas{clip-path:inset(0 round 15px)}
 .isStudioEditor .previewCaption{display:none}
 .isStudioEditor .screenContent{padding:0}
 .isStudioEditor .studioScreen{padding:0 0 calc(78px + var(--safe-bottom));background:#08090b}

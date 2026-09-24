@@ -175,6 +175,8 @@ const DEFAULTS = {
   visaFinish: 'silver',
   visaGloss: 0.48,
   visaReflection: 0.42,
+  cardTextOffsetX: 0,
+  cardTextOffsetY: 0,
   number: false,
   numberText: '••••  ••••  ••••  4242',
   holder: false,
@@ -667,6 +669,8 @@ function normalizeDesignState(value) {
   next.visaGloss = finiteClamp(raw.visaGloss, DEFAULTS.visaGloss, 0, 1);
   next.visaReflection = finiteClamp(raw.visaReflection, DEFAULTS.visaReflection, 0, 1);
 
+  next.cardTextOffsetX = finiteClamp(raw.cardTextOffsetX, DEFAULTS.cardTextOffsetX, -1.5, 1.5);
+  next.cardTextOffsetY = finiteClamp(raw.cardTextOffsetY, DEFAULTS.cardTextOffsetY, -1.5, 1.5);
   next.number = Boolean(raw.number);
   next.numberText = singleLineCardText(raw.numberText ?? DEFAULTS.numberText, 32);
   next.holder = Boolean(raw.holder);
@@ -929,11 +933,14 @@ function pointInBuiltinText(px, py, design, padding = 0) {
     );
   };
 
+  const offsetX = Number(design.cardTextOffsetX || 0) * OUT_W;
+  const offsetY = Number(design.cardTextOffsetY || 0) * OUT_H;
+
   return (
-    hit(design.badge, design.badgeText ?? 'CARD', '800 66px -apple-system, BlinkMacSystemFont, sans-serif', OUT_W - 105, 130, 'right') ||
-    hit(design.number, design.numberText, '600 64px ui-monospace, SFMono-Regular, Menlo, monospace', 120, 700, 'left') ||
-    hit(design.holder, design.holderText, '650 34px -apple-system, BlinkMacSystemFont, sans-serif', 122, 815, 'left') ||
-    hit(design.expiry, design.expiryText, '650 34px -apple-system, BlinkMacSystemFont, sans-serif', OUT_W - 122, 815, 'right')
+    hit(design.badge, design.badgeText ?? 'CARD', '800 66px -apple-system, BlinkMacSystemFont, sans-serif', OUT_W - 105 + offsetX, 130 + offsetY, 'right') ||
+    hit(design.number, design.numberText, '600 64px ui-monospace, SFMono-Regular, Menlo, monospace', 120 + offsetX, 700 + offsetY, 'left') ||
+    hit(design.holder, design.holderText, '650 34px -apple-system, BlinkMacSystemFont, sans-serif', 122 + offsetX, 815 + offsetY, 'left') ||
+    hit(design.expiry, design.expiryText, '650 34px -apple-system, BlinkMacSystemFont, sans-serif', OUT_W - 122 + offsetX, 815 + offsetY, 'right')
   );
 }
 
@@ -1119,6 +1126,11 @@ function customLayerSelectionStyle(layer, layerImage) {
     Number(layer?.rotation ?? 0),
     customLayerBounds(layer, layerImage)
   );
+}
+
+function writeInlineStyle(node, style) {
+  if (!node) return;
+  Object.assign(node.style, style);
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -2870,8 +2882,22 @@ export default function Page() {
   const imageImportGenerationRef = useRef(0);
   const pendingDesignFrameRef = useRef(0);
   const pendingVisualDesignRef = useRef(null);
-  const gesturePreviewFrameRef = useRef(0);
+  const renderCardRef = useRef(null);
+  const gestureRenderedDesignRef = useRef(null);
+  const chipSelectionRef = useRef(null);
+  const contactlessSelectionRef = useRef(null);
+  const layerSelectionRef = useRef(null);
   const finishActiveGestureRef = useRef(null);
+
+  const updateActiveGuides = useCallback((x, y) => {
+    const nextX = guidesEnabled ? x : null;
+    const nextY = guidesEnabled ? y : null;
+    setActiveGuides((current) => (
+      current.x === nextX && current.y === nextY
+        ? current
+        : { x: nextX, y: nextY }
+    ));
+  }, [guidesEnabled]);
 
   useEffect(() => {
     const artwork = new window.Image();
@@ -2912,6 +2938,8 @@ export default function Page() {
     const resolved = shouldNormalize ? normalizeDesignState(nextDesign) : nextDesign;
     designRef.current = resolved;
 
+    // During a canvas gesture, paint the preview directly once per animation
+    // frame. Keep the surrounding editor tree stable until the gesture ends.
     if (deferVisual && typeof window !== 'undefined') {
       pendingVisualDesignRef.current = resolved;
       if (!pendingDesignFrameRef.current) {
@@ -2919,7 +2947,16 @@ export default function Page() {
           pendingDesignFrameRef.current = 0;
           const pending = pendingVisualDesignRef.current;
           pendingVisualDesignRef.current = null;
-          if (pending) setDesign(pending);
+          if (!pending) return;
+
+          const canvas = canvasRef.current;
+          const context = canvas?.getContext('2d');
+          if (context && renderCardRef.current) {
+            renderCardRef.current(context, EDITOR_PREVIEW_W, EDITOR_PREVIEW_H, {
+              design: pending
+            });
+            gestureRenderedDesignRef.current = { design: pending, canvas };
+          }
         });
       }
       return resolved;
@@ -2930,6 +2967,9 @@ export default function Page() {
       pendingDesignFrameRef.current = 0;
     }
     pendingVisualDesignRef.current = null;
+    if (gestureRenderedDesignRef.current?.design !== resolved) {
+      gestureRenderedDesignRef.current = null;
+    }
     setDesign(resolved);
     return resolved;
   }, []);
@@ -3003,10 +3043,6 @@ export default function Page() {
         window.cancelAnimationFrame(pendingDesignFrameRef.current);
         pendingDesignFrameRef.current = 0;
       }
-      if (gesturePreviewFrameRef.current) {
-        window.cancelAnimationFrame(gesturePreviewFrameRef.current);
-        gesturePreviewFrameRef.current = 0;
-      }
       pendingVisualDesignRef.current = null;
     };
   }, []);
@@ -3016,7 +3052,7 @@ export default function Page() {
       pointers.current.size > 0 ||
       Boolean(gestureStartDesign.current) ||
       gestureHistoryRecorded.current ||
-      Boolean(gesturePreviewFrameRef.current);
+      Boolean(pendingDesignFrameRef.current);
     if (!active) return;
 
     if (gestureHistoryRecorded.current) {
@@ -3043,10 +3079,6 @@ export default function Page() {
     gestureHistoryRecorded.current = false;
     setActiveGuides({ x: null, y: null });
 
-    if (gesturePreviewFrameRef.current) {
-      window.cancelAnimationFrame(gesturePreviewFrameRef.current);
-      gesturePreviewFrameRef.current = 0;
-    }
   }, [replaceDesign]);
 
   finishActiveGestureRef.current = finishActiveGesture;
@@ -4026,22 +4058,38 @@ export default function Page() {
       if (renderDesign.badge) {
         ctx.textAlign = 'right';
         ctx.font = '800 66px -apple-system, BlinkMacSystemFont, sans-serif';
-        ctx.fillText(renderDesign.badgeText ?? 'CARD', OUT_W - 105, 130);
+        ctx.fillText(
+          renderDesign.badgeText ?? 'CARD',
+          OUT_W - 105 + Number(renderDesign.cardTextOffsetX || 0) * OUT_W,
+          130 + Number(renderDesign.cardTextOffsetY || 0) * OUT_H
+        );
       }
       if (renderDesign.number) {
         ctx.textAlign = 'left';
         ctx.font = '600 64px ui-monospace, SFMono-Regular, Menlo, monospace';
-        ctx.fillText(renderDesign.numberText, 120, 700);
+        ctx.fillText(
+          renderDesign.numberText,
+          120 + Number(renderDesign.cardTextOffsetX || 0) * OUT_W,
+          700 + Number(renderDesign.cardTextOffsetY || 0) * OUT_H
+        );
       }
 
       ctx.font = '650 34px -apple-system, BlinkMacSystemFont, sans-serif';
       if (renderDesign.holder) {
         ctx.textAlign = 'left';
-        ctx.fillText(renderDesign.holderText, 122, 815);
+        ctx.fillText(
+          renderDesign.holderText,
+          122 + Number(renderDesign.cardTextOffsetX || 0) * OUT_W,
+          815 + Number(renderDesign.cardTextOffsetY || 0) * OUT_H
+        );
       }
       if (renderDesign.expiry) {
         ctx.textAlign = 'right';
-        ctx.fillText(renderDesign.expiryText, OUT_W - 122, 815);
+        ctx.fillText(
+          renderDesign.expiryText,
+          OUT_W - 122 + Number(renderDesign.cardTextOffsetX || 0) * OUT_W,
+          815 + Number(renderDesign.cardTextOffsetY || 0) * OUT_H
+        );
       }
       ctx.restore();
     };
@@ -4256,24 +4304,17 @@ export default function Page() {
     loadedImageLayerSourceKey
   ]);
 
-  const scheduleGesturePreview = useCallback(() => {
-    if (gesturePreviewFrameRef.current) return;
-    gesturePreviewFrameRef.current = window.requestAnimationFrame(() => {
-      gesturePreviewFrameRef.current = 0;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      renderCard(ctx, EDITOR_PREVIEW_W, EDITOR_PREVIEW_H, {
-        design: designRef.current
-      });
-    });
-  }, [renderCard]);
+  renderCardRef.current = renderCard;
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
+
+      const gestureRender = gestureRenderedDesignRef.current;
+      const gestureAlreadyRendered =
+        gestureRender?.design === design && gestureRender.canvas === canvas;
+      gestureRenderedDesignRef.current = null;
 
       const originalTarget = showOriginal
         ? ((design.customLayers || []).some((layer) => layer.id === selectedElement && layer.type === 'image')
@@ -4281,7 +4322,9 @@ export default function Page() {
             : 'artwork')
         : null;
 
-      renderCard(canvas.getContext('2d'), EDITOR_PREVIEW_W, EDITOR_PREVIEW_H, { originalTarget });
+      if (!gestureAlreadyRendered || showOriginal) {
+        renderCard(canvas.getContext('2d'), EDITOR_PREVIEW_W, EDITOR_PREVIEW_H, { originalTarget });
+      }
 
       if (showExportPreview && fullPreviewCanvasRef.current) {
         renderCard(fullPreviewCanvasRef.current.getContext('2d'), OUT_W, OUT_H);
@@ -4289,7 +4332,7 @@ export default function Page() {
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [design.customLayers, renderCard, selectedElement, showOriginal, showExportPreview]);
+  }, [design.customLayers, renderCard, selectedElement, showOriginal, showExportPreview, tab]);
 
   const loadCucu = useCallback(async (
     nextPage = 1,
@@ -6243,6 +6286,41 @@ export default function Page() {
     }
   }
 
+  function syncSelectionOutline(target) {
+    const liveDesign = designRef.current;
+    if (target === 'chip' && selectedElement === 'chip' && liveDesign.chip) {
+      writeInlineStyle(chipSelectionRef.current, {
+        left: (liveDesign.chipX * 100) + '%',
+        top: (liveDesign.chipY * 100) + '%',
+        width: ((CHIP_ART_WIDTH * liveDesign.chipScale / OUT_W) * 100) + '%',
+        height: ((CHIP_ART_HEIGHT * liveDesign.chipScale / OUT_H) * 100) + '%',
+        transform: 'rotate(' + Number(liveDesign.chipRotation || 0) + 'deg)'
+      });
+      return;
+    }
+
+    if (target === 'contactless' && selectedElement === 'contactless' && liveDesign.contactless) {
+      writeInlineStyle(contactlessSelectionRef.current, selectionStyleForBounds(
+        liveDesign.contactlessX * OUT_W,
+        liveDesign.contactlessY * OUT_H,
+        Number(liveDesign.contactlessScale || 1),
+        Number(liveDesign.contactlessRotation || 0),
+        CONTACTLESS_BOUNDS
+      ));
+      return;
+    }
+
+    if (target === selectedElement && !BUILTIN_LAYER_IDS.includes(target)) {
+      const layer = (liveDesign.customLayers || []).find((entry) => entry.id === target);
+      if (layer && !layer.hidden) {
+        writeInlineStyle(layerSelectionRef.current, customLayerSelectionStyle(
+          layer,
+          layer.type === 'image' ? layerImages[layer.id] : null
+        ));
+      }
+    }
+  }
+
   function pointerMove(event) {
     if (!pointers.current.has(event.pointerId)) return;
     event.preventDefault();
@@ -6259,71 +6337,101 @@ export default function Page() {
         const currentDesign = designRef.current;
 
         if (target === 'chip') {
+          const nextX = clamp(currentDesign.chipX + dx, 0, 0.82);
+          const nextY = clamp(currentDesign.chipY + dy, 0, 0.8);
           const snapX = snapValue(
-            clamp(currentDesign.chipX + dx, 0, 0.82),
+            nextX,
             [0.04, 0.105, 1 / 3, 0.5, 2 / 3, 0.78]
           );
           const snapY = snapValue(
-            clamp(currentDesign.chipY + dy, 0, 0.8),
+            nextY,
             [0.04, 1 / 3, 0.35, 0.5, 2 / 3, 0.76]
           );
-          setActiveGuides({
-            x: snapX.snapped ? snapX.value : null,
-            y: snapY.snapped ? snapY.value : null
-          });
+          // Snap candidates only position optional visual guides; movement
+          // always uses the raw, bounded pointer coordinates below.
+          updateActiveGuides(
+            snapX.snapped ? snapX.value : null,
+            snapY.snapped ? snapY.value : null
+          );
 
           if (
-            !Object.is(currentDesign.chipX, snapX.value) ||
-            !Object.is(currentDesign.chipY, snapY.value)
+            !Object.is(currentDesign.chipX, nextX) ||
+            !Object.is(currentDesign.chipY, nextY)
           ) {
             recordGestureHistory();
-            patch({ chipX: snapX.value, chipY: snapY.value }, false);
+            patch({ chipX: nextX, chipY: nextY }, false);
+            syncSelectionOutline(target);
           }
         } else if (target === 'contactless' && !currentDesign.contactlessLocked) {
+          const nextX = clamp(currentDesign.contactlessX + dx, 0.03, 0.97);
+          const nextY = clamp(currentDesign.contactlessY + dy, 0.03, 0.97);
           const snapX = snapValue(
-            clamp(currentDesign.contactlessX + dx, 0.03, 0.97),
+            nextX,
             [0.05, 0.285, 1 / 3, 0.5, 2 / 3, 0.95]
           );
           const snapY = snapValue(
-            clamp(currentDesign.contactlessY + dy, 0.03, 0.97),
+            nextY,
             [0.05, 1 / 3, 0.43, 0.5, 2 / 3, 0.95]
           );
-          setActiveGuides({
-            x: snapX.snapped ? snapX.value : null,
-            y: snapY.snapped ? snapY.value : null
-          });
+          updateActiveGuides(
+            snapX.snapped ? snapX.value : null,
+            snapY.snapped ? snapY.value : null
+          );
 
           if (
-            !Object.is(currentDesign.contactlessX, snapX.value) ||
-            !Object.is(currentDesign.contactlessY, snapY.value)
+            !Object.is(currentDesign.contactlessX, nextX) ||
+            !Object.is(currentDesign.contactlessY, nextY)
           ) {
             recordGestureHistory();
-            patch({ contactlessX: snapX.value, contactlessY: snapY.value }, false);
+            patch({ contactlessX: nextX, contactlessY: nextY }, false);
+            syncSelectionOutline(target);
           }
         } else if (target === 'visa') {
-          const snapX = snapValue(clamp(currentDesign.visaX + dx, 0.1, 0.9), [0.2, 1 / 3, 0.5, 2 / 3, 0.8, 0.84]);
-          const snapY = snapValue(clamp(currentDesign.visaY + dy, 0.08, 0.92), [0.16, 1 / 3, 0.5, 2 / 3, 0.84]);
-          setActiveGuides({ x: snapX.snapped ? snapX.value : null, y: snapY.snapped ? snapY.value : null });
-          if (!Object.is(currentDesign.visaX, snapX.value) || !Object.is(currentDesign.visaY, snapY.value)) { recordGestureHistory(); patch({ visaX: snapX.value, visaY: snapY.value }, false); }
+          const nextX = clamp(currentDesign.visaX + dx, 0.1, 0.9);
+          const nextY = clamp(currentDesign.visaY + dy, 0.08, 0.92);
+          const snapX = snapValue(nextX, [0.2, 1 / 3, 0.5, 2 / 3, 0.8, 0.84]);
+          const snapY = snapValue(nextY, [0.16, 1 / 3, 0.5, 2 / 3, 0.84]);
+          updateActiveGuides(
+            snapX.snapped ? snapX.value : null,
+            snapY.snapped ? snapY.value : null
+          );
+          if (!Object.is(currentDesign.visaX, nextX) || !Object.is(currentDesign.visaY, nextY)) {
+            recordGestureHistory();
+            patch({ visaX: nextX, visaY: nextY }, false);
+            syncSelectionOutline(target);
+          }
+        } else if (target === 'card-text') {
+          const nextX = clamp(Number(currentDesign.cardTextOffsetX || 0) + dx, -1.5, 1.5);
+          const nextY = clamp(Number(currentDesign.cardTextOffsetY || 0) + dy, -1.5, 1.5);
+          updateActiveGuides(null, null);
+          if (
+            !Object.is(currentDesign.cardTextOffsetX, nextX) ||
+            !Object.is(currentDesign.cardTextOffsetY, nextY)
+          ) {
+            recordGestureHistory();
+            patch({ cardTextOffsetX: nextX, cardTextOffsetY: nextY }, false);
+          }
         } else if (target !== 'artwork') {
           const layer = (currentDesign.customLayers || []).find((entry) => entry.id === target);
           if (layer && !layer.locked) {
             const currentX = Number(layer.x ?? 0.5);
             const currentY = Number(layer.y ?? 0.5);
+            const nextX = clamp(currentX + dx, 0, 1);
+            const nextY = clamp(currentY + dy, 0, 1);
             const snapX = snapValue(
-              clamp(currentX + dx, 0, 1),
+              nextX,
               [0.05, 1 / 3, 0.5, 2 / 3, 0.95]
             );
             const snapY = snapValue(
-              clamp(currentY + dy, 0, 1),
+              nextY,
               [0.05, 1 / 3, 0.5, 2 / 3, 0.95]
             );
-            setActiveGuides({
-              x: snapX.snapped ? snapX.value : null,
-              y: snapY.snapped ? snapY.value : null
-            });
+            updateActiveGuides(
+              snapX.snapped ? snapX.value : null,
+              snapY.snapped ? snapY.value : null
+            );
 
-            if (!Object.is(currentX, snapX.value) || !Object.is(currentY, snapY.value)) {
+            if (!Object.is(currentX, nextX) || !Object.is(currentY, nextY)) {
               recordGestureHistory();
               patch((current) => {
                 const layers = current.customLayers || [];
@@ -6333,14 +6441,15 @@ export default function Page() {
                 const entry = layers[index];
                 const entryX = Number(entry.x ?? 0.5);
                 const entryY = Number(entry.y ?? 0.5);
-                if (Object.is(entryX, snapX.value) && Object.is(entryY, snapY.value)) {
+                if (Object.is(entryX, nextX) && Object.is(entryY, nextY)) {
                   return {};
                 }
 
                 const nextLayers = layers.slice();
-                nextLayers[index] = { ...entry, x: snapX.value, y: snapY.value };
+                nextLayers[index] = { ...entry, x: nextX, y: nextY };
                 return { customLayers: nextLayers };
               }, false);
+              syncSelectionOutline(target);
             }
           }
         } else if (currentDesign.background) {
@@ -6348,14 +6457,14 @@ export default function Page() {
           const rawY = clamp(currentDesign.y + dy, -1.5, 1.5);
           const snapX = snapValue(rawX, [-0.45, -1 / 6, 0, 1 / 6, 0.45]);
           const snapY = snapValue(rawY, [-0.45, -1 / 6, 0, 1 / 6, 0.45]);
-          setActiveGuides({
-            x: snapX.snapped ? clamp(0.5 + snapX.value, 0.05, 0.95) : null,
-            y: snapY.snapped ? clamp(0.5 + snapY.value, 0.05, 0.95) : null
-          });
+          updateActiveGuides(
+            snapX.snapped ? clamp(0.5 + snapX.value, 0.05, 0.95) : null,
+            snapY.snapped ? clamp(0.5 + snapY.value, 0.05, 0.95) : null
+          );
 
-          if (!Object.is(currentDesign.x, snapX.value) || !Object.is(currentDesign.y, snapY.value)) {
+          if (!Object.is(currentDesign.x, rawX) || !Object.is(currentDesign.y, rawY)) {
             recordGestureHistory();
-            patch({ x: snapX.value, y: snapY.value }, false);
+            patch({ x: rawX, y: rawY }, false);
           }
         }
       }
@@ -6391,6 +6500,7 @@ export default function Page() {
           ) {
             recordGestureHistory();
             patch({ chipScale: nextScale, chipRotation: nextRotation }, false);
+            syncSelectionOutline(target);
           }
         } else if (target === 'contactless') {
           const nextScale = clamp(currentDesign.contactlessScale * factor, 0.4, 2.2);
@@ -6403,6 +6513,7 @@ export default function Page() {
           ) {
             recordGestureHistory();
             patch({ contactlessScale: nextScale, contactlessRotation: nextRotation }, false);
+            syncSelectionOutline(target);
           }
         } else if (target === 'visa') {
           const nextScale = clamp(currentDesign.visaScale * factor, 0.45, 2.2);
@@ -6410,6 +6521,7 @@ export default function Page() {
           if (!Object.is(currentDesign.visaScale, nextScale) || !Object.is(currentDesign.visaRotation, nextRotation)) {
             recordGestureHistory();
             patch({ visaScale: nextScale, visaRotation: nextRotation }, false);
+            syncSelectionOutline(target);
           }
         } else if (target !== 'artwork' && gestureLayer) {
           const currentScale = Number(gestureLayer.scale ?? 1);
@@ -6442,6 +6554,7 @@ export default function Page() {
               };
               return { customLayers: nextLayers };
             }, false);
+            syncSelectionOutline(target);
           }
         } else if (target === 'artwork') {
           const currentRotation = Number(currentDesign.rotate || 0);
@@ -6461,7 +6574,6 @@ export default function Page() {
       lastAngle.current = angle;
     }
 
-    if (gestureHistoryRecorded.current) scheduleGesturePreview();
   }
 
   function pointerUp(event) {
@@ -6880,7 +6992,7 @@ export default function Page() {
         )}
       </div>
 
-      <div className={'cardFrame ' + (previewMode === 'physical' ? 'physicalCard' : '')}>
+      <div className={'cardFrame ' + (previewMode === 'physical' ? 'physicalCard' : '') + (tab === 'studio' && previewMode === 'flat' && guidesEnabled ? ' cardGuidesVisible' : '')}>
         <canvas
           ref={canvasRef}
           width={EDITOR_PREVIEW_W}
@@ -6917,6 +7029,7 @@ export default function Page() {
 
         {tab === 'studio' && previewMode === 'flat' && selectedElement === 'chip' && design.chip ? (
           <div
+            ref={chipSelectionRef}
             className="selectionOutline chipSelection"
             aria-hidden="true"
             style={{
@@ -6931,6 +7044,7 @@ export default function Page() {
 
         {tab === 'studio' && previewMode === 'flat' && selectedElement === 'contactless' && design.contactless ? (
           <div
+            ref={contactlessSelectionRef}
             className="selectionOutline contactlessSelection"
             aria-hidden="true"
             style={selectionStyleForBounds(
@@ -6964,6 +7078,7 @@ export default function Page() {
         (selectedLayer.type !== 'image' ||
           (loadedImageLayerSourceKey === imageLayerSourceKey && Boolean(layerImages[selectedLayer.id]))) ? (
           <div
+            ref={layerSelectionRef}
             className="selectionOutline layerSelection"
             aria-hidden="true"
             style={customLayerSelectionStyle(
