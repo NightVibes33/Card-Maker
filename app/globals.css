@@ -2074,6 +2074,9 @@ button:disabled{opacity:.38}
 .isStudioEditor .studioPreview .studioGuidesButton{grid-column:4}
 .isStudioEditor .studioPreview .studioLayersButton{grid-column:5}
 .isStudioEditor .studioPreview .studioOverflowWrap{grid-column:6}
+.isStudioEditor .studioPreview .studioOverflowButton{
+  width:40px;min-width:40px;height:44px;padding:0;font-size:18px;letter-spacing:2px;
+}
 .isStudioEditor .studioPreview .studioGuidesButton svg,
 .isStudioEditor .studioPreview .studioLayersButton svg{display:block}
 .isStudioEditor .studioPreview .studioGuidesButton.isActive{
