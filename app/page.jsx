@@ -3132,6 +3132,7 @@ export default function Page() {
   const [maskFeather, setMaskFeather] = useState(0);
   const [aiCutoutBusy, setAiCutoutBusy] = useState(false);
   const [aiCutoutStatus, setAiCutoutStatus] = useState('');
+  const [aiCutoutError, setAiCutoutError] = useState('');
   const [showOriginal, setShowOriginal] = useState(false);
   const [showExportPreview, setShowExportPreview] = useState(false);
   const [menuItem, setMenuItem] = useState(null);
@@ -6984,6 +6985,7 @@ export default function Page() {
     }
 
     setAiCutoutBusy(true);
+    setAiCutoutError('');
     setAiCutoutStatus('Preparing image…');
     try {
       await withImageImportLock(async (isCurrent) => {
@@ -7066,17 +7068,21 @@ export default function Page() {
           if (!applied) {
             await dbDelete('imports', id).catch(() => {});
             setImports((items) => items.filter((entry) => entry.id !== id));
-            setMessage('AI Cutout could not be applied to the selected image.');
+            const userMessage = 'AI Cutout could not be applied to the selected image.';
+            setAiCutoutError(userMessage);
+            setMessage(userMessage);
             return;
           }
           setMessage('AI cutout ready · refine edges with Erase and Restore');
         } catch (error) {
           const text = String(error?.message || '');
-          setMessage(
-            /fetch|network|download|load failed/i.test(text)
-              ? 'Could not load the AI model. Connect to the internet and try again.'
-              : text || 'AI Cutout could not finish on this device.'
-          );
+          const userMessage = /fetch|network|download|load failed/i.test(text)
+            ? 'AI Cutout could not download its model. Check your connection and retry.'
+            : /memory|allocation|out of memory|aborted/i.test(text)
+              ? 'AI Cutout ran out of available memory. Close other tabs, reload, and retry.'
+              : text || 'AI Cutout could not finish on this device.';
+          setAiCutoutError(userMessage);
+          setMessage(userMessage);
         }
       });
     } finally {
@@ -7895,6 +7901,7 @@ export default function Page() {
       </div>
 
       <div className={'cardFrame ' + (previewMode === 'physical' ? 'physicalCard' : '') + (tab === 'studio' && previewMode === 'flat' && guidesEnabled ? ' cardGuidesVisible' : '')}>
+      <div className={'cardSurface' + (previewMode === 'physical' ? ' physicalSurface' : '')}>
         <canvas
           ref={canvasRef}
           width={EDITOR_PREVIEW_W}
@@ -7975,6 +7982,7 @@ export default function Page() {
             )}
           />
         ) : null}
+      </div>
       </div>
 
       <div className="previewCaption" aria-live="polite">
@@ -8612,6 +8620,7 @@ export default function Page() {
                       <span>{aiCutoutBusy ? (aiCutoutStatus || 'Preparing AI Cutout…') : activeAIMaskSource ? 'Run AI Cutout Again' : 'AI Cutout'}</span>
                     </button>
                     <p className="aiCutoutHint">Runs on your device. First use downloads a 44–88 MB model. Use Erase and Restore to refine edges.</p>
+                    {aiCutoutError ? <p className="aiCutoutError" role="alert">{aiCutoutError}</p> : null}
                     {activeAIMaskSource ? <button type="button" className="settingsResetButton" disabled={aiCutoutBusy} onClick={()=>selectedImageLayer ? updateLayer(selectedImageLayer.id,{maskSource:''}) : patch({backgroundMaskSource:''})}>Reset AI Cutout</button> : null}
                     <div className="maskModeSwitch" role="group" aria-label="Image mask brush mode">
                       <button type="button" className={maskMode==='erase'?'selected':''} aria-pressed={maskMode==='erase'} onClick={()=>setMaskMode('erase')}>Erase</button>

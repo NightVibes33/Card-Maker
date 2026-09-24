@@ -257,7 +257,11 @@ requireMatch(
 );
 requireMatch(storage, /const DB_VERSION = 3;[\s\S]{0,140}const STORES = \[[^\]]*'fonts'/, 'custom fonts have a versioned local IndexedDB store');
 requireMatch(page, /previewMode === 'physical' \? 'physicalCard' : ''/, 'Physical Preview uses the original lightweight card renderer');
-requireMatch(css, /\.physicalCard\{[^}]*animation:physicalTilt/, 'Physical Preview retains the original CSS tilt');
+requireMatch(page, /className=\{'cardSurface' \+ \(previewMode === 'physical' \? ' physicalSurface' : ''\)\}[\s\S]{0,160}<canvas/, 'the complete card canvas is inside one animated physical surface');
+requireMatch(css, /\.physicalSurface\{[^}]*animation:physicalTilt/, 'the common card surface carries the physical tilt animation');
+requireMatch(css, /\.physicalSurface:after\{[^}]*animation:physicalSheen/, 'the common card surface carries one shared sheen');
+requireMatch(page, /setAiCutoutError\(userMessage\)/, 'AI cutout failures are kept in dedicated state');
+requireMatch(page, /className="aiCutoutError" role="alert">\{aiCutoutError\}/, 'AI cutout failures remain visible in the effects panel');
 requireMatch(page, /\[\['mask','Cutout'\],\['gloss','Gloss'\]/, 'Cutout is the first visible Effects tool');
 requireMatch(page, /capcutSubtools capcutTextSubtools/, 'advanced text tools are shown together without hidden horizontal items');
 if (/ThreeCardPreview|physicalThreeReady|threeCardPreview/.test(page + css)) {
@@ -294,7 +298,7 @@ for (const [pattern, label] of touchChecks) {
 }
 requireMatch(
   css,
-  /\.physicalCard:after\{[^}]*background:linear-gradient\(/s,
+  /\.physicalSurface:after\{[^}]*background:linear-gradient\(/s,
   'one card-wide sheen overlays the card artwork and chip together'
 );
 if (/physicalChipReflection|chipSheen/.test(page + css)) {
@@ -307,15 +311,15 @@ requireMatch(
 );
 requireMatch(
   css,
-  /\.physicalCard canvas\{[^}]*border-radius:inherit;[^}]*clip-path:inset\(0 round var\(--card-shape-radius\)\)/s,
+  /\.physicalSurface canvas\{[^}]*border-radius:inherit;[^}]*clip-path:inset\(0 round var\(--card-shape-radius\)\)/s,
   'physical canvas is independently clipped to the exact Studio card shape'
 );
 requireMatch(
   css,
-  /\.physicalCard:after\{[^}]*inset:0;[^}]*border-radius:inherit;[^}]*clip-path:inset\(0 round var\(--card-shape-radius\)\)/s,
+  /\.physicalSurface:after\{[^}]*inset:0;[^}]*border-radius:inherit;[^}]*clip-path:inset\(0 round var\(--card-shape-radius\)\)/s,
   'physical sheen cannot bleed outside the exact card mask'
 );
-if (/\.physicalCard:after\{[\s\S]{0,180}inset:-15%/.test(css)) {
+if (/\.physicalSurface:after\{[\s\S]{0,180}inset:-15%/.test(css)) {
   throw new Error('Editor contract failed: physical sheen must not overscan past the card mask');
 }
 requireMatch(
