@@ -99,6 +99,17 @@ jobs:
                   raise SystemExit("Expected an unsigned IPA, but an app signature was found")
               print(f"Verified unsigned device IPA; bundled ONNX model is {model.file_size:,} bytes")
           PY
+      - name: Split unsigned IPA for artifact download
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/CardMaker-ipa-parts"
+          split -b 20971520 -a 2 "$RUNNER_TEMP/CardMaker-unsigned.ipa" "$RUNNER_TEMP/CardMaker-ipa-parts/CardMaker-unsigned.ipa.part-"
+          PART_COUNT=$(find "$RUNNER_TEMP/CardMaker-ipa-parts" -type f -name 'CardMaker-unsigned.ipa.part-*' | wc -l | tr -d ' ')
+          if [[ "$PART_COUNT" -gt 3 ]]; then
+            echo "Unsigned IPA grew beyond the supported three-part download size."
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: CardMaker-iOS-Simulator
@@ -107,7 +118,19 @@ jobs:
           retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
-          name: CardMaker-iOS-Unsigned-IPA
-          path: ${{ runner.temp }}/CardMaker-unsigned.ipa
+          name: CardMaker-iOS-Unsigned-IPA-Part-aa
+          path: ${{ runner.temp }}/CardMaker-ipa-parts/CardMaker-unsigned.ipa.part-aa
           if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CardMaker-iOS-Unsigned-IPA-Part-ab
+          path: ${{ runner.temp }}/CardMaker-ipa-parts/CardMaker-unsigned.ipa.part-ab
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CardMaker-iOS-Unsigned-IPA-Part-ac
+          path: ${{ runner.temp }}/CardMaker-ipa-parts/CardMaker-unsigned.ipa.part-ac
+          if-no-files-found: ignore
           retention-days: 14
