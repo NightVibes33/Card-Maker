@@ -68,7 +68,7 @@ jobs:
           APP_PATH="$RUNNER_TEMP/CardMakerDeviceDerived/Build/Products/Release-iphoneos/CardMaker.app"
           test -d "$APP_PATH"
           test -s "$APP_PATH/CardMaker"
-          xcrun lipo -verify_arch arm64 "$APP_PATH/CardMaker"
+          xcrun lipo "$APP_PATH/CardMaker" -verify_arch arm64
           plutil -lint "$APP_PATH/Info.plist"
           mkdir -p "$RUNNER_TEMP/CardMaker-UnsignedIPA/Payload"
           ditto "$APP_PATH" "$RUNNER_TEMP/CardMaker-UnsignedIPA/Payload/CardMaker.app"
