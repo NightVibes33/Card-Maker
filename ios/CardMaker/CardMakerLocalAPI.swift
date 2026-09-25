@@ -82,7 +82,7 @@ final class CardMakerLocalAPI {
         let total: Int?
     }
 
-    private let collections: [String: Collection] = [
+    private let collections: [String: CatalogCollection] = [
         "all": CatalogCollection(label: "All Card Skins", handle: "all-card-covers", total: 2225),
         "best": CatalogCollection(label: "Best Sellers", handle: "best-sellers", total: nil),
         "new": CatalogCollection(label: "New Arrivals", handle: "latest-1", total: nil),
