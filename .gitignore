@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+public/models/
+ios/CardMaker/WebApp/
+ios/CardMaker/Assets.xcassets/AppIcon.appiconset/
+ios/CardMaker.xcodeproj/
+ios/build/
+DerivedData/

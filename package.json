@@ -8,7 +8,9 @@
     "start": "next start",
     "verify:v2": "node scripts/verify-v2-contract.mjs",
     "verify:editor": "node scripts/verify-editor-contract.mjs",
-    "verify:ai-cutout": "node scripts/verify-ai-cutout.mjs"
+    "verify:ai-cutout": "node scripts/verify-ai-cutout.mjs",
+    "build:ios-web": "node scripts/build-ios-web.mjs",
+    "verify:ios-native": "node scripts/verify-ios-native.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",

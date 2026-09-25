@@ -1,0 +1,57 @@
+name: iOS Simulator Build
+
+on:
+  push:
+    branches: [codex/app-store-ipa]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Install JavaScript dependencies
+        run: npm ci
+      - name: Install model downloader
+        run: python -m pip install --disable-pip-version-check huggingface_hub
+      - name: Verify native packaging contract
+        run: npm run verify:ios-native
+      - name: Download pinned offline cutout model
+        run: python scripts/download-ios-model.py
+      - name: Export app UI and local model
+        run: npm run build:ios-web
+      - name: Generate Xcode project
+        run: xcodegen generate --spec ios/project.yml --project ios/CardMaker.xcodeproj
+      - name: Build iOS Simulator app
+        run: >-
+          xcodebuild
+          -project ios/CardMaker.xcodeproj
+          -scheme CardMaker
+          -configuration Release
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath "$RUNNER_TEMP/CardMakerDerived"
+          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_REQUIRED=NO
+          build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CardMaker-iOS-Simulator
+          path: ${{ runner.temp }}/CardMakerDerived/Build/Products/Release-iphonesimulator/CardMaker.app
+          if-no-files-found: error
+          retention-days: 14
