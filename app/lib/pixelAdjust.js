@@ -1,8 +1,25 @@
 // Canvas 2D filters are disabled by default in Safari. Process the image
 // pixels once per source/crop/settings combination before drawing the card.
 const processedCache = [];
+const MAX_ADJUSTED_EDGE = 3072;
 
 const clampByte = (value) => Math.max(0, Math.min(255, Math.round(value)));
+
+export function fitAdjustedDimensions(desiredWidth, desiredHeight) {
+  const requestedWidth = Number(desiredWidth);
+  const requestedHeight = Number(desiredHeight);
+  const width = Number.isFinite(requestedWidth) && requestedWidth > 0
+    ? Math.max(1, Math.round(requestedWidth))
+    : 1;
+  const height = Number.isFinite(requestedHeight) && requestedHeight > 0
+    ? Math.max(1, Math.round(requestedHeight))
+    : 1;
+  const scale = Math.min(1, MAX_ADJUSTED_EDGE / Math.max(width, height));
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale))
+  };
+}
 
 function boxBlur(pixels, width, height, radius) {
   if (radius < 1) return pixels;
@@ -47,8 +64,7 @@ export function adjustedImage(source, crop, settings, desiredWidth, desiredHeigh
   const sy = crop?.y || 0;
   const sw = crop?.w || source.width;
   const sh = crop?.h || source.height;
-  const width = Math.max(1, Math.min(2048, Math.round(desiredWidth)));
-  const height = Math.max(1, Math.min(2048, Math.round(desiredHeight)));
+  const { width, height } = fitAdjustedDimensions(desiredWidth, desiredHeight);
   const brightness = Number(settings.brightness ?? 1) * Math.pow(2, Number(settings.exposure ?? 0));
   const contrast = Number(settings.contrast ?? 1);
   const saturation = Number(settings.saturation ?? 1);

@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 
 const source = (await readFile(new URL('../app/lib/pixelAdjust.js', import.meta.url), 'utf8'))
+  .replace('export function fitAdjustedDimensions', 'window.fitAdjustedDimensions = function fitAdjustedDimensions')
   .replace('export function adjustedImage', 'window.adjustedImage = function adjustedImage');
 const browser = await chromium.launch({ headless: true });
 try {
@@ -29,7 +30,12 @@ try {
     const blurred = point(window.adjustedImage(original, crop, { blur: 1 }, 32, 16), 15);
     const sharp = point(window.adjustedImage(original, crop, { sharpness: 1 }, 32, 16), 15);
     const cropped = point(window.adjustedImage(original, { x: 16, y: 0, w: 16, h: 16 }, {}, 32, 16));
-    return { normalPixel, bright, contrasted, dark, gray, blurred, sharp, cropped, sourceAfter: point(original) };
+    const fullExportScale = window.fitAdjustedDimensions(3000, 1800);
+    const cappedPortrait = window.fitAdjustedDimensions(2000, 6000);
+    return {
+      normalPixel, bright, contrasted, dark, gray, blurred, sharp, cropped,
+      sourceAfter: point(original), fullExportScale, cappedPortrait
+    };
   });
 
   assert.deepEqual(result.normalPixel, [100, 100, 100]);
@@ -41,6 +47,16 @@ try {
   assert.ok(result.sharp[0] < 100, 'sharpness accentuates the hard image edge');
   assert.deepEqual(result.cropped, [160, 80, 40]);
   assert.deepEqual(result.sourceAfter, [100, 100, 100], 'source pixels remain untouched');
+  assert.deepEqual(
+    result.fullExportScale,
+    { width: 3000, height: 1800 },
+    'adjustment buffers preserve full 3x export resolution above the old 2048px cap'
+  );
+  assert.deepEqual(
+    result.cappedPortrait,
+    { width: 1024, height: 3072 },
+    'large intermediate images are downscaled uniformly without changing aspect ratio'
+  );
   console.log('PASS pixel adjustments, true sharpening, blur, crop, original');
 } finally {
   await browser.close();
