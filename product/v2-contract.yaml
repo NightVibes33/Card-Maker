@@ -58,6 +58,11 @@ features:
     contains:
       - "touch-action:pan-x pan-y;"
 
+  editor_controls_pinch_disabled:
+    file: app/globals.css
+    contains:
+      - "button{touch-action:pan-x pan-y}"
+
 
   discover_architecture:
     file: app/page.jsx

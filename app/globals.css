@@ -845,7 +845,7 @@ button:disabled{opacity:.38}
   @media(prefers-color-scheme:dark){:root{--separator:rgba(235,235,245,.42)}}
 }
 @media (pointer:coarse){
-  button{touch-action:manipulation}
+  button{touch-action:pan-x pan-y}
 }
 @media (min-width:501px){
   body{
