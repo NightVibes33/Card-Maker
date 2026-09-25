@@ -846,6 +846,7 @@ button:disabled{opacity:.38}
 }
 @media (pointer:coarse){
   button{touch-action:pan-x pan-y}
+  .isStudioEditor .studioContextCard{touch-action:pan-x pan-y}
 }
 @media (min-width:501px){
   body{
