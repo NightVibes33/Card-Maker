@@ -3824,14 +3824,6 @@ export default function Page() {
           navigator.serviceWorker.addEventListener('controllerchange', controllerChangeHandler);
         }
 
-        const standalone =
-          window.matchMedia('(display-mode: standalone)').matches ||
-          Boolean(navigator.standalone);
-        let dismissed = false;
-        try {
-          dismissed = localStorage.getItem('aircard-install-dismissed-v2') === '1';
-        } catch {}
-        if (!standalone && !dismissed) setInstallHelp(true);
       } catch {
         setMessage('Local library could not fully load');
       } finally {
