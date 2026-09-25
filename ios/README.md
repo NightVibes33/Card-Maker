@@ -31,4 +31,6 @@ Run **Package App Store IPA** from the Actions tab on the `codex/app-store-ipa` 
 
 The workflow builds and signs the IPA, then makes it available as a GitHub Actions artifact. It does not submit the build to App Store Connect. Upload the artifact using Transporter or App Store Connect after creating the matching app record. The current bundle identifier is `com.bobbytatum.cardmaker`; it must match the identifier registered to your Apple Developer account.
 
+The **iOS Simulator and Unsigned IPA Build** workflow also produces a device-architecture `.ipa` without signing credentials. It contains the same bundled offline app and model, but must be re-signed with a valid provisioning profile before iOS can install it.
+
 The simulator build workflow runs on pushes to this branch and pull requests targeting `main`. It checks that the app uses the local shell, local cutout model, direct device networking, and on-device offline caches.

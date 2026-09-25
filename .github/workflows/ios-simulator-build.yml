@@ -1,4 +1,4 @@
-name: iOS Simulator Build
+name: iOS Simulator and Unsigned IPA Build
 
 on:
   push:
@@ -49,9 +49,42 @@ jobs:
           CODE_SIGNING_ALLOWED=NO
           CODE_SIGNING_REQUIRED=NO
           build
+      - name: Build unsigned iPhone app
+        run: >-
+          xcodebuild
+          -project ios/CardMaker.xcodeproj
+          -scheme CardMaker
+          -configuration Release
+          -sdk iphoneos
+          -destination 'generic/platform=iOS'
+          -derivedDataPath "$RUNNER_TEMP/CardMakerDeviceDerived"
+          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_REQUIRED=NO
+          build
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_PATH="$RUNNER_TEMP/CardMakerDeviceDerived/Build/Products/Release-iphoneos/CardMaker.app"
+          test -d "$APP_PATH"
+          test -s "$APP_PATH/CardMaker"
+          xcrun lipo -verify_arch arm64 "$APP_PATH/CardMaker"
+          plutil -lint "$APP_PATH/Info.plist"
+          mkdir -p "$RUNNER_TEMP/CardMaker-UnsignedIPA/Payload"
+          ditto "$APP_PATH" "$RUNNER_TEMP/CardMaker-UnsignedIPA/Payload/CardMaker.app"
+          cd "$RUNNER_TEMP/CardMaker-UnsignedIPA"
+          ditto -c -k --sequesterRsrc --keepParent Payload "$RUNNER_TEMP/CardMaker-unsigned.ipa"
+          test -s "$RUNNER_TEMP/CardMaker-unsigned.ipa"
+          unzip -l "$RUNNER_TEMP/CardMaker-unsigned.ipa" | grep -q 'Payload/CardMaker.app/Info.plist'
       - uses: actions/upload-artifact@v4
         with:
           name: CardMaker-iOS-Simulator
           path: ${{ runner.temp }}/CardMakerDerived/Build/Products/Release-iphonesimulator/CardMaker.app
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CardMaker-iOS-Unsigned-IPA
+          path: ${{ runner.temp }}/CardMaker-unsigned.ipa
           if-no-files-found: error
           retention-days: 14
