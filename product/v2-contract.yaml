@@ -47,11 +47,14 @@ forbidden:
       - "Loading CUCU"
       - "Search all CUCU card skins"
       - "Load some CUCU card skins first"
-  - file: app/layout.js
-    tokens:
-      - "maximumScale"
-
 features:
+  mobile_page_pinch_zoom_disabled:
+    file: app/layout.js
+    contains:
+      - "maximumScale: 1"
+      - "userScalable: false"
+
+
   discover_architecture:
     file: app/page.jsx
     contains:

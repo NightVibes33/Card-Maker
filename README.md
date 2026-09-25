@@ -77,7 +77,7 @@ iPhone-first CUCU card-design PWA for AirCard-iOS.
 - iPhone-safe target sizing
 - VoiceOver labels and `aria-valuetext` on important adjustable controls
 - gesture actions always have slider/numeric alternatives
-- browser zoom is not disabled
+- mobile page pinch-zoom is disabled for app-like interaction; canvas gestures remain app-controlled
 - Apple body text sizing support
 - Reduce Motion / Reduce Transparency handling
 - dialog semantics for modal sheets
