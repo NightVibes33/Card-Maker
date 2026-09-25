@@ -36,7 +36,7 @@ jobs:
       - name: Export app UI and local model
         run: npm run build:ios-web
       - name: Generate Xcode project
-        run: xcodegen generate --spec ios/project.yml --project ios/CardMaker.xcodeproj
+        run: xcodegen generate --spec ios/project.yml --project ios
       - name: Build iOS Simulator app
         run: >-
           xcodebuild

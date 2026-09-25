@@ -12,7 +12,7 @@ python -m pip install huggingface_hub
 python scripts/download-ios-model.py
 npm run verify:ios-native
 npm run build:ios-web
-xcodegen generate --spec ios/project.yml --project ios/CardMaker.xcodeproj
+xcodegen generate --spec ios/project.yml --project ios
 xcodebuild -project ios/CardMaker.xcodeproj -scheme CardMaker -configuration Release -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
