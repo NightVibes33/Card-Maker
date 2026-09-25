@@ -53,6 +53,10 @@ features:
     contains:
       - "maximumScale: 1"
       - "userScalable: false"
+  page_pinch_disabled_with_scroll_preserved:
+    file: app/globals.css
+    contains:
+      - "touch-action:pan-x pan-y;"
 
 
   discover_architecture:
