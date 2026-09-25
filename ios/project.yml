@@ -16,7 +16,6 @@ targets:
       - path: CardMaker
         excludes:
           - WebApp
-    resources:
       - path: CardMaker/WebApp
         type: folder
     settings:

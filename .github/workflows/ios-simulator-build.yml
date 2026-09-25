@@ -75,7 +75,30 @@ jobs:
           cd "$RUNNER_TEMP/CardMaker-UnsignedIPA"
           ditto -c -k --sequesterRsrc --keepParent Payload "$RUNNER_TEMP/CardMaker-unsigned.ipa"
           test -s "$RUNNER_TEMP/CardMaker-unsigned.ipa"
-          unzip -l "$RUNNER_TEMP/CardMaker-unsigned.ipa" | grep -q 'Payload/CardMaker.app/Info.plist'
+          python3 - "$RUNNER_TEMP/CardMaker-unsigned.ipa" <<'PY'
+          import sys
+          from zipfile import ZipFile
+
+          with ZipFile(sys.argv[1]) as ipa:
+              names = set(ipa.namelist())
+              required = [
+                  "Payload/CardMaker.app/Info.plist",
+                  "Payload/CardMaker.app/CardMaker",
+                  "Payload/CardMaker.app/WebApp/index.html",
+                  "Payload/CardMaker.app/WebApp/models/onnx-community/ormbg-ONNX/onnx/model_quantized.onnx",
+                  "Payload/CardMaker.app/WebApp/models/onnx-community/ormbg-ONNX/LICENSE.txt",
+                  "Payload/CardMaker.app/WebApp/models/onnx-community/ormbg-ONNX/NOTICE.txt",
+              ]
+              missing = [path for path in required if path not in names]
+              if missing:
+                  raise SystemExit("IPA is missing required app files: " + ", ".join(missing))
+              model = ipa.getinfo(required[3])
+              if model.file_size < 40_000_000:
+                  raise SystemExit(f"Bundled cutout model is incomplete ({model.file_size} bytes)")
+              if any(path.startswith("Payload/CardMaker.app/_CodeSignature/") for path in names):
+                  raise SystemExit("Expected an unsigned IPA, but an app signature was found")
+              print(f"Verified unsigned device IPA; bundled ONNX model is {model.file_size:,} bytes")
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: CardMaker-iOS-Simulator
