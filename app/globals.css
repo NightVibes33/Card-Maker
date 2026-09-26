@@ -115,6 +115,11 @@ button:disabled{opacity:.38}
   -webkit-backdrop-filter:saturate(180%) blur(24px);
   backdrop-filter:saturate(180%) blur(24px);
 }
+.editingPreview.exportPreview{
+  position:relative;
+  top:auto;
+  z-index:1;
+}
 .cardFrame{
   --card-shape-radius:20px;
   position:relative;
