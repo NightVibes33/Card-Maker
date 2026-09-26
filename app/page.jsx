@@ -7989,7 +7989,7 @@ export default function Page() {
   return (
     <>
       <main
-        className={'studio ' + (tab === 'studio' ? 'isStudioEditor' : '') + (tab === 'export' ? ' isExportScreen' : '') + (tab === 'studio' && !studioPanelOpen ? ' studioPanelClosed' : '')}
+        className={'studio ' + (tab === 'studio' ? 'isStudioEditor' : '') + (tab === 'studio' && !studioPanelOpen ? ' studioPanelClosed' : '')}
         inert={blockingAssetOperation || undefined}
         aria-busy={blockingAssetOperation || undefined}
       >
