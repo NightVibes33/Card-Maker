@@ -2656,3 +2656,33 @@ body:has(.studio.isStudioEditor){
   .isStudioEditor .textStyleComposer{flex-wrap:wrap}
   .isStudioEditor .textStyleComposer button{flex:1 1 100%}
 }
+
+
+/* Export layout: keep the card preview anchored while only the export controls scroll. */
+.isExportScreen{
+  height:100dvh;
+  min-height:100svh;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  padding-bottom:0;
+}
+.isExportScreen > .largeTitleBar{
+  flex:0 0 auto;
+}
+.isExportScreen > .editingPreview.exportPreview{
+  position:relative;
+  z-index:20;
+  top:auto;
+  flex:0 0 auto;
+}
+.isExportScreen > .screenContent{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior-y:contain;
+  -webkit-overflow-scrolling:touch;
+}
+.isExportScreen #panel-export{
+  padding-bottom:calc(92px + var(--safe-bottom));
+}
